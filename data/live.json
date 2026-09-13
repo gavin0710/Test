@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.1",
+  "dashboard_date": "2026-09-13",
+  "target_date": "2026-09-12",
+  "latest_date": "2026-09-12",
+  "status": "fresh",
+  "freshness_days": 0,
+  "source_tier": "official_relay",
+  "source_name": "今日房产（上游：网上房地产）",
+  "source_url": "https://www.sohu.com/a/1075377372_353578?scm=10001.325_13-325_13.0.0-0-0-0-0.5_1334",
+  "secondhand_units": 245,
+  "new_units": 6408,
+  "secondhand_area_m2": null,
+  "new_area_m2": null,
+  "secondhand_avg_area_m2": null,
+  "new_avg_area_m2": null,
+  "last_checked_at": "2026-09-13T20:20:19+08:00",
+  "errors": []
+}
