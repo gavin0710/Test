@@ -27,11 +27,11 @@ def flt(s): return float(s.replace(',', ''))
 
 
 def date_matches(text: str, d) -> bool:
-    vals=[f'{d.month}月{d.day}日',f'{d.month}月{d.day}号',f'{d.year}年{d.month}月{d.day}日',d.isoformat(),f'{d.month}/{d.day}',f'{d.month}-{d.day}']
-    return any(x in text for x in vals)
+    # Match the transaction date written in the article body, not publication timestamp.
+    return f'{d.year}年{d.month}月{d.day}日' in text
 
 
-def context(text: str, keyword: str, radius=120):
+def context(text: str, keyword: str, radius=180):
     out=[]
     for m in re.finditer(keyword,text):
         a=max(0,m.start()-radius); b=min(len(text),m.end()+radius)
@@ -41,39 +41,20 @@ def context(text: str, keyword: str, radius=120):
 
 
 def parse_units_area(text: str):
-    # Strong preference for explicit single-day phrases. Never use cumulative/截至 values as daily.
     sh_units=new_units=sh_area=new_area=None
-    sh_patterns=[
-        r'(?:当日|昨日|今日)?\s*二手(?:房)?(?:成交|网签|签约)[^\d]{0,10}(\d[\d,]*)\s*套',
-        r'二手(?:房)?[^\n]{0,18}?(?:成交|网签)[^\d]{0,8}(\d[\d,]*)\s*套'
-    ]
-    new_patterns=[
-        r'(?:当日|昨日|今日)?\s*(?:一手|新房|新建商品房)(?:成交|网签|签约)[^\d]{0,10}(\d[\d,]*)\s*套',
-        r'(?:一手|新房)[^\n]{0,18}?(?:成交|网签)[^\d]{0,8}(\d[\d,]*)\s*套'
-    ]
-    def first_valid(patterns):
-        for p in patterns:
-            for m in re.finditer(p,text,re.S|re.I):
-                snippet=text[max(0,m.start()-35):min(len(text),m.end()+35)]
-                if re.search(r'累计|截至|月内|本月',snippet):
-                    continue
-                try:
-                    v=num(m.group(1))
-                except: continue
-                # daily Shanghai market counts should not be in the many-thousands; reject obvious cumulative values
-                if v>2500: continue
-                return v
-        return None
-    sh_units=first_valid(sh_patterns)
-    new_units=first_valid(new_patterns)
-    for p in [r'二手(?:房)?(?:成交|网签|签约)?面积[^\d]{0,12}([\d,]+(?:\.\d+)?)\s*(?:㎡|平方米)']:
+    # These relays use explicit labels such as "上海新房单日成交 753 套".
+    for p in [r'上海\s*二手房\s*单日成交\s*(\d[\d,]*)\s*套', r'二手房\s*单日成交\s*(\d[\d,]*)\s*套']:
         m=re.search(p,text,re.S|re.I)
-        if m:
-            sh_area=flt(m.group(1)); break
-    for p in [r'(?:一手|新房|新建商品房)(?:成交|网签|签约)?面积[^\d]{0,12}([\d,]+(?:\.\d+)?)\s*(?:㎡|平方米)']:
+        if m: sh_units=num(m.group(1)); break
+    for p in [r'上海\s*新房\s*单日成交\s*(\d[\d,]*)\s*套', r'新房\s*单日成交\s*(\d[\d,]*)\s*套']:
         m=re.search(p,text,re.S|re.I)
-        if m:
-            new_area=flt(m.group(1)); break
+        if m: new_units=num(m.group(1)); break
+    for p in [r'上海\s*二手房\s*单日成交面积\s*([\d,]+(?:\.\d+)?)\s*(?:㎡|平方米)', r'二手房\s*成交面积\s*([\d,]+(?:\.\d+)?)\s*(?:㎡|平方米)']:
+        m=re.search(p,text,re.S|re.I)
+        if m: sh_area=flt(m.group(1)); break
+    for p in [r'上海\s*新房\s*单日成交面积\s*([\d,]+(?:\.\d+)?)\s*(?:㎡|平方米)', r'新房\s*成交面积\s*([\d,]+(?:\.\d+)?)\s*(?:㎡|平方米)']:
+        m=re.search(p,text,re.S|re.I)
+        if m: new_area=flt(m.group(1)); break
     return sh_units,new_units,sh_area,new_area
 
 
@@ -116,7 +97,7 @@ def relay_sohu():
             if not rr.ok: continue
             txt=BeautifulSoup(rr.text,'html.parser').get_text('\n',strip=True)
             if '网上房地产' not in txt or not date_matches(txt,TARGET): continue
-            DEBUG.write_text('URL: '+href+'\n\n'+'\n---\n'.join(context(txt,r'套|二手|一手|新房|累计|截至',150)),encoding='utf-8')
+            DEBUG.write_text('URL: '+href+'\n\n'+'\n---\n'.join(context(txt,r'单日成交|截至|累计|二手|新房',180)),encoding='utf-8')
             sh,new,sha,newa=parse_units_area(txt)
             print('matched',href,sh,new,sha,newa)
             if sh is not None or new is not None:
@@ -127,8 +108,8 @@ def relay_sohu():
 
 
 def build_result(payload):
-    sh=payload.get('secondhand_units'); new=payload.get('new_units'); sha=payload.get('secondhand_area_m2'); newa=payload.get('new_area_m2')
-    return {'schema_version':'1.2','dashboard_date':TODAY.isoformat(),'target_date':TARGET.isoformat(),'latest_date':TARGET.isoformat(),'status':'fresh','freshness_days':0,**payload,'secondhand_avg_area_m2':round(sha/sh,2) if sha and sh else None,'new_avg_area_m2':round(newa/new,2) if newa and new else None,'last_checked_at':datetime.now(TZ).isoformat(timespec='seconds')}
+    sh=payload.get('secondhand_units'); new=payload.get('new_units'); sha=payload.get('secondhand_area_m2'); newa=payload.get('new_house_area_m2')
+    return {'schema_version':'1.3','dashboard_date':TODAY.isoformat(),'target_date':TARGET.isoformat(),'latest_date':TARGET.isoformat(),'status':'fresh','freshness_days':0,**payload,'secondhand_avg_area_m2':round(sha/sh,2) if sha and sh else None,'new_avg_area_m2':round(newa/new,2) if newa and new else None,'last_checked_at':datetime.now(TZ).isoformat(timespec='seconds')}
 
 
 def main():
@@ -139,7 +120,7 @@ def main():
         try: payload=relay_sohu()
         except Exception as e: errors.append('relay:'+repr(e)); print(errors[-1])
     if payload is None:
-        result={'schema_version':'1.2','dashboard_date':TODAY.isoformat(),'target_date':TARGET.isoformat(),'latest_date':None,'status':'failed','freshness_days':None,'secondhand_units':None,'new_units':None,'secondhand_area_m2':None,'new_area_m2':None,'secondhand_avg_area_m2':None,'new_avg_area_m2':None,'source_tier':None,'source_name':None,'source_url':None,'errors':errors,'last_checked_at':datetime.now(TZ).isoformat(timespec='seconds')}
+        result={'schema_version':'1.3','dashboard_date':TODAY.isoformat(),'target_date':TARGET.isoformat(),'latest_date':None,'status':'failed','freshness_days':None,'secondhand_units':None,'new_units':None,'secondhand_area_m2':None,'new_area_m2':None,'secondhand_avg_area_m2':None,'new_avg_area_m2':None,'source_tier':None,'source_name':None,'source_url':None,'errors':errors,'last_checked_at':datetime.now(TZ).isoformat(timespec='seconds')}
     else:
         result=build_result(payload); result['errors']=errors
     OUT.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
