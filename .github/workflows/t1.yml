@@ -28,7 +28,7 @@ jobs:
         run: |
           git config user.name 'Data Bot'
           git config user.email 'bot@github-actions'
-          git add data/live.json || true
+          git add data/live.json data/matched_article.txt 2>/dev/null || true
           git diff --staged --quiet || git commit -m "data: Shanghai T+1 $(date -u '+%Y-%m-%d')"
           git push
       - name: Fail if T+1 missing
