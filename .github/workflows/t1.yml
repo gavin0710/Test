@@ -3,6 +3,9 @@ name: Shanghai T+1
 on:
   push:
     branches: [master]
+    paths:
+      - 'scraper.py'
+      - '.github/workflows/t1.yml'
   schedule:
     - cron: '20 0 * * *'
   workflow_dispatch:
