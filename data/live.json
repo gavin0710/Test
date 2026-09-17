@@ -1,7 +1,7 @@
 {
   "schema_version": "1.3",
-  "dashboard_date": "2026-09-16",
-  "target_date": "2026-09-15",
+  "dashboard_date": "2026-09-17",
+  "target_date": "2026-09-16",
   "latest_date": null,
   "status": "failed",
   "freshness_days": null,
@@ -15,5 +15,5 @@
   "source_name": null,
   "source_url": null,
   "errors": [],
-  "last_checked_at": "2026-09-16T12:57:30+08:00"
+  "last_checked_at": "2026-09-17T13:00:49+08:00"
 }
