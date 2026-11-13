@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Fetch and validate all twelve source K-lines
+      - name: Fetch and validate the sixteen source K-lines
         run: python macd-resonance/collect.py
       - name: Commit source snapshot only when bars changed
         run: |
@@ -41,5 +41,7 @@ jobs:
             echo "No market updates"
           else
             git commit -m "data: refresh MACD resonance index bars"
-            git push
+            git fetch origin master
+            git rebase origin/master
+            git push origin HEAD:master
           fi
