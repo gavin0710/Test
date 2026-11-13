@@ -2,7 +2,13 @@
 
 极简市场信号矩阵：上证指数、深证成指、创业板指、科创50；15/60/90/120分钟、日、周六周期。
 
-## 入口
+## 访问入口（已通过独立的外网验收）
+
+[直接打开已托管看板](https://raw.githack.com/gavin0710/Test/master/macd-resonance/index.html)
+
+2026-11-13 的 GitHub Actions 外网验收 [#43529680707](https://github.com/gavin0710/Test/actions/runs/43529680707) 验证页面返回 HTTP 200、Content-Type 为 text/html、且数据归档 JSON 可以读取。此访问使用第三方 RawGitHack 开发版代理（官方声明 HTML 首次浏览可能需要安全确认，后续会按分钟级缓存，无法保证长期 SLA），不是 GitHub Pages 正式域名。此项可作临时访问链接，不应视为有可靠 SLA 的生产部署。
+
+## GitHub Pages 正式入口（待管理员启用）
 打开 `index.html`，或启用 GitHub Pages (Settings → Pages → Source: GitHub Actions) 后使用站点地址。该项目放在仓库的 `macd-resonance/` 目录，不修改现有抓取任务。
 
 ## 数据
