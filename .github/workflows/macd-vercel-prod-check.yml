@@ -1,0 +1,59 @@
+name: Verify MACD Vercel production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-vercel-prod-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browser
+        run: |
+          npm install --prefix /tmp/macd-browser --no-save playwright
+          /tmp/macd-browser/node_modules/.bin/playwright install chromium
+      - name: Test production page, API, data matrix and drilldown
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-browser/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({args:['--no-sandbox']});
+            try {
+              const page=await browser.newPage({viewport:{width:1400,height:900}});
+              const errs=[];page.on('pageerror',e=>errs.push(e.message));
+              const base='https://macd-resonance-monitor.vercel.app';
+              const response=await page.goto(base,{waitUntil:'domcontentloaded',timeout:40000});
+              console.log('PRODUCTION_HTTP',response.status());
+              assert.equal(response.status(),200,'Production HTML not public');
+              await page.waitForSelector('#matrixbody button.cell',{timeout:15000});
+              assert.equal(await page.locator('#matrixbody button.cell').count(),24);
+              await page.waitForFunction(()=>/周期有数据/.test(document.querySelector('#status').textContent),null,{timeout:50000});
+              console.log('MATRIX',await page.locator('#status').innerText());
+              const resp=await page.request.get(base+'/api/latest');
+              console.log('API_HTTP',resp.status(),'CONTENT_TYPE',resp.headers()['content-type']);
+              assert.equal(resp.status(),200,'Market snapshot function failed');
+              const data=await resp.json();
+              assert.equal(data.data.length,4,'Index count error');
+              console.log('DATA_TIMESTAMP',data.generated_at_utc);
+              await page.locator('button.cell[data-i="2"][data-p="D"]').click();
+              assert((await page.locator('#detailtitle').innerText()).includes('创业板指 · 日线'));
+              await page.locator('#tabs button[data-p="W"]').click();
+              assert((await page.locator('#detailtitle').innerText()).includes('创业板指 · 周线'));
+              console.log('DRILLDOWN_OK');
+              assert.deepEqual(errs,[],'JS errors');
+              console.log('JS_ERRORS_0');
+            } finally {await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)})
+          NODE
