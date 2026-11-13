@@ -1,0 +1,45 @@
+name: MACD resonance market data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 01:00-07:59 UTC is 09:00-15:59 China Standard Time; Mon-Fri.
+    # Runs are best-effort, not a guaranteed 15-minute live feed.
+    - cron: "*/15 1-7 * * 1-5"
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/collect.py"
+      - ".github/workflows/macd-resonance-data.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macd-resonance-data
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch and validate all twelve source K-lines
+        run: python macd-resonance/collect.py
+      - name: Commit source snapshot only when bars changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add macd-resonance/data/latest.json
+          if git diff --cached --quiet; then
+            echo "No market updates"
+          else
+            git commit -m "data: refresh MACD resonance index bars"
+            git push
+          fi
