@@ -112,7 +112,7 @@ function calculate(bars){if(!bars||bars.length<65)return null;const closes=bars.
 const nine=[];let run=0,side=0;for(let i=0;i<bars.length;i++){const dir=i>=4?Math.sign(closes[i]-closes[i-4]):0;if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
 const events=[],segments=[];let current=null,mode="",watchRef=null,lastSignalIndex=-1000;
 for(let i=35;i<bars.length;i++){const sign=hist[i]<-1e-10?-1:hist[i]>1e-10?1:current?current.sign:0;if(!sign)continue;
-if(!current||sign!==current.sign){if(current)segments.push(current);current={sign,start:i,end:i,len:0,p:sign<0?Infinity:-Infinity,d:sign<0?Infinity:-Infinity};mode="";watchRef=null}
+if(!current||sign!==current.sign){if(current&&mode==="watch"&&(current.sign<0?dif[i]>dif[i-1]:dif[i]<dif[i-1])){lastSignalIndex=i;events.push({type:current.sign<0?"buy":"sell",i,t:bars[i].t,dif:dif[i],ref:watchRef,atCross:true})}if(current)segments.push(current);current={sign,start:i,end:i,len:0,p:sign<0?Infinity:-Infinity,d:sign<0?Infinity:-Infinity};mode="";watchRef=null}
 current.end=i;current.len++;current.p=sign<0?Math.min(current.p,bars[i].l):Math.max(current.p,bars[i].h);current.d=sign<0?Math.min(current.d,dif[i]):Math.max(current.d,dif[i]);
 const ref=[...segments].reverse().find(x=>x.sign===sign&&x.len>=2);
 if(!ref||current.len<2)continue;
