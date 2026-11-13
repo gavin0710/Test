@@ -108,7 +108,7 @@ for(let start=0;start<16;start+=size){const expected=Math.min(size,16-start),gro
 return out}
 function resampleHourly(src){const days={};for(const b of src){const d=dayKey(b.t);(days[d]||(days[d]=[])).push(b)}const out=[];for(const d of Object.keys(days).sort()){const a=days[d].sort((x,y)=>x.t.localeCompare(y.t));for(let k=0;k+1<a.length;k+=2){if(k>=4)break;const g=a.slice(k,k+2);if(g.length!==2)continue;out.push({t:g[1].t,o:g[0].o,c:g[1].c,h:Math.max(g[0].h,g[1].h),l:Math.min(g[0].l,g[1].l)})}}return out}
 function ema(series,n){const out=[];const k=2/(n+1);for(let i=0;i<series.length;i++){out.push(i===0?series[i]:out[i-1]*(1-k)+series[i]*k)}return out}
-function calculate(bars){if(!bars||bars.length<65)return null;const closes=bars.map(b=>b.c),f=ema(closes,12),s=ema(closes,26),dif=f.map((x,i)=>x-s[i]),dea=ema(dif,9),hist=dif.map((x,i)=>2*(x-dea[i]));
+function calculate(bars){if(!bars||bars.length<60)return null;const closes=bars.map(b=>b.c),f=ema(closes,12),s=ema(closes,26),dif=f.map((x,i)=>x-s[i]),dea=ema(dif,9),hist=dif.map((x,i)=>2*(x-dea[i]));
 const nine=[];let run=0,side=0;for(let i=0;i<bars.length;i++){const dir=i>=4?Math.sign(closes[i]-closes[i-4]):0;if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
 const events=[],segments=[];let current=null,mode="",watchRef=null,lastSignalIndex=-1000;
 for(let i=35;i<bars.length;i++){const sign=hist[i]<-1e-10?-1:hist[i]>1e-10?1:current?current.sign:0;if(!sign)continue;
