@@ -162,12 +162,45 @@ const last=v.bars.at(-1);byId("detailnote").innerHTML="<span>收盘 <b>"+last.c.
 function renderEvents(){const events=[];for(let i=0;i<4;i++)for(const [p,name] of PERIODS){const v=getSignal(i,p);if(!v)continue;for(const e of v.events.filter(e=>e.type==="buy"||e.type==="sell").slice(-5))events.push({...e,i,p,period:name})}
 events.sort((a,b)=>b.t.localeCompare(a.t));byId("events").innerHTML=events.length?events.slice(0,22).map(e=>"<div class='evt'><div><div class='et'>"+IDX[e.i].name+" · "+e.period+"</div><div class='when'>"+esc(timestampLabel(e.t))+(e.alreadyTurned?" · 钝化成立时DIF已转向":" · DIF首次转向")+"</div></div><div class='way' style='color:"+(e.type==="buy"?"#139b69":"#d3615b")+"'>"+(e.type==="buy"?"↑ 买入方向":"↓ 卖出方向")+"</div></div>").join(""):"<div class='empty'>最近可计算历史中无DIF拐头信号</div>"}
 function render(){renderMatrix();renderTabs();renderOverlay();renderDetail();renderEvents()}
-async function load(){byId("refresh").disabled=true;byId("status").textContent="正在更新…";byId("statusdot").className="dot";dataErrors=[];usedSnapshot=false;
-const jobs=IDX.map(async(index,i)=>{let out={};for(const klt of ["15","60","101","102"]){try{const result=await jsonp(endpoint(index.secid,klt,klt==="15"||klt==="60"?1800:480));out[klt]=parseBars(result)}catch(err){dataErrors.push(index.short+" "+klt+": "+err.message)}}return [i,out]});
-const pairs=await Promise.all(jobs);raw={};for(const [i,v] of pairs){if(Object.keys(v).length)raw[i]=v}
-const found=Object.values(raw).reduce((a,o)=>a+Object.keys(o).length,0);
-if(found<16){try{const r=await fetch("./data/latest.json?ts="+Date.now(),{cache:"no-store"});if(r.ok){const s=await r.json();if(s&&s.data&&s.data.length===4){for(let i=0;i<4;i++)for(const klt of ["15","101","102"]){if(!raw[i])raw[i]={};if(!raw[i][klt]&&Array.isArray(s.data[i][klt]))raw[i][klt]=s.data[i][klt]}usedSnapshot=true}}}catch(err){}}
-lastFetch=Date.now();processAll();const valid=Object.values(store).reduce((a,m)=>a+PERIODS.filter(p=>m[p[0]]).length,0);const recent15=Object.values(raw).flatMap(q=>q["15"]?[q["15"].at(-1).t]:[]).sort().at(-1)||"未知";byId("statusdot").className="dot "+(valid===24?"ok":valid?"ok":"bad");byId("status").textContent=valid===24?"24/24周期已载入":valid?valid+"/24周期可用":"行情暂不可用";byId("updated").textContent="本次检查 "+new Intl.DateTimeFormat("zh-CN",{timeZone:"Asia/Shanghai",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date())+"（北京时间） · 最近15分K线 "+recent15.slice(5,16);byId("sourceline").textContent=usedSnapshot?"数据：东方财富K线 / 归档快照（部分数据可能延迟）":"数据：东方财富公开指数K线";byId("chartfail").hidden=valid>0;byId("chartfail").textContent="数据接口不可用；保留空白而非生成模拟信号。";byId("refresh").disabled=false}
+function paintDataSource(directHits){
+ const valid=Object.values(store).reduce((a,m)=>a+PERIODS.filter(p=>m[p[0]]).length,0);
+ const recent15=Object.values(raw).flatMap(q=>q["15"]?[q["15"].at(-1).t]:[]).sort().at(-1)||"未知";
+ byId("statusdot").className="dot "+(valid?"ok":"bad");
+ byId("status").textContent=valid===24?"24/24周期有数据":valid?valid+"/24周期有数据":"行情暂不可用";
+ byId("updated").textContent="最新15分K线 "+recent15.slice(0,16).replace("T"," ")+"（北京时间）";
+ const detail=directHits===16?"行情直连":directHits?"直连+归档补充":usedSnapshot?"归档快照":"行情源无响应";
+ byId("sourceline").textContent="数据：东方财富公开指数K线 / 腾讯归档备用源 · "+detail;
+ byId("chartfail").hidden=valid>0;
+ byId("chartfail").textContent="行情接口和归档均暂不可用；不会使用模拟数据填充。";
+}
+async function load(){
+ if(load.busy)return;
+ load.busy=true;byId("refresh").disabled=true;byId("status").textContent="正在更新…";byId("statusdot").className="dot";
+ dataErrors=[];usedSnapshot=false;raw={};
+ try{
+  try{
+   const res=await Promise.race([fetch("./data/latest.json?ts="+Date.now(),{cache:"no-store"}),new Promise((_,reject)=>setTimeout(()=>reject(Error("快照超时")),3000))]);
+   if(res.ok){const snapshot=await res.json();if(snapshot&&snapshot.data&&snapshot.data.length===4){
+    for(let i=0;i<4;i++){raw[i]={};for(const klt of ["15","60","101","102"]){if(Array.isArray(snapshot.data[i][klt]))raw[i][klt]=snapshot.data[i][klt]}}
+    usedSnapshot=true;processAll();paintDataSource(0);
+   }}
+  }catch(err){}
+  let directHits=0;
+  const jobs=IDX.map(async(index,i)=>{
+   for(const klt of ["15","60","101","102"]){
+    try{
+     const response=await jsonp(endpoint(index.secid,klt,klt==="15"||klt==="60"?1800:480));
+     const rows=parseBars(response);if(!raw[i])raw[i]={};raw[i][klt]=rows;directHits++;
+    }catch(err){dataErrors.push(index.short+" "+klt+": "+err.message)}
+   }
+   processAll();paintDataSource(directHits);
+  });
+  await Promise.all(jobs);
+  lastFetch=Date.now();processAll();paintDataSource(directHits);
+ }finally{
+  lastFetch=Date.now();load.busy=false;byId("refresh").disabled=false;
+ }
+}
 byId("refresh").onclick=load;let resizeWait;window.addEventListener("resize",()=>{clearTimeout(resizeWait);resizeWait=setTimeout(render,180)});document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-lastFetch>5*60*1000)load()});setInterval(()=>{if(!document.hidden&&Date.now()-lastFetch>5*60*1000)load()},60*1000);load();
 </script>
 </body></html>
