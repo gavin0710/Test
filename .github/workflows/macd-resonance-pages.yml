@@ -1,0 +1,46 @@
+name: Deploy MACD resonance dashboard
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/index.html"
+      - "macd-resonance/data/latest.json"
+      - ".github/workflows/macd-resonance-pages.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: macd-resonance-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare static site
+        run: |
+          mkdir -p _site
+          cp macd-resonance/index.html _site/index.html
+          if [ -f macd-resonance/data/latest.json ]; then
+            mkdir -p _site/data
+            cp macd-resonance/data/latest.json _site/data/latest.json
+          fi
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
