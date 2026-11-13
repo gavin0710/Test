@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check MACD signal engine and page script
+        run: node macd-resonance/verify.js
       - name: Prepare static site
         run: |
           mkdir -p _site
