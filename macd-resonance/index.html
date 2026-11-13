@@ -118,14 +118,18 @@ const ref=[...segments].reverse().find(x=>x.sign===sign&&x.len>=2);
 if(!ref||current.len<2)continue;
 const divergence=sign<0?(current.p<ref.p&&current.d>ref.d+1e-10):(current.p>ref.p&&current.d<ref.d-1e-10);
 if(mode==="watch"&&!divergence){mode="";watchRef=null;events.push({type:"invalid",i,p:sign<0?"底":"顶",t:bars[i].t})}
+const justArmed=!mode&&divergence;
 if(!mode&&divergence){mode="watch";watchRef={price:ref.p,dif:ref.d,from:ref.start,t:bars[ref.end].t};events.push({type:sign<0?"watchBuy":"watchSell",i,t:bars[i].t,ref:watchRef})}
-const turn=sign<0?(dif[i]>dif[i-1]&&dif[i-1]<=dif[i-2]):(dif[i]<dif[i-1]&&dif[i-1]>=dif[i-2]);
-if(mode==="watch"&&turn){mode="signal";lastSignalIndex=i;events.push({type:sign<0?"buy":"sell",i,t:bars[i].t,dif:dif[i],ref:watchRef});}
+const alreadyTurned=justArmed&&(sign<0?dif[i]>dif[i-1]:dif[i]<dif[i-1]);
+const turn=alreadyTurned||(sign<0?(dif[i]>dif[i-1]&&dif[i-1]<=dif[i-2]):(dif[i]<dif[i-1]&&dif[i-1]>=dif[i-2]));
+if(mode==="watch"&&turn){mode="signal";lastSignalIndex=i;events.push({type:sign<0?"buy":"sell",i,t:bars[i].t,dif:dif[i],ref:watchRef,alreadyTurned});}
 if(mode==="signal"&&!divergence){mode="";watchRef=null;events.push({type:"invalid",i,t:bars[i].t})}
 }
 let state="neutral",ref=watchRef;const age=bars.length-1-lastSignalIndex;
 if(current&&mode==="watch")state=current.sign<0?"watchBuy":"watchSell";
-if(current&&mode==="signal"&&age<=2)state=current.sign<0?"buy":"sell";
+const lastEvent=events.filter(e=>e.type==="buy"||e.type==="sell").at(-1);
+const invalidAfter=lastEvent&&events.some(e=>e.type==="invalid"&&e.i>=lastEvent.i);
+if(lastEvent&&age<=2&&!invalidAfter)state=lastEvent.type;
 const recent=events.filter(e=>e.type==="buy"||e.type==="sell");
 return {bars,dif,dea,hist,nine,events,state,ref,lastSignalIndex,age,recent}}
 function processAll(){store={};for(let j=0;j<4;j++){const a=raw[j];if(!a)continue;const m=filterFinal(a["15"]||[],"15"),h=filterFinal(a["60"]||[],"60"),d=filterFinal(a["101"]||[],"D"),w=filterFinal(a["102"]||[],"W");store[j]={};store[j]["15"]=calculate(m);store[j]["60"]=calculate(h.length>65?h:resample(m,4));store[j]["90"]=calculate(resample(m,6));store[j]["120"]=calculate(h.length>65?resampleHourly(h):resample(m,8));store[j].D=calculate(d);store[j].W=calculate(w)}render()}
@@ -156,7 +160,7 @@ for(let k=0;k<5;k++){const i=Math.round((bars.length-1)*k/4);text(ctx,bars[i].t.
 const ma=sizeCanvas(byId("macd"));ctx=ma.ctx;w=ma.width;h=ma.height;pad={l:53,r:10,t:10,b:22};const subD=v.dif.slice(-64),subE=v.dea.slice(-64),subH=v.hist.slice(-64);[mn,mx]=scaleBounds([...subD,...subE,...subH,0]);py=axis(ctx,w,h,mn,mx,pad);const bw=(w-pad.l-pad.r)/bars.length;x=i=>pad.l+(i+.5)*bw;ctx.strokeStyle="#c9d1d8";ctx.beginPath();ctx.moveTo(pad.l,py(0));ctx.lineTo(w-pad.r,py(0));ctx.stroke();subH.forEach((val,i)=>{ctx.strokeStyle=val>=0?"#df847d":"#75b6a2";ctx.lineWidth=Math.max(1,bw*.56);ctx.beginPath();ctx.moveTo(x(i),py(0));ctx.lineTo(x(i),py(val));ctx.stroke()});[[subD,"#316cb4"],[subE,"#e8a342"]].forEach(z=>{ctx.strokeStyle=z[1];ctx.lineWidth=1.8;ctx.beginPath();z[0].forEach((val,i)=>i?ctx.lineTo(x(i),py(val)):ctx.moveTo(x(i),py(val)));ctx.stroke()});text(ctx,"DIF",pad.l+10,16,10,"#316cb4");text(ctx,"DEA",pad.l+44,16,10,"#e8a342");
 const last=v.bars.at(-1);byId("detailnote").innerHTML="<span>收盘 <b>"+last.c.toFixed(2)+"</b></span><span>DIF <b>"+v.dif.at(-1).toFixed(3)+"</b></span><span>DEA <b>"+v.dea.at(-1).toFixed(3)+"</b></span><span>"+nLabel(v.nine.at(-1))+"</span>"+(v.ref?"<span>参考波段极值 "+v.ref.price.toFixed(2)+" / DIF "+v.ref.dif.toFixed(3)+"</span>":"")}
 function renderEvents(){const events=[];for(let i=0;i<4;i++)for(const [p,name] of PERIODS){const v=getSignal(i,p);if(!v)continue;for(const e of v.events.filter(e=>e.type==="buy"||e.type==="sell").slice(-5))events.push({...e,i,p,period:name})}
-events.sort((a,b)=>b.t.localeCompare(a.t));byId("events").innerHTML=events.length?events.slice(0,22).map(e=>"<div class='evt'><div><div class='et'>"+IDX[e.i].name+" · "+e.period+"</div><div class='when'>"+esc(timestampLabel(e.t))+" · DIF首次转向</div></div><div class='way' style='color:"+(e.type==="buy"?"#139b69":"#d3615b")+"'>"+(e.type==="buy"?"↑ 买入方向":"↓ 卖出方向")+"</div></div>").join(""):"<div class='empty'>最近可计算历史中无DIF拐头信号</div>"}
+events.sort((a,b)=>b.t.localeCompare(a.t));byId("events").innerHTML=events.length?events.slice(0,22).map(e=>"<div class='evt'><div><div class='et'>"+IDX[e.i].name+" · "+e.period+"</div><div class='when'>"+esc(timestampLabel(e.t))+(e.alreadyTurned?" · 钝化成立时DIF已转向":" · DIF首次转向")+"</div></div><div class='way' style='color:"+(e.type==="buy"?"#139b69":"#d3615b")+"'>"+(e.type==="buy"?"↑ 买入方向":"↓ 卖出方向")+"</div></div>").join(""):"<div class='empty'>最近可计算历史中无DIF拐头信号</div>"}
 function render(){renderMatrix();renderTabs();renderOverlay();renderDetail();renderEvents()}
 async function load(){byId("refresh").disabled=true;byId("status").textContent="正在更新…";byId("statusdot").className="dot";dataErrors=[];usedSnapshot=false;
 const jobs=IDX.map(async(index,i)=>{let out={};for(const klt of ["15","60","101","102"]){try{const result=await jsonp(endpoint(index.secid,klt,klt==="15"||klt==="60"?1800:480));out[klt]=parseBars(result)}catch(err){dataErrors.push(index.short+" "+klt+": "+err.message)}}return [i,out]});
