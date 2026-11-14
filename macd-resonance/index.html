@@ -170,7 +170,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
   </details>
   <details class="fold" id="statfold"><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
     <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
@@ -1008,7 +1008,7 @@ function getHistoryStats(){
 }
 function renderStats(){
  const {rows,total}=getHistoryStats();
- const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["待卖出",total.open]];
+ const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["买后未配对",total.open]];
  byId("statsoverall").innerHTML=items.map(([name,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+name+'</span></div>').join("");
  byId("statsbody").innerHTML=rows.map(({i,period,label,v,stats:q})=>{
   const hist=v.bars,range=hist[0].t.slice(0,10)+'～'+hist.at(-1).t.slice(0,10);
@@ -1022,12 +1022,12 @@ function renderStats(){
   if(v.position)open.push({...v.position,index:i,label,lastT:v.bars.at(-1).t,lastClose:v.bars.at(-1).c});
  }
  stops.sort((a,b)=>b.t.localeCompare(a.t));open.sort((a,b)=>b.entryT.localeCompare(a.entryT));
- byId("stopsbadge").textContent=stops.length+"次失败止损 / "+open.length+"个待卖出";
+ byId("stopsbadge").textContent=stops.length+"次失败止损 / "+open.length+"个未配对买入";
  byId("stoprecords").innerHTML='<h3 class="stat-section-head">结构失败止损 · 按发生时间倒序</h3>'+
  (stops.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>止损K线</th><th>买入收盘</th><th>止损收盘</th><th>DIF参考低点</th><th>持有根数</th></tr></thead><tbody>'+
   stops.map(l=>'<tr><td>'+IDX[l.index].name+'</td><td>'+l.label+'</td><td>'+l.entryT.replace("T"," ")+'</td><td>'+l.t.replace("T"," ")+'</td><td>'+valstr(l.entryClose)+'</td><td class="fail">'+valstr(l.close)+'</td><td>'+valstr(l.refDIF,4)+'</td><td>'+((l.i??0)||0)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前已加载历史范围内没有这类止损记录。</p>');
- byId("openrecords").innerHTML='<h3 class="stat-section-head">买入后尚无顶部卖点 · 逐指数/周期</h3>'+
- (open.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>买入收盘</th><th>最近K线</th><th>最新收盘</th><th>追加买点</th><th>状态</th></tr></thead><tbody>'+
+ byId("openrecords").innerHTML='<h3 class="stat-section-head">买入后未配对 · 逐指数/周期</h3>'+
+ (open.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>买入收盘</th><th>最近K线</th><th>最新收盘</th><th>追加买点</th><th>入场类型</th><th>关联首次买入</th><th>状态</th></tr></thead><tbody>'+
   open.map(o=>'<tr><td>'+IDX[o.index].name+'</td><td>'+o.label+'</td><td>'+o.entryT.replace("T"," ")+'</td><td>'+valstr(o.entryClose)+'</td><td>'+o.lastT.replace("T"," ")+'</td><td>'+valstr(o.lastClose)+'</td><td>'+Math.max(0,o.buySignals.length-1)+'</td><td class="important">待卖出</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前历史窗口内没有尚未配对的买入头寸。</p>');
 }
 function renderHistory(){
