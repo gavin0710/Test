@@ -97,7 +97,18 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .buyrecent{border:0;background:transparent;color:#6d8397;font-size:11px;white-space:nowrap;padding:6px 2px}
 .chart-card .chartfoot{padding-top:8px}
 @media(max-width:560px){.buynav{padding:9px 10px;gap:4px}.buynav-meta{font-size:10px}.buyjump{padding:5px 8px}.buyrecent{font-size:10px}}
-.wave-tag{white-space:nowrap;font-size:11px;padding:4px 7px;border-radius:5px;background:#f3f5f7;color:#748494}.wave-tag.up{background:#fff0f0;color:#c26268}.wave-tag.down{background:#eaf8f1;color:#178967}.wave-note{font-size:11px;color:#798b9d;line-height:1.7;margin:12px 3px} </style></head><body>
+.wave-tag{white-space:nowrap;font-size:11px;padding:4px 7px;border-radius:5px;background:#f3f5f7;color:#748494}.wave-tag.up{background:#fff0f0;color:#c26268}.wave-tag.down{background:#eaf8f1;color:#178967}.wave-note{font-size:11px;color:#798b9d;line-height:1.7;margin:12px 3px} 
+.history-strip{display:flex;align-items:center;gap:15px;margin:-2px 0 14px;padding:8px 11px;background:#edf2f5;border-radius:9px;flex-wrap:wrap;min-height:40px}
+.history-hint{font-size:11px;font-weight:650;color:#3f6884;white-space:nowrap}
+.history-range{font-size:10px;color:#718596;white-space:nowrap}
+.history-scrubber{display:flex;align-items:center;gap:7px;min-width:140px;flex:1}
+.history-scrubber span{font-size:10px;color:#8898a6;white-space:nowrap}
+.history-scrubber input{flex:1;min-width:35px;accent-color:#648cac;cursor:ew-resize;height:20px}
+.history-reset{font-size:11px;border:1px solid #d9e1e7;background:#fff;color:#54748d;padding:6px 9px;border-radius:6px;white-space:nowrap}
+.kplot,.mplot{cursor:crosshair;touch-action:pan-y}
+.kplot.dragging,.mplot.dragging,.chartgrid.dragging .kplot,.chartgrid.dragging .mplot{cursor:grabbing;user-select:none}
+@media(max-width:570px){.history-strip{gap:7px;padding:7px 9px}.history-scrubber{order:3;flex-basis:100%}.history-range{font-size:9px;flex:1;white-space:normal}.history-reset{padding:5px 7px}}
+</style></head><body>
 <main class="shell">
  <header class="head">
   <div class="brand"><div class="brandmark">↗</div><div><h1>四指共振 · K线看板</h1><div class="brand-sub">MACD × 九转 · 四指数同步观察</div></div></div>
@@ -105,8 +116,14 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
  </header>
  <nav class="toolbar" aria-label="行情操作">
   <div class="periodbar" id="periodbar"></div>
-  <div class="controls"><div class="resblock" id="resonance"></div><span class="faint">最近</span><button class="winbtn" data-n="60">60根</button><button class="winbtn active" data-n="100">100根</button><button class="winbtn" data-n="0">全部</button></div>
+  <div class="controls"><div class="resblock" id="resonance"></div><span class="faint">最近</span><button class="winbtn" data-n="60">60根</button><button class="winbtn active" data-n="100">100根</button><button class="winbtn" data-n="0" title="加载整个历史区间，但保持100根K线可读窗口；拖动或滚动时间轴浏览历史">全部历史</button></div>
  </nav>
+ <div class="history-strip" aria-label="历史K线横向浏览">
+  <span class="history-hint">← 拖动K线回看历史</span>
+  <span id="history-range" class="history-range">正在读取历史范围…</span>
+  <div class="history-scrubber"><span>最早</span><input id="history-slider" type="range" min="0" max="0" value="0" step="1" aria-label="历史时间轴滚动"><span>最新</span></div>
+  <button class="history-reset" id="history-reset" type="button" title="回到最新K线">回最新</button>
+ </div>
  <div id="chartfail" class="error" hidden></div>
  <section class="chartgrid" id="chartgrid" aria-label="四大指数K线图"></section>
  <section class="secondary" aria-label="辅助信息">
@@ -431,6 +448,7 @@ function stateClass(s){return s==="buy"?"buy":s==="sell"?"sell":s==="watchBuy"?"
 
 
 let visibleBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
+let panOffsetByPeriod={},dragSession=null;
 const buyTypes=new Set(["buy","secondBuy","thirdBuy","laterBuy"]);
 const sellTypes=new Set(["sell","secondSell","thirdSell","laterSell"]);
 let signalAnchors={};
@@ -452,15 +470,66 @@ function canvasSize(el){const b=el.getBoundingClientRect(),w=Math.max(160,Math.f
 }
 function plotText(ctx,str,x,y,color="#9ba7b3",size=10,align="left",weight="400"){ctx.font=weight+" "+size+"px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif";ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(str,x,y)}
 function dims(w,h){return {l:15,r:64,t:16,b:27,ww:w-79,hh:h-43}}
+function viewportLength(v){return Math.min(visibleBars===0?100:visibleBars,v?.bars?.length||0)}
+function maxPanOffset(period=selectedP){
+ const lens=IDX.map((_,i)=>getSignal(i,period)).filter(Boolean).map(v=>Math.max(0,v.bars.length-viewportLength(v)));
+ return lens.length?Math.min(...lens):0;
+}
+function currentPanOffset(period=selectedP){return Math.min(maxPanOffset(period),Math.max(0,panOffsetByPeriod[period]||0))}
 function visible(i){
  const v=getSignal(i,selectedP);if(!v)return null;
- const length=visibleBars===0?v.bars.length:Math.min(visibleBars,v.bars.length);
- const anchor=signalAnchors[selectedP+":"+i];
- const from=Number.isInteger(anchor)&&visibleBars!==0?
- Math.max(0,Math.min(v.bars.length-length,anchor-Math.floor(length*.5))):
- v.bars.length-length;
- return {v,from,bars:v.bars.slice(from,from+length),dif:v.dif.slice(from,from+length),dea:v.dea.slice(from,from+length),hist:v.hist.slice(from,from+length),nine:v.nine.slice(from,from+length)}
+ const length=viewportLength(v),anchor=signalAnchors[selectedP+":"+i],maxLeft=Math.max(0,v.bars.length-length);
+ const from=Number.isInteger(anchor)?
+   Math.max(0,Math.min(maxLeft,anchor-Math.floor(length*.5))):
+   Math.max(0,maxLeft-currentPanOffset());
+ return {v,from,bars:v.bars.slice(from,from+length),dif:v.dif.slice(from,from+length),
+  dea:v.dea.slice(from,from+length),hist:v.hist.slice(from,from+length),nine:v.nine.slice(from,from+length)}
 }
+function syncHistoryStrip(){
+ const v=getSignal(0,selectedP),range=byId("history-range"),slider=byId("history-slider");
+ if(!v||!v.bars?.length){range.textContent="暂无有效行情";slider.disabled=true;return}
+ const rows=visible(0),bars=rows.bars,max=maxPanOffset(),offset=currentPanOffset();
+ const short=t=>t?selectedP==="D"||selectedP==="W"?t.slice(0,10):t.slice(0,16).replace("T"," "):"—";
+ range.textContent="总历史 "+short(v.bars[0].t)+" → "+short(v.bars.at(-1).t)+" · "+v.bars.length+"根 ｜ 当前窗口 "+short(bars[0]?.t)+" → "+short(bars.at(-1)?.t);
+ slider.max=String(max);slider.value=String(Math.max(0,max-offset));slider.disabled=max===0;
+ const button=byId("history-reset");button.disabled=offset===0&&!Object.keys(signalAnchors).some(k=>k.startsWith(selectedP+":"));
+}
+function setPanOffset(offset,{paintOnly=false}={}){
+ panOffsetByPeriod[selectedP]=Math.max(0,Math.min(maxPanOffset(),Math.round(offset)));
+ for(let i=0;i<4;i++)delete signalAnchors[selectedP+":"+i];
+ hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;
+ if(paintOnly){syncHistoryStrip();queueDraw()}
+ else render();
+}
+function pointerStart(i,ev){
+ if(ev.button!==undefined&&ev.button!==0)return;
+ const el=ev.currentTarget,data=visible(i);if(!data||!data.bars.length)return;
+ const width=el.getBoundingClientRect().width,dim=dims(width,el.getBoundingClientRect().height);
+ const per=dim.ww/data.bars.length;
+ const baseline=data.v.bars.length-data.from-data.bars.length;
+ dragSession={id:ev.pointerId,startX:ev.clientX,startOffset:baseline,per:Math.max(.1,per),moved:false};
+ el.setPointerCapture?.(ev.pointerId);
+}
+function pointerMove(i,ev){
+ if(dragSession&&dragSession.id===ev.pointerId){
+  const delta=ev.clientX-dragSession.startX;
+  if(dragSession.moved||Math.abs(delta)>5){
+   dragSession.moved=true;ev.preventDefault();
+   const offset=dragSession.startOffset+Math.round(delta/dragSession.per);
+   setPanOffset(offset,{paintOnly:true});byId("chartgrid").classList.add("dragging");
+  }
+  return;
+ }
+ ptr(i,ev);
+}
+function pointerStop(ev){
+ if(!dragSession||dragSession.id!==ev.pointerId)return;
+ const wasMoved=dragSession.moved;dragSession=null;
+ byId("chartgrid").classList.remove("dragging");
+ try{if(ev.currentTarget.hasPointerCapture?.(ev.pointerId))ev.currentTarget.releasePointerCapture(ev.pointerId)}catch(e){}
+ if(wasMoved)render();
+}
+
 function ptr(i,ev){
  const data=visible(i),el=ev.currentTarget;if(!data)return;
  const rect=el.getBoundingClientRect(),dim=dims(rect.width,rect.height);
@@ -717,8 +786,17 @@ function render(){renderPeriods();renderResonance();const grid=byId("chartgrid")
  grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
  grid.querySelectorAll(".buyjump").forEach(b=>b.onclick=()=>navigateBuy(Number(b.dataset.i),Number(b.dataset.step)));
  grid.querySelectorAll(".buyselect").forEach(sel=>sel.onchange=()=>{if(sel.value!=="")jumpToBuy(Number(sel.dataset.i),Number(sel.value))});
- grid.querySelectorAll(".buyrecent").forEach(b=>b.onclick=()=>{delete signalAnchors[selectedP+":"+b.dataset.i];hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
- grid.querySelectorAll("canvas").forEach(c=>{c.addEventListener("pointermove",e=>ptr(Number(c.dataset.i),e));c.addEventListener("pointerleave",()=>{hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;queueDraw()})});
+ grid.querySelectorAll(".buyrecent").forEach(b=>b.onclick=()=>{setPanOffset(0)});
+ grid.querySelectorAll("canvas").forEach(c=>{
+  const i=Number(c.dataset.i);
+  c.addEventListener("pointerdown",e=>pointerStart(i,e));
+  c.addEventListener("pointermove",e=>pointerMove(i,e));
+  c.addEventListener("pointerup",pointerStop);
+  c.addEventListener("pointercancel",pointerStop);
+  c.addEventListener("lostpointercapture",()=>{if(dragSession){dragSession=null;grid.classList.remove("dragging")}});
+  c.addEventListener("pointerleave",()=>{if(!dragSession){hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;queueDraw()}})
+ });
+ syncHistoryStrip();
  renderMatrix();renderHistory();renderStats();renderWinRates();requestAnimationFrame(drawAll)}
 
 function paintDataSource(directHits){
@@ -760,6 +838,10 @@ async function load(){
   lastFetch=Date.now();load.busy=false;byId("refresh").disabled=false;
  }
 }
-byId("refresh").onclick=load;let resizeWait;window.addEventListener("resize",()=>{clearTimeout(resizeWait);resizeWait=setTimeout(render,180)});document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-lastFetch>5*60*1000)load()});setInterval(()=>{if(!document.hidden&&Date.now()-lastFetch>5*60*1000)load()},60*1000);load();
+byId("refresh").onclick=load;
+byId("history-reset").onclick=()=>setPanOffset(0);
+byId("history-slider").addEventListener("input",e=>{const max=maxPanOffset();setPanOffset(max-Number(e.target.value),{paintOnly:true})});
+byId("history-slider").addEventListener("change",()=>render());
+let resizeWait;window.addEventListener("resize",()=>{clearTimeout(resizeWait);resizeWait=setTimeout(render,180)});document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-lastFetch>5*60*1000)load()});setInterval(()=>{if(!document.hidden&&Date.now()-lastFetch>5*60*1000)load()},60*1000);load();
 
 </script></body></html>
