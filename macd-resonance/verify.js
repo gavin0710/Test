@@ -105,7 +105,7 @@ ok(html.includes('id="history-slider"'),"Full-history scrubber is present");
 ok(html.includes('id="history-range"'),"Actual historical coverage date range is displayed");
 
 const graphSection=script.slice(script.indexOf("function drawPrice("),script.indexOf("function drawMacd("));
-ok(graphSection.includes('const label=(bullish?"买":"卖")'),"Explicit buy/sell label in price chart");
+ok(graphSection.includes('const label=correction?"纠错"')&&graphSection.includes('(bullish?"买":"卖")'),"Chart annotates standard buys, sells and purple correction rebuys");
 ok(graphSection.includes('signalAnchors[selectedP+":"+i]'),"Focused history marker highlighted");
 ok(graphSection.includes('["buy","secondBuy","thirdBuy","laterBuy"]'),"All stage buy events mapped onto K-line");
 // Profit classification uses exactly one initial buy and its first matched exit/stop.
