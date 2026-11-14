@@ -572,7 +572,7 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   ctx.fillStyle=v.active.sign<0?"rgba(21,160,118,.045)":"rgba(216,90,102,.045)";
   ctx.fillRect(startX,t,Math.max(1,w-r-startX),hh);
  }
- const proj=v.projection;
+ const proj=(bars.at(-1)?.t===v.bars.at(-1)?.t)?v.projection:null;
  if(proj&&(proj.mode==="watch"||proj.mode==="candidate"||proj.mode==="campaign")){
   const guidelines=[];
   if(proj.mode==="watch"||proj.mode==="campaign"){
@@ -704,7 +704,7 @@ function buyNavigator(i,v){
 }
 function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v&&v.bars.at(-2),pct=last&&prev?(last.c-prev.c)/prev.c*100:0,delta=last&&prev?last.c-prev.c:0,n=v?v.nine.at(-1):0,s=v?v.state:"missing";
  const c=delta>=0?"up":"down";
- const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const latestLabel=v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const projection=projectionHTML(v,nextLabel);const navigator=buyNavigator(i,v);
+ const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const latestLabel=v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const view=visible(i),isLatest=view?.bars.at(-1)?.t===v?.bars.at(-1)?.t;const projection=isLatest?projectionHTML(v,nextLabel):'<div class="estimate"><span class="estimate-text">历史浏览中 · 下一根条件推演仅对应最新K线；点击“回最新”查看</span></div>';const navigator=buyNavigator(i,v);
  return '<article class="chart-card '+(focusIndex===i?"focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>买1/2/3：DIF逐次上拐 · 卖：顶部结构 · 止损：结构失败</span><span class="latest">'+timed+'</span></div></article>'
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
