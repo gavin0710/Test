@@ -188,6 +188,10 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
 .confluence-item .none{color:#8d9baa}
 .replay-time-note{color:#8a9eae;font-size:10px;margin-top:8px}
 @media(max-width:660px){.confluence-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.replay-post{margin-top:12px;border-radius:10px;padding:12px 15px;background:#fff;border:1px solid #e6edf2}
+.replay-post[hidden]{display:none!important}
+.replay-post .replay-overview{margin-bottom:10px}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -227,13 +231,13 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
    <select id="replay-case" aria-label="选择完整交易案例"><option value="">选择案例</option></select>
    <button type="button" id="replay-next" title="下一笔案例">›</button>
    <span id="replay-number" class="faint">—</span></div>
-  <div id="replay-overview" class="replay-overview"></div>
+  
   <div class="replay-chain">
    <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>正式信号实线 · 拟止损虚线</span></div>
    <div id="replay-nodes" class="replay-nodes"></div>
   </div>
   <div id="replay-confluence" class="replay-confluence" aria-label="同周期四指数历史信号共振"></div>
-  <div id="replay-compare" class="replay-compare"></div>
+  
  </section>
  <section class="quickfilter" id="quickfilter" aria-label="K线历史关键点位快速筛选">
   <div class="quicktop"><strong>图上关键点</strong><span class="quickmeta" id="quick-count">载入关键点位中</span><select id="quick-index" aria-label="指数范围"><option value="all">四指数</option><option value="0">上证指数</option><option value="1">深证成指</option><option value="2">创业板指</option><option value="3">科创50</option></select></div>
@@ -242,6 +246,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
  </section>
  <div id="chartfail" class="error" hidden></div>
  <section class="chartgrid" id="chartgrid" aria-label="四大指数K线图"></section>
+ <section class="replay-post" id="replay-post" hidden><div id="replay-overview" class="replay-overview"></div><div id="replay-compare" class="replay-compare"></div></section>
  <section class="secondary" aria-label="辅助信息">
   <details class="fold" id="winfold" open><summary>六周期 · 关键点位与交易结果 <span class="faint">数量 / 成功率 / 平均盈利幅度 / 未配对</span></summary>
     <div class="foldbody">
@@ -782,8 +787,9 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
  const signalMap=new Map(),pairInfo=quickPairStatus(v),rc=replayMode?replayCurrent():null;
  for(const e of v.events){
   if(e.i<from||e.i>=v.bars.length)continue;
-  if(rc){if(rc.index!==i||!rc.nodes.some(n=>!n.reference&&n.i===e.i))continue}
-  else{if(quickIndex!=="all"&&Number(quickIndex)!==i)continue;if(quickKind!=="all"&&!matchQuickEvent(e,quickKind,pairInfo))continue}
+  // Replay preserves the other three indices' real historical signals for resonance comparison.
+  // Normal market view still honors the chosen top quick filter.
+  if(!replayMode){if(quickIndex!=="all"&&Number(quickIndex)!==i)continue;if(quickKind!=="all"&&!matchQuickEvent(e,quickKind,pairInfo))continue}
   const list=signalMap.get(e.i)||[];list.push(e);signalMap.set(e.i,list)
  }
  bars.forEach((bar,k)=>{const up=bar.c>=bar.o,color=up?"#d95562":"#11a47a",x=xc(k);
@@ -837,11 +843,23 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
     plotText(ctx,txt,tx+6,t+20,nd.reference?"#805ea5":"#2f698f",10,"left","700");}
   }
  }}
+ // Historical replay crosshair is synchronized by the same completed-bar date.
+ if(replayMode&&rc?.nodes?.[replayNodeIndex]){
+  const node=rc.nodes[replayNodeIndex];
+  const at=findEndAtOrBefore(bars,node.t)-1;
+  if(at>=0&&bars[at]?.t<=node.t){
+   const x=xc(at);
+   ctx.strokeStyle=i===rc.index?"#497aa3":"#96b0c2";ctx.lineWidth=i===rc.index?1.4:1;
+   ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,t);ctx.lineTo(x,h-b);ctx.stroke();ctx.setLineDash([]);
+   if(i!==rc.index)plotText(ctx,"同期",Math.max(l+28,Math.min(w-r-29,x)),t+12,"#6e92b0",9,"center");
+  }
+ }
  // Current price dotted guide
  const last=bars.at(-1).c,yp=y(last);ctx.strokeStyle="#aebdca";ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(l,yp);ctx.lineTo(w-r,yp);ctx.stroke();ctx.setLineDash([]);
  ctx.fillStyle="#253d54";ctx.fillRect(w-r+7,yp-9,r-10,18);plotText(ctx,valstr(last,2),w-8,yp+4,"white",10,"right","600");
  for(let j=0;j<=4;j++){const k=Math.round((bars.length-1)*j/4),d=bars[k].t,label=selectedP==="D"||selectedP==="W"?d.slice(5,10):d.slice(5,10)+" "+d.slice(11,16);plotText(ctx,label,xc(k),h-8,"#a1adba",10,j===0?"left":j===4?"right":"center")}
  let k=hoverTime?bars.findIndex(b=>b.t===hoverTime):-1;
+ if(k<0&&replayMode&&rc?.nodes?.[replayNodeIndex])k=findEndAtOrBefore(bars,rc.nodes[replayNodeIndex].t)-1;
  if(k>=0){const x=xc(k),bar=bars[k];ctx.strokeStyle="#99a8b8";ctx.lineWidth=.8;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,t);ctx.lineTo(x,h-b);ctx.stroke();ctx.setLineDash([]);
   const located=hoverIndex===i&&Number.isFinite(hoverPixelPrice),hoverPrice=located?hoverPixelPrice:bar.c;
   const py=y(hoverPrice);
@@ -861,7 +879,8 @@ function drawMacd(i,data){const el=byId("m"+i);if(!el||el.getBoundingClientRect(
  for(const [values,color] of [[dif,"#377eae"],[dea,"#d5a14f"]]){ctx.strokeStyle=color;ctx.lineWidth=1.7;ctx.lineJoin="round";ctx.beginPath();values.forEach((v,k)=>k?ctx.lineTo(xc(k),y(v)):ctx.moveTo(xc(k),y(v)));ctx.stroke()}
  plotText(ctx,"DIF",dim.l+7,12,"#377eae",10,"left","650");plotText(ctx,"DEA",dim.l+40,12,"#d5a14f",10,"left","650");
  plotText(ctx,valstr(mx,2),w-7,dim.t+4,"#a4afba",9,"right");plotText(ctx,"0",w-7,y(0)+3,"#9aa8b5",9,"right");plotText(ctx,valstr(mn,2),w-7,h-dim.b+5,"#a4afba",9,"right");
- const hoverK=hoverTime?bars.findIndex(b=>b.t===hoverTime):-1;
+ let hoverK=hoverTime?bars.findIndex(b=>b.t===hoverTime):-1;
+ if(hoverK<0&&replayMode&&replayCurrent()?.nodes?.[replayNodeIndex])hoverK=findEndAtOrBefore(bars,replayCurrent().nodes[replayNodeIndex].t)-1;
  if(hoverK>=0){ctx.strokeStyle="#9aa9b8";ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(xc(hoverK),0);ctx.lineTo(xc(hoverK),h);ctx.stroke();ctx.setLineDash([])}
  const k=hoverK>=0?hoverK:bars.length-1;
  const difValue=dif[k],deaValue=dea[k],histValue=hist[k];
@@ -1190,6 +1209,7 @@ function renderReplay(){
  byId("view-market").classList.toggle("active",!replayMode);
  byId("view-replay").classList.toggle("active",replayMode);
  byId("replay-panel").hidden=!replayMode;
+ byId("replay-post").hidden=!replayMode;
  byId("view-market").onclick=()=>replaySetMode(false);
  byId("view-replay").onclick=()=>replaySetMode(true);
  if(!replayMode)return;
