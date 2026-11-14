@@ -30,6 +30,13 @@ const server=http.createServer((req,res)=>{
    assert.equal(await page.locator(".kplot").count(),4);
    assert.equal(await page.locator(".mplot").count(),4);
    assert.equal(await page.locator("#statsbody tr").count(),24);
+   const projectionPanels=await page.evaluate(()=>[0,1,2,3].map(i=>{
+    const v=getSignal(i,selectedP),at=visible(i);
+    const latest=!replayMode&&v?.bars?.at(-1)?.t===at?.bars?.at(-1)?.t;
+    return {i,mode:v?.projection?.mode||"none",shown:!!document.querySelector("#card"+i+" .estimate"),
+     expected:!!latest&&isFocusedProjection(v?.projection)};
+   }));
+   assert(projectionPanels.every(x=>x.shown===x.expected),"Only confirmed divergence watch/campaign should display next-candle projection");
    const report=await page.evaluate(()=>{
     const v=getSignal(0,"D"),buy=v.events.find(e=>e.type==="buy"&&e.t.startsWith("2024-01-16"));
     const stop=buy&&v.events.find(e=>e.type==="stopLoss"&&e.structureId===buy.structureId);
@@ -62,11 +69,17 @@ const server=http.createServer((req,res)=>{
    await page.locator("#view-replay").click();
    assert.equal(await page.locator(".chart-card:visible").count(),4);
    assert.equal(await page.locator(".confluence-item").count(),4);
+   assert.equal(await page.locator(".chart-card .estimate").count(),0,"Historical replay has no next-candle prediction footers");
    assert(await page.locator(".replay-overview .replay-metric").count()>=5);
    await page.locator("#view-market").click();
    assert.equal(await page.locator(".chart-card:visible").count(),4);
+   if(await page.evaluate(()=>maxPanOffset()>2)){
+    await page.evaluate(()=>setPanOffset(3));
+    assert.equal(await page.locator(".chart-card .estimate").count(),0,"Historical Kline browsing should not show forward projections");
+    await page.evaluate(()=>setPanOffset(0));
+   }
    assert.deepEqual(errors,[],"Browser script errors");
-   console.log("LEDGER_UI_PASS",JSON.stringify({viewport,...report}));
+   console.log("LEDGER_UI_PASS",JSON.stringify({viewport,...report,projectionPanels}));
    await page.close();
   }
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
