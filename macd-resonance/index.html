@@ -133,6 +133,51 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .wave-pending{padding:9px 11px;margin:10px 0 7px;border-left:2px solid #bdcbd8;background:#f6f8fa;color:#5c7186;font-size:11px;font-weight:680}
 .wave-pending span{display:inline;color:#9aa7b4;font-weight:400;margin-left:10px}
 .wave-pending icon{font-size:12px}
+
+.replay-switch{display:flex;gap:5px;align-items:center;margin-bottom:13px}
+.replay-tab{padding:9px 16px;background:#eef2f6;border:1px solid transparent;border-radius:8px;color:#8191a1;font-size:12px;font-weight:700}
+.replay-tab.active{background:#244968;color:white}
+.replay-switch-hint{font-size:11px;color:#8c9ba9;margin-left:8px}
+.replay-panel{padding:15px;border-radius:12px;border:1px solid #dee6ed;background:#fff;margin-bottom:13px;box-shadow:0 3px 12px #23394e09}
+.replay-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.replay-controls label{display:flex;gap:7px;flex-direction:column;font-size:10px;color:#8594a2}
+.replay-controls select,.replay-selector select,.replay-note select,.replay-note textarea{min-width:0;width:100%;padding:8px 10px;border-radius:7px;border:1px solid #dbe5ec;background:white;color:#37516a;font-size:12px}
+.replay-selector{display:flex;align-items:center;gap:8px;margin:12px 0}
+.replay-selector select{flex:1;min-width:0}
+.replay-selector button{font-size:21px;border-radius:7px;border:1px solid #dbe5ec;background:#f3f7fa;padding:3px 12px;color:#466a8a}
+.replay-selector button:disabled{opacity:.35}
+.replay-overview{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.replay-metric{background:#f4f7fa;border-radius:7px;padding:9px 12px;min-width:104px;display:flex;gap:4px;flex-direction:column}
+.replay-metric span{font-size:10px;color:#8b9cab}.replay-metric b{font-size:14px;color:#34536d}
+.replay-metric b.positive{color:#128c71}.replay-metric b.negative{color:#c95765}
+.replay-chain{border-top:1px solid #eef2f4;padding-top:12px}
+.replay-chain-title{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#4f6b82;font-size:12px}
+.replay-chain-title span{color:#92a1af;font-size:10px}
+.replay-nodes{display:flex;gap:7px;overflow-x:auto;padding:12px 0;scrollbar-width:thin}
+.replay-node{min-width:128px;flex:1;max-width:230px;text-align:left;padding:11px;border-radius:8px;border:1px solid #e0e8ee;background:#fafdff;color:#496278;display:flex;flex-direction:column;gap:5px;cursor:pointer}
+.replay-node:hover{border-color:#86adc8}.replay-node.active{border:2px solid #4e88b2;background:#eef6fb;padding:10px}
+.replay-node.reference{border-style:dashed;opacity:.84}
+.replay-node .node-label{font-size:12px;font-weight:750}
+.replay-node .node-time,.replay-node .node-price{font-size:10px;color:#8091a0;white-space:nowrap}
+.replay-node.buy .node-label{color:#0b9975}.replay-node.sell .node-label,.replay-node.stop .node-label{color:#cc5663}.replay-node.correction .node-label{color:#855bb9}
+.replay-compare{font-size:11px;color:#657e91;line-height:1.8}
+.replay-compare b{color:#3d6584}
+.replay-note{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;align-items:center;padding-top:12px;margin-top:12px;border-top:1px solid #eef2f5}
+.replay-note label{font-size:11px;color:#8092a1}
+.replay-note textarea{resize:vertical;min-height:65px}
+.replay-note button{justify-self:start;background:#2e6688;color:white;border:0;border-radius:7px;padding:8px 13px;font-size:11px;grid-column:2}
+.replay-note #replay-save-status{grid-column:2;font-size:10px}
+body.reviewing .quickfilter{display:none}
+body.reviewing .chartgrid{grid-template-columns:1fr}
+body.reviewing .chartgrid .chart-card{display:none}
+body.reviewing .chartgrid .chart-card.review-focused{display:block}
+body.reviewing .chartgrid .kplot{height:470px}
+body.reviewing .chartgrid .mplot{height:150px}
+body.reviewing .secondary{opacity:.82}
+@media(max-width:640px){.replay-controls{grid-template-columns:1fr 1fr}.replay-controls label:first-child{grid-column:span 2}
+.replay-panel{padding:10px}.replay-switch-hint{display:none}.replay-node{min-width:115px;flex:none}
+.replay-note{grid-template-columns:1fr;gap:6px}.replay-note button,.replay-note #replay-save-status{grid-column:1}
+body.reviewing .chartgrid .kplot{height:330px}body.reviewing .chartgrid .mplot{height:120px}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -149,6 +194,43 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
   <div class="history-scrubber"><span>最早</span><input id="history-slider" type="range" min="0" max="0" value="0" step="1" aria-label="历史时间轴滚动"><span>最新</span></div>
   <button class="history-reset" id="history-reset" type="button" title="回到最新K线">回最新</button>
  </div>
+
+ <section class="replay-switch" aria-label="看盘与逐笔复盘">
+  <button class="replay-tab active" id="view-market" type="button">四指数看盘</button>
+  <button class="replay-tab" id="view-replay" type="button">逐笔交易复盘</button>
+  <span class="replay-switch-hint" id="replay-switch-hint">选择一笔交易，查看整轮买卖与止损</span>
+ </section>
+ <section id="replay-panel" class="replay-panel" hidden aria-label="逐笔交易复盘">
+  <div class="replay-controls">
+   <label>复盘场景<select id="replay-kind" aria-label="复盘分类">
+    <option value="all">全部交易轮次</option><option value="correction">有纠错买回</option>
+    <option value="correctionStop">纠错止损</option><option value="stop">结构止损</option>
+    <option value="topSell">正常顶部卖出</option><option value="open">买后未配对</option>
+    <option value="unpairedSell">顶部卖点未配对</option>
+   </select></label>
+   <label>指数<select id="replay-index" aria-label="复盘指数"><option value="all">四指数</option><option value="0">上证指数</option><option value="1">深证成指</option><option value="2">创业板指</option><option value="3">科创50</option></select></label>
+   <label>周期<select id="replay-period" aria-label="复盘周期">
+    <option value="all">六周期</option><option value="15">15分钟</option><option value="60">60分钟</option>
+    <option value="90">90分钟</option><option value="120">120分钟</option><option value="D">日线</option><option value="W">周线</option></select></label>
+  </div>
+  <div class="replay-selector"><button type="button" id="replay-prev" title="上一笔案例">‹</button>
+   <select id="replay-case" aria-label="选择完整交易案例"><option value="">选择案例</option></select>
+   <button type="button" id="replay-next" title="下一笔案例">›</button>
+   <span id="replay-number" class="faint">—</span></div>
+  <div id="replay-overview" class="replay-overview"></div>
+  <div class="replay-chain">
+   <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>原信号实线 · 规则对照虚线</span></div>
+   <div id="replay-nodes" class="replay-nodes"></div>
+  </div>
+  <div id="replay-compare" class="replay-compare"></div>
+  <div class="replay-note"><label for="replay-tag">复盘标记</label>
+   <select id="replay-tag"><option value="">待评价</option><option>规则有效</option><option>买入过早</option>
+    <option>顶部卖出过早</option><option>止损过早</option><option>缺少退出</option><option>需调整纠错规则</option></select>
+   <label for="replay-memo">本笔复盘结论</label>
+   <textarea id="replay-memo" rows="2" placeholder="记录这一轮交易的经验、异常、待验证的优化思路"></textarea>
+   <button id="replay-save" type="button">保存复盘记录</button><span class="faint" id="replay-save-status">仅存于当前浏览器，不上传服务器</span>
+  </div>
+ </section>
  <section class="quickfilter" id="quickfilter" aria-label="K线历史关键点位快速筛选">
   <div class="quicktop"><strong>图上关键点</strong><span class="quickmeta" id="quick-count">载入关键点位中</span><select id="quick-index" aria-label="指数范围"><option value="all">四指数</option><option value="0">上证指数</option><option value="1">深证成指</option><option value="2">创业板指</option><option value="3">科创50</option></select></div>
   <div class="quickchips" id="quick-chips"></div>
