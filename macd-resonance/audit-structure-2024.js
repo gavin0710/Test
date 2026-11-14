@@ -107,7 +107,7 @@ for(let i=0;i<4;i++){
   const first4=strict4.events.filter(e=>e.type==="buy"||e.type==="sell");
   const key=e=>e.type+"|"+e.i;
   const shadowSet=new Set(first4.map(key));
-  const gone=first3.filter(e=>!shadowSet.has(key)).map(e=>({date:e.t,type:e.type,ref:e.ref?.dif}));
+  const gone=first3.filter(e=>!shadowSet.has(key(e))).map(e=>({date:e.t,type:e.type,ref:e.ref?.dif}));
   const trades3=v.trades, trades4=lifecycle4.trades;
   const win=trades=>trades.filter(t=>t.exitClose>t.entryClose).length;
   compared.push({index:idxNames[i],period:pName,first3:first3.length,first4:first4.length,
