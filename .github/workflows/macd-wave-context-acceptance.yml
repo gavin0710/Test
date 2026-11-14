@@ -1,0 +1,67 @@
+name: Wave context and trade-rate production acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-wave-context-acceptance.yml"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Regression test
+        run: node macd-resonance/verify.js
+      - name: Install headless Chromium
+        run: |
+          npm install --prefix /tmp/macd-wave-check --no-save playwright
+          /tmp/macd-wave-check/node_modules/.bin/playwright install chromium
+      - name: Test wave and trade tables on live production
+        run: |
+          node <<'NODE'
+          const assert=require('node:assert/strict'),{chromium}=require('/tmp/macd-wave-check/node_modules/playwright');
+          (async()=>{
+            const browser=await chromium.launch({args:['--no-sandbox']});
+            try{
+              const page=await browser.newPage({viewport:{width:1460,height:990}});
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              const response=await page.goto('https://macd-resonance-monitor.vercel.app/',{waitUntil:'domcontentloaded',timeout:45000});
+              assert.equal(response.status(),200);
+              await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:55000});
+              assert.equal(await page.locator('#win-period-body tr').count(),6);
+              assert.equal(await page.locator('#win-index-body tr').count(),24);
+              assert.equal(await page.locator('#wave-entry-body tr').count(),18);
+              const current=await page.locator('#win-period-body tr').allInnerTexts();
+              const grouped=await page.locator('#wave-entry-body tr').allInnerTexts();
+              const idx=await page.locator('#win-index-body tr').allInnerTexts();
+              console.log('PERIOD_CURRENT_WAVES',JSON.stringify(current));
+              console.log('WAVE_WINRATES',JSON.stringify(grouped));
+              console.log('CURRENT_INDEX_WAVES',JSON.stringify(idx.map(x=>x.split('\\t').slice(0,3))));
+              const waves=await page.locator('#win-index-body .wave-tag').allInnerTexts();
+              assert.equal(waves.length,24);
+              assert(waves.every(x=>/上行观察|下行观察|未确认/.test(x)),'Incorrect period wave status');
+              const count=await page.evaluate(()=>{const {rows}=getHistoryStats();return rows.reduce((n,r)=>n+(r.v.trades||[]).length,0)});
+              const waveCount=await page.evaluate(()=>{const {rows}=getHistoryStats();return rows.flatMap(r=>r.v.trades||[]).filter(t=>['up','down','unknown'].includes(t.entryWave)).length});
+              assert.equal(count,waveCount,'Trade entries missing wave classification');
+              console.log('CLASSIFIED_CLOSED_TRADES',count);
+              console.log('MARKET',await page.locator('#status').innerText());
+              await page.locator('#winfold summary').first().click();
+              await page.locator('#winfold summary').first().click();
+              await page.locator('.periodbtn[data-p="15"]').click();
+              await page.locator('.periodbtn[data-p="D"]').click();
+              assert.deepEqual(errors,[]);
+              console.log('JS_ERRORS_0');
+              const mobile=await browser.newPage({viewport:{width:390,height:844}});
+              assert.equal((await mobile.goto('https://macd-resonance-monitor.vercel.app/',{waitUntil:'domcontentloaded',timeout:45000})).status(),200);
+              assert.equal(await mobile.locator('#win-period-body tr').count(),6);
+              console.log('MOBILE_OK');
+              console.log('ALL_PASS');
+            }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)})
+          NODE
