@@ -175,6 +175,19 @@ body.reviewing .secondary{opacity:.82}
 @media(max-width:640px){.replay-controls{grid-template-columns:1fr 1fr}.replay-controls label:first-child{grid-column:span 2}
 .replay-panel{padding:10px}.replay-switch-hint{display:none}.replay-node{min-width:115px;flex:none}
 body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{height:95px}}
+
+.replay-confluence{background:#f5f8fa;border:1px solid #e3ebf1;border-radius:9px;padding:11px 12px;margin-bottom:11px}
+.confluence-title{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:#526f87;margin-bottom:9px}
+.confluence-title strong{color:#31516e}
+.confluence-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.confluence-item{padding:8px;background:#fff;border:1px solid #e4e9ef;border-radius:8px;display:flex;justify-content:space-between;gap:5px;align-items:center;font-size:11px;min-width:0}
+.confluence-item.active{border-color:#7fa8c3}
+.confluence-item .sub{font-size:10px;color:#8b9da8}
+.confluence-item .up{color:#0d9870;font-weight:750}
+.confluence-item .down{color:#ce626b;font-weight:750}
+.confluence-item .none{color:#8d9baa}
+.replay-time-note{color:#8a9eae;font-size:10px;margin-top:8px}
+@media(max-width:660px){.confluence-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -219,6 +232,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
    <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>正式信号实线 · 拟止损虚线</span></div>
    <div id="replay-nodes" class="replay-nodes"></div>
   </div>
+  <div id="replay-confluence" class="replay-confluence" aria-label="同周期四指数历史信号共振"></div>
   <div id="replay-compare" class="replay-compare"></div>
  </section>
  <section class="quickfilter" id="quickfilter" aria-label="K线历史关键点位快速筛选">
@@ -1131,6 +1145,45 @@ function replaySetMode(active){
   if(first)replaySetCase(first.id);else render();
  }else{focusIndex=-1;signalAnchors={};render()}
 }
+
+function replayResonance(c,node){
+ if(!c||!node)return null;
+ const direction=node.kind==="buy"||node.kind==="correction"?"buy":node.kind==="sell"&&!node.reference?"sell":null;
+ const result=[];
+ for(let i=0;i<4;i++){
+  const v=getSignal(i,c.period);
+  if(!v?.bars?.length||v.bars[0].t>node.t){
+   result.push({index:i,status:"无同期行情",buy:false,sell:false,match:false,age:null});continue;
+  }
+  const at=findEndAtOrBefore(v.bars,node.t)-1;
+  if(at<0){result.push({index:i,status:"无同期行情",buy:false,sell:false,match:false,age:null});continue}
+  const candidates=v.events.filter(e=>e.i<=at&&e.i>=Math.max(0,at-2)&&e.t<=node.t);
+  const buys=candidates.filter(e=>REPLAY_BUYS.has(e.type));
+  const sells=candidates.filter(e=>REPLAY_SELLS.has(e.type));
+  const buy=buys.length>0,sell=sells.length>0;
+  const match=direction==="buy"?buy:direction==="sell"?sell:false;
+  const relevant=direction==="buy"?buys:direction==="sell"?sells:[...buys,...sells];
+  const last=relevant.at(-1),age=last?at-last.i:null;
+  result.push({index:i,status:buy&&sell?"买卖信号均有":buy?"买入信号":sell?"卖出信号":"无同向结构信号",buy,sell,match,age});
+ }
+ return {direction,items:result,matched:result.filter(x=>x.match).length,eventTime:node.t};
+}
+function renderReplayResonance(c,node){
+ const el=byId("replay-confluence");if(!c||!node){el.innerHTML="";return}
+ const r=replayResonance(c,node);
+ const count=r.direction?r.matched+"/4指数":"—";
+ const type=r.direction==="buy"?"买点":r.direction==="sell"?"卖点":"非买卖触发节点";
+ el.innerHTML='<div class="confluence-title"><strong>同周期历史信号共振 · '+esc(c.label)+' · '+esc(node.t.replace("T"," "))+'</strong><span>'+type+'同向 '+count+'</span></div>'+
+  '<div class="confluence-grid">'+r.items.map(x=>{
+   const value=x.status==="无同期行情"?"无行情":x.match?(r.direction==="buy"?"↑买":"↓卖"):
+    x.buy&&x.sell?"买/卖":x.buy?"↑买":x.sell?"↓卖":"—";
+   const age=x.age!==null?"· "+(x.age===0?"当根":x.age+"根前"):"";
+   return '<div class="confluence-item '+(x.index===c.index?"active":"")+'"><span>'+esc(IDX[x.index].short)+'</span><span class="'+(x.match?r.direction==="buy"?"up":"down":"none")+'">'+esc(value)+
+    '<span class="sub">'+esc(age)+'</span></span></div>'
+  }).join("")+'</div>'+
+  '<div class="replay-time-note">仅统计该历史时点及此前2根已完成K线上的同向MACD结构信号；不使用未来K线，不代表该次共振已验证盈利效果。四图按同一日期窗口同步回看。</div>';
+}
+
 function replayPct(n){return Number.isFinite(n)?(n>0?"+":"")+n.toFixed(2)+"%":"未配对"}
 function renderReplay(){
  document.body.classList.toggle("reviewing",replayMode);
@@ -1159,6 +1212,7 @@ function renderReplay(){
   byId("replay-overview").textContent="暂无历史案例";
   byId("replay-nodes").innerHTML="";
   byId("replay-compare").innerHTML="";
+  byId("replay-confluence").innerHTML="";
   return;
  }
  replayCaseId=c.id;
@@ -1190,17 +1244,19 @@ function renderReplay(){
   return '<button type="button" class="replay-node '+n.kind+(i===replayNodeIndex?" active":"")+(n.reference?" reference":"")+'" data-node="'+i+'" aria-pressed="'+(i===replayNodeIndex)+'"><span class="node-label">'+esc(n.title)+'</span><span class="node-time">'+esc(n.t.replace("T"," "))+'</span><span class="node-price">收盘 '+valstr(n.close)+(pc?" · "+pc:"")+'</span></button>';
  }).join("");
  byId("replay-nodes").querySelectorAll("button").forEach(b=>b.onclick=()=>replayGoNode(Number(b.dataset.node)));
+ renderReplayResonance(c,c.nodes[replayNodeIndex]||c.nodes[0]);
  const corrections=c.legs.filter(t=>t.entryType==="correctionBuy"),comparisons=[];
  for(const leg of corrections){
-  if(!Number.isInteger(leg.exitI))continue;
-  const next=c.nodes.find(n=>n.reference&&n.i>leg.exitI&&REPLAY_SELLS.has(n.ev?.type));
-  if(next){
-   const hypothetical=(next.close/leg.entryClose-1)*100,actual=(leg.exitClose/leg.entryClose-1)*100;
-   comparisons.push("纠错 "+leg.entryT.slice(0,10)+"：实际"+(leg.exitType==="correctionStop"?"止损":"卖出")+" "+replayPct(actual)+"；后续顶部信号对照 "+replayPct(hypothetical)+"；差 "+(actual-hypothetical).toFixed(2)+"个百分点");
-  }
+  const candidate=c.nodes.find(n=>n.ev?.type==="candidateCorrectionStop"&&n.trade?.entryI===leg.entryI);
+  if(!candidate)continue;
+  const proposed=(candidate.close/leg.entryClose-1)*100;
+  const actual=Number.isInteger(leg.exitI)?(leg.exitClose/leg.entryClose-1)*100:null;
+  const difference=actual===null?"正式交易仍未配对":'比正式退出 '+replayPct(proposed-actual)+'（百分点）';
+  comparisons.push('纠错 '+leg.entryT.slice(0,10)+' · 拟DIF止损 '+candidate.t.slice(0,10)+'：'+replayPct(proposed)+
+   '；原规则'+(leg.exitType==="topSell"?"顶部退出":"尚未退出")+'：'+replayPct(actual)+'；'+difference);
  }
- byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>退出对照：</b>'+esc(x)+'</div>').join(""):"<span>选择时间线任一节点即可在K线图中定位；未配对不虚构卖点。</span>")+
-  '<div class="faint">比较仅使用信号K线收盘价、未计手续费或滑点；后续顶部点是反事实观察，不是实际退出。</div>';
+ byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>规则对照（未启用）：</b>'+esc(x)+'</div>').join(""):"<span>点击交易链节点定位四张历史K线。没有符合条件的拟止损点时不生成虚拟退出。</span>")+
+  '<div class="faint">虚线拟止损仅供对照研究，不计入正式买卖信号、交易次数及成功率。收益基于历史信号收盘价，未计成交费用。</div>';
 }
 
 function buySignalEvents(v){return v?v.events.filter(e=>buyTypes.has(e.type)&&Number.isInteger(e.i)):[]}
