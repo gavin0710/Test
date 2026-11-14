@@ -446,7 +446,15 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
  ctx.fillStyle="#253d54";ctx.fillRect(w-r+7,yp-9,r-10,18);plotText(ctx,valstr(last,2),w-8,yp+4,"white",10,"right","600");
  for(let j=0;j<=4;j++){const k=Math.round((bars.length-1)*j/4),d=bars[k].t,label=selectedP==="D"||selectedP==="W"?d.slice(5,10):d.slice(5,10)+" "+d.slice(11,16);plotText(ctx,label,xc(k),h-8,"#a1adba",10,j===0?"left":j===4?"right":"center")}
  let k=hoverTime?bars.findIndex(b=>b.t===hoverTime):-1;
- if(k>=0){const x=xc(k),bar=bars[k];ctx.strokeStyle="#99a8b8";ctx.lineWidth=.8;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,t);ctx.lineTo(x,h-b);ctx.moveTo(l,y(bar.c));ctx.lineTo(w-r,y(bar.c));ctx.stroke();ctx.setLineDash([]);
+ if(k>=0){const x=xc(k),bar=bars[k];ctx.strokeStyle="#99a8b8";ctx.lineWidth=.8;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x,t);ctx.lineTo(x,h-b);ctx.stroke();ctx.setLineDash([]);
+  const located=hoverIndex===i&&Number.isFinite(hoverPixelPrice),hoverPrice=located?hoverPixelPrice:bar.c;
+  const py=y(hoverPrice);
+  if(py>=t&&py<=h-b){
+   ctx.strokeStyle="#8999aa";ctx.lineWidth=.9;ctx.setLineDash([4,3]);
+   ctx.beginPath();ctx.moveTo(l,py);ctx.lineTo(w-r,py);ctx.stroke();ctx.setLineDash([]);
+   ctx.fillStyle="#253d54";ctx.fillRect(w-r+7,py-9,r-10,18);
+   plotText(ctx,valstr(hoverPrice,2),w-8,py+4,"white",10,"right","700");
+  }
   byId("ohlc"+i).textContent=bar.t.replace("T"," ")+"  开 "+valstr(bar.o)+"  高 "+valstr(bar.h)+"  低 "+valstr(bar.l)+"  收 "+valstr(bar.c);
  }else{const bar=bars.at(-1);byId("ohlc"+i).textContent="开 "+valstr(bar.o)+"  高 "+valstr(bar.h)+"  低 "+valstr(bar.l)+"  收 "+valstr(bar.c)}
 }
