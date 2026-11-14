@@ -7,8 +7,8 @@ assert(script,"Dashboard script missing");new vm.Script(script,{filename:"dashbo
 const cut=script.indexOf('byId("refresh").onclick=load;');assert(cut>0,"Engine isolation failed");
 const sandbox={window:{},document:{},console};
 vm.createContext(sandbox);
-vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,projectNext,resample,resampleHourly,ema};",sandbox,{timeout:3000});
-const {calculate,scanStructure,projectNext,resample,resampleHourly,ema}=sandbox.testApi;
+vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema};",sandbox,{timeout:3000});
+const {calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema}=sandbox.testApi;
 let assertions=0;
 function ok(value,label){assert(value,label);assertions++}
 function equal(actual,expected,label){assert.equal(actual,expected,label);assertions++}
@@ -89,6 +89,54 @@ equal(calculate(Array.from({length:40},(_,i)=>({t:"t"+i,o:100,c:100,h:100,l:100}
 const simple=calculate(Array.from({length:110},(_,i)=>({t:"t"+i,o:100+i*.05,c:100+i*.05,h:101+i*.05,l:99+i*.05})));
 ok(simple&&Number.isFinite(simple.dif.at(-1)),"MACD price calculation");
 ok(simple.projection!==null,"Projection attached to each complete signal unit");
+// Lifecycle tests: first turn is buy; later qualifying turns before three opposite-color
+// columns are second and third structure, with a reference DIF break causing a stop.
+function campaign({stop=false,top=false,breakAfterThree=false,closingAt=23}={}){
+ const dif=Array(36).fill(-.8);
+ [dif[9],dif[10],dif[11],dif[12],dif[13],dif[14],dif[15],dif[16],dif[17],dif[18]]=
+ [-1.5,-1.4,-1.3,-1.5,-1.7,-1.6,-1.75,-1.85,-1.70,stop?-2.1:-1.65];
+ const hist=Array(36).fill(-.5);
+ if(breakAfterThree){
+  hist[19]=1;hist[20]=1;hist[21]=1;dif[22]=-2.5;
+ }
+ const bars=dif.map((value,i)=>({t:"2026-01-"+String(1+Math.floor(i/4)).padStart(2,"0")+"T"+String(i).padStart(2,"0"),c:100+i*.1}));
+ const events=[{type:"watchBuy",i:9,t:bars[9].t,regionStart:4,ref:{dif:-2,close:102}},
+  {type:"buy",i:10,t:bars[10].t,regionStart:4,ref:{dif:-2,close:102}}];
+ if(top)events.push({type:"sell",i:closingAt,t:bars[closingAt].t,regionStart:21,ref:{dif:3,close:103}});
+ return analyzeLifecycle(bars,dif,hist,events);
+}
+const first=campaign();
+equal(first.counts.watch,1,"One qualifying bottom divergence");
+equal(first.counts.formed,1,"One first structure");
+equal(first.counts.second,1,"Second DIF upturn");
+equal(first.counts.third,1,"Third DIF upturn");
+equal(first.counts.buy,3,"First, second, third buys all counted");
+equal(first.counts.sell,0,"No invented top sell");
+equal(first.counts.open,1,"Unpaired buy retained");
+equal(first.trades.length,0,"No synthetic closing trade without sell/stop");
+const st=campaign({stop:true});
+equal(st.counts.failStop,1,"DIF breaking original reference before 3 opposite columns triggers stop");
+equal(st.counts.stopExits,1,"Stop closes open position only once");
+equal(st.counts.open,0,"Stopped position not considered pending");
+equal(st.losses[0].i,18,"Stop event bar index auditable");
+equal(st.losses[0].holdBars,8,"Stop duration in completed bars");
+equal(st.trades[0].exitType,"stop","Stop exit never counted as top sell");
+equal(st.counts.sellExits,0,"Stop excluded from matched top exits");
+const sold=campaign({top:true});
+equal(sold.counts.sell,1,"Top structure produces one sale signal");
+equal(sold.counts.sellExits,1,"Bottom buy and same-timeframe top sell paired");
+equal(sold.counts.stopExits,0,"Valid top exit not counted as stop");
+equal(sold.counts.open,0,"Matched trade no longer pending");
+equal(sold.trades[0].exitType,"topSell","Top exit tagged distinctly");
+const unpairedSell=analyzeLifecycle(
+ Array.from({length:28},(_,i)=>({t:"t"+i,c:100})),Array(28).fill(2),Array(28).fill(1),
+ [{type:"sell",i:20,t:"t20",regionStart:16,ref:{dif:3,close:100}}]);
+equal(unpairedSell.counts.sell,1,"Raw top sell signal preserved");
+equal(unpairedSell.counts.unpairedSells,1,"Unpaired sell flagged instead of phantom trade");
+equal(unpairedSell.counts.sellExits,0,"No sell trade without prior buy");
+const safe=campaign({breakAfterThree:true});
+equal(safe.counts.failStop,0,"Three consecutive opposite colors terminate stop guard before later reference break");
+equal(safe.counts.open,1,"No fabricated stop after campaign ended");
 if(fs.existsSync(path.join(root,"data","latest.json"))){
  const snap=JSON.parse(fs.readFileSync(path.join(root,"data","latest.json"),"utf8"));
  ok(Array.isArray(snap.data)&&snap.data.length===4,"Four market indexes");
@@ -97,4 +145,4 @@ if(fs.existsSync(path.join(root,"data","latest.json"))){
   for(const b of bars)ok(Number.isFinite(b.c)&&Number.isFinite(b.o)&&b.h>=b.l,"OHLC integrity");
  }
 }
-console.log("PASS:",assertions,"assertions: close prices, >=3 separators, region-DIF, exact equalities, DIF first turns, expiry, next-close thresholds, 90/120m, data schema");
+console.log("PASS:",assertions,"assertions: close prices, >=3 separators, region-DIF, second/third structures, stop before 3 opposite bars, time-frame-local sell exits, unresolved holds, EMA thresholds and verified OHLC");
