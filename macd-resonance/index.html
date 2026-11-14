@@ -162,23 +162,19 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .replay-node.buy .node-label{color:#0b9975}.replay-node.sell .node-label,.replay-node.stop .node-label{color:#cc5663}.replay-node.correction .node-label{color:#855bb9}
 .replay-compare{font-size:11px;color:#657e91;line-height:1.8}
 .replay-compare b{color:#3d6584}
-.replay-note{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;align-items:center;padding-top:12px;margin-top:12px;border-top:1px solid #eef2f5}
-.replay-note label{font-size:11px;color:#8092a1}
-.replay-note textarea{resize:vertical;min-height:65px}
-.replay-note button{justify-self:start;background:#2e6688;color:white;border:0;border-radius:7px;padding:8px 13px;font-size:11px;grid-column:2}
-.replay-note #replay-save-status{grid-column:2;font-size:10px}
 body.reviewing .quickfilter{display:none}
 body.reviewing .periodbar{display:none}
-body.reviewing .chartgrid{grid-template-columns:1fr}
-body.reviewing .chartgrid .chart-card{display:none}
-body.reviewing .chartgrid .chart-card.review-focused{display:block}
-body.reviewing .chartgrid .kplot{height:470px}
-body.reviewing .chartgrid .mplot{height:150px}
+body.reviewing .chartgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+body.reviewing .chartgrid .chart-card{display:block;border-color:#dce5ec}
+body.reviewing .chartgrid .chart-card.review-focused{border:2px solid #527fa4;box-shadow:0 0 0 2px #aac7dd44}
+body.reviewing .chartgrid .kplot{height:285px}
+body.reviewing .chartgrid .mplot{height:115px}
+body.reviewing .chartgrid .buynav{display:none}
 body.reviewing .secondary{opacity:.82}
+@media(max-width:950px){body.reviewing .chartgrid{grid-template-columns:1fr}}
 @media(max-width:640px){.replay-controls{grid-template-columns:1fr 1fr}.replay-controls label:first-child{grid-column:span 2}
 .replay-panel{padding:10px}.replay-switch-hint{display:none}.replay-node{min-width:115px;flex:none}
-.replay-note{grid-template-columns:1fr;gap:6px}.replay-note button,.replay-note #replay-save-status{grid-column:1}
-body.reviewing .chartgrid .kplot{height:330px}body.reviewing .chartgrid .mplot{height:120px}}
+body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{height:95px}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -203,9 +199,9 @@ body.reviewing .chartgrid .kplot{height:330px}body.reviewing .chartgrid .mplot{h
  </section>
  <section id="replay-panel" class="replay-panel" hidden aria-label="逐笔交易复盘">
   <div class="replay-controls">
-   <label>复盘场景<select id="replay-kind" aria-label="复盘分类">
+   <label>复盘案例<select id="replay-kind" aria-label="复盘分类">
     <option value="all">全部交易轮次</option><option value="correction">有纠错买回</option>
-    <option value="correctionStop">纠错止损</option><option value="stop">结构止损</option>
+    <option value="candidateStop">拟纠错止损 · 待验证</option><option value="stop">结构止损</option>
     <option value="topSell">正常顶部卖出</option><option value="open">买后未配对</option>
     <option value="unpairedSell">顶部卖点未配对</option>
    </select></label>
@@ -220,17 +216,10 @@ body.reviewing .chartgrid .kplot{height:330px}body.reviewing .chartgrid .mplot{h
    <span id="replay-number" class="faint">—</span></div>
   <div id="replay-overview" class="replay-overview"></div>
   <div class="replay-chain">
-   <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>原信号实线 · 规则对照虚线</span></div>
+   <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>正式信号实线 · 拟止损虚线</span></div>
    <div id="replay-nodes" class="replay-nodes"></div>
   </div>
   <div id="replay-compare" class="replay-compare"></div>
-  <div class="replay-note"><label for="replay-tag">复盘标记</label>
-   <select id="replay-tag"><option value="">待评价</option><option>规则有效</option><option>买入过早</option>
-    <option>顶部卖出过早</option><option>止损过早</option><option>缺少退出</option><option>需调整纠错规则</option></select>
-   <label for="replay-memo">本笔复盘结论</label>
-   <textarea id="replay-memo" rows="2" placeholder="记录这一轮交易的经验、异常、待验证的优化思路"></textarea>
-   <button id="replay-save" type="button">保存复盘记录</button><span class="faint" id="replay-save-status">仅存于当前浏览器，不上传服务器</span>
-  </div>
  </section>
  <section class="quickfilter" id="quickfilter" aria-label="K线历史关键点位快速筛选">
   <div class="quicktop"><strong>图上关键点</strong><span class="quickmeta" id="quick-count">载入关键点位中</span><select id="quick-index" aria-label="指数范围"><option value="all">四指数</option><option value="0">上证指数</option><option value="1">深证成指</option><option value="2">创业板指</option><option value="3">科创50</option></select></div>
