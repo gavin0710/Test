@@ -1,0 +1,97 @@
+name: MACD historical buy marker browser acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-buy-marker-acceptance.yml"
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Regression test
+        run: node macd-resonance/verify.js
+      - name: Chromium setup
+        run: |
+          npm install --prefix /tmp/macd-markers --no-save playwright
+          /tmp/macd-markers/node_modules/.bin/playwright install chromium
+      - name: Check all buy markers by index and timeframe, historical navigation, full range, mobile
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-markers/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({args:['--no-sandbox']});
+            try{
+              const page=await browser.newPage({viewport:{width:1460,height:1100}});
+              const errs=[];page.on('pageerror',e=>errs.push(e.message));
+              await page.addInitScript(()=>{
+                window.__drawnLabels=[];
+                const old=CanvasRenderingContext2D.prototype.fillText;
+                CanvasRenderingContext2D.prototype.fillText=function(str,...rest){
+                  if(/^买[0-9]+$/.test(String(str)))window.__drawnLabels.push(String(str));
+                  return old.call(this,str,...rest);
+                };
+              });
+              const response=await page.goto('https://macd-resonance-monitor.vercel.app',{waitUntil:'domcontentloaded',timeout:50000});
+              assert.equal(response.status(),200);
+              await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:60000});
+              let crossCounts=0;
+              for(const p of ['15','60','90','120','D','W']){
+                await page.locator('.periodbtn[data-p="'+p+'"]').click();
+                const v=await page.evaluate(()=>Array.from({length:4},(_,i)=>({i,expected:buySignalEvents(getSignal(i,selectedP)).length,options:document.querySelectorAll('.buyselect[data-i="'+i+'"] option').length,
+                  menu:document.querySelector('.buynav[data-chart="'+i+'"] .buynav-meta')?.textContent})));
+                for(const row of v){assert.equal(row.options,row.expected+1,'Missing selectable buy marker');
+                  assert(row.menu.includes(String(row.expected)),'Buy count missing in chart header');
+                  crossCounts+=row.expected;}
+                console.log('PERIOD_BUYS',p,JSON.stringify(v.map(x=>x.expected)));
+              }
+              assert.equal(crossCounts,79,'Every historical buy must be reachable in chart navigation');
+              console.log('BUY_SIGNALS_MAPPED',crossCounts);
+              await page.locator('.periodbtn[data-p="15"]').click();
+              // Navigate an index with historical buys, ensure target candle becomes visible and is highlighted.
+              const firstIndex=await page.evaluate(()=>buySignalEvents(getSignal(0,selectedP))[0].i);
+              await page.locator('.buyselect[data-i="0"]').selectOption(String(firstIndex));
+              const focused=await page.evaluate(()=>({target:signalAnchors['15:0'],from:visible(0).from,length:visible(0).bars.length,date:hoverTime}));
+              assert.equal(focused.target,firstIndex);
+              assert(focused.from<=firstIndex&&firstIndex<focused.from+focused.length);
+              console.log('JUMP_TO_EXACT_BUY',JSON.stringify(focused));
+              await page.waitForTimeout(200);
+              assert((await page.evaluate(()=>window.__drawnLabels)).some(x=>x==='买1'||x==='买2'||x==='买3'),'No drawn labeled buy arrow');
+              await page.locator('.buyjump.next[data-i="0"]').click();
+              const next=await page.evaluate(()=>signalAnchors['15:0']);
+              assert(next>firstIndex,'Next signal did not advance');
+              await page.locator('.buyjump.prev[data-i="0"]').click();
+              assert.equal(await page.evaluate(()=>signalAnchors['15:0']),firstIndex);
+              console.log('NEXT_PREVIOUS_OK');
+              await page.locator('.buyrecent[data-i="0"]').click();
+              assert.equal(await page.evaluate(()=>signalAnchors['15:0']),undefined);
+              await page.locator('.winbtn[data-n="0"]').click();
+              assert.equal(await page.evaluate(()=>visibleBars),0);
+              const all=await page.evaluate(()=>({counts:Array.from({length:4},(_,i)=>visible(i).bars.length),expected:Array.from({length:4},(_,i)=>getSignal(i,selectedP).bars.length)}));
+              assert.deepEqual(all.counts,all.expected);
+              console.log('ALL_HISTORY_MODE',JSON.stringify(all.counts));
+              assert.equal(await page.locator('#win-period-body tr').count(),6);
+              assert.equal(await page.locator('#statsbody tr').count(),24);
+              assert.deepEqual(errs,[]);
+              console.log('NO_JS_ERRORS');
+              await page.screenshot({path:'/tmp/macd-buys-full.png',fullPage:true});
+              const mobile=await browser.newPage({viewport:{width:390,height:844}});
+              mobile.on('pageerror',e=>errs.push(e.message));
+              const m=await mobile.goto('https://macd-resonance-monitor.vercel.app',{waitUntil:'domcontentloaded',timeout:50000});
+              assert.equal(m.status(),200);
+              await mobile.waitForSelector('.buyselect');
+              assert.equal(await mobile.locator('.buyselect').count(),4);
+              assert.deepEqual(errs,[]);
+              console.log('MOBILE_BUY_MENU_OK');
+              console.log('ALL_BUY_MARKERS_ACCEPTANCE_PASS');
+            } finally {await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
