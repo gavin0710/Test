@@ -49,6 +49,9 @@ jobs:
               console.log('SIX_PERIOD_COUNTS',JSON.stringify(firstStats));
               const total=await page.evaluate(()=>{const rows=getHistoryStats().rows;return {points:rows.reduce((n,x)=>n+x.v.events.filter(e=>QUICK_EVENTS.has(e.type)).length,0),buys:rows.reduce((n,x)=>n+x.stats.buy,0),sells:rows.reduce((n,x)=>n+x.stats.sell,0),corrections:rows.reduce((n,x)=>n+x.stats.correctionBuy,0),matched:rows.reduce((n,x)=>n+x.v.trades.length,0),open:rows.reduce((n,x)=>n+(x.v.position?1:0),0)}}); 
               console.log('TOTAL_EVENTS',JSON.stringify(total));
+              const thresholdCode=await page.evaluate(()=>projectNext.toString().includes('v.correctionPending')&&projectionHTML.toString().includes('纠错观察中'));
+              assert(thresholdCode,'Production must show DIF top breakout rebuy trigger price for pending correction');
+              console.log('CORRECTION_THRESHOLD_FORMULA_READY');
               const inc=await page.locator('#density-count').inputValue();assert.equal(inc,'100');
               await page.locator('#density-minus').click();assert.equal(await page.locator('#density-count').inputValue(),'90');
               assert.equal(await page.evaluate(()=>visible(0).bars.length),90);
