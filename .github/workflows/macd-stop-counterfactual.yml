@@ -1,0 +1,20 @@
+name: Analyze correction rebuy stop - read only
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/research-correction-stop.js"
+      - ".github/workflows/macd-stop-counterfactual.yml"
+permissions: {contents: read}
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Reconstruct MACD DIF and evaluate each correction buy (no production change)
+        run: node macd-resonance/research-correction-stop.js
