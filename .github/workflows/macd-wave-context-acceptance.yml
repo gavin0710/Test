@@ -59,6 +59,7 @@ jobs:
               console.log('JS_ERRORS_0');
               const mobile=await browser.newPage({viewport:{width:390,height:844}});
               assert.equal((await mobile.goto('https://macd-resonance-monitor.vercel.app/',{waitUntil:'domcontentloaded',timeout:45000})).status(),200);
+              await mobile.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:55000});
               assert.equal(await mobile.locator('#win-period-body tr').count(),6);
               console.log('MOBILE_OK');
               console.log('ALL_PASS');
