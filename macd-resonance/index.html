@@ -109,30 +109,120 @@ for(let start=0;start<16;start+=size){const expected=Math.min(size,16-start),gro
 return out}
 function resampleHourly(src){const days={};for(const b of src){const d=dayKey(b.t);(days[d]||(days[d]=[])).push(b)}const out=[];for(const d of Object.keys(days).sort()){const a=days[d].sort((x,y)=>x.t.localeCompare(y.t));for(let k=0;k+1<a.length;k+=2){if(k>=4)break;const g=a.slice(k,k+2);if(g.length!==2)continue;out.push({t:g[1].t,o:g[0].o,c:g[1].c,h:Math.max(g[0].h,g[1].h),l:Math.min(g[0].l,g[1].l)})}}return out}
 function ema(series,n){const out=[];const k=2/(n+1);for(let i=0;i<series.length;i++){out.push(i===0?series[i]:out[i-1]*(1-k)+series[i]*k)}return out}
-function calculate(bars){if(!bars||bars.length<60)return null;const closes=bars.map(b=>b.c),f=ema(closes,12),s=ema(closes,26),dif=f.map((x,i)=>x-s[i]),dea=ema(dif,9),hist=dif.map((x,i)=>2*(x-dea[i]));
-const nine=[];let run=0,side=0;for(let i=0;i<bars.length;i++){const dir=i>=4?Math.sign(closes[i]-closes[i-4]):0;if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
-const events=[],segments=[];let current=null,mode="",watchRef=null,lastSignalIndex=-1000;
-for(let i=35;i<bars.length;i++){const sign=hist[i]<-1e-10?-1:hist[i]>1e-10?1:current?current.sign:0;if(!sign)continue;
-if(!current||sign!==current.sign){if(current&&mode==="watch"&&(current.sign<0?dif[i]>dif[i-1]:dif[i]<dif[i-1])){lastSignalIndex=i;events.push({type:current.sign<0?"buy":"sell",i,t:bars[i].t,dif:dif[i],ref:watchRef,atCross:true})}if(current)segments.push(current);current={sign,start:i,end:i,len:0,p:sign<0?Infinity:-Infinity,d:sign<0?Infinity:-Infinity};mode="";watchRef=null}
-current.end=i;current.len++;current.p=sign<0?Math.min(current.p,bars[i].l):Math.max(current.p,bars[i].h);current.d=sign<0?Math.min(current.d,dif[i]):Math.max(current.d,dif[i]);
-const ref=[...segments].reverse().find(x=>x.sign===sign&&x.len>=2);
-if(!ref||current.len<2)continue;
-const divergence=sign<0?(current.p<ref.p&&current.d>ref.d+1e-10):(current.p>ref.p&&current.d<ref.d-1e-10);
-if(mode==="watch"&&!divergence){mode="";watchRef=null;events.push({type:"invalid",i,p:sign<0?"底":"顶",t:bars[i].t})}
-const justArmed=!mode&&divergence;
-if(!mode&&divergence){mode="watch";watchRef={price:ref.p,dif:ref.d,from:ref.start,t:bars[ref.end].t};events.push({type:sign<0?"watchBuy":"watchSell",i,t:bars[i].t,ref:watchRef})}
-const alreadyTurned=justArmed&&(sign<0?dif[i]>dif[i-1]:dif[i]<dif[i-1]);
-const turn=alreadyTurned||(sign<0?(dif[i]>dif[i-1]&&dif[i-1]<=dif[i-2]):(dif[i]<dif[i-1]&&dif[i-1]>=dif[i-2]));
-if(mode==="watch"&&turn){mode="signal";lastSignalIndex=i;events.push({type:sign<0?"buy":"sell",i,t:bars[i].t,dif:dif[i],ref:watchRef,alreadyTurned});}
-if(mode==="signal"&&!divergence){mode="";watchRef=null;events.push({type:"invalid",i,t:bars[i].t})}
+const EPS=1e-9;
+function scanStructure(bars,dif,hist){
+ const signs=hist.map(h=>h<-EPS?-1:h>EPS?1:0),regions=[],events=[];
+ for(let i=0;i<bars.length;i++){const sign=signs[i];if(!regions.length||regions.at(-1).sign!==sign)regions.push({sign,start:i,end:i});else regions.at(-1).end=i}
+ let active=null;
+ const turning=(i,sign)=>i>=2&&(sign<0?(dif[i]>dif[i-1]+EPS&&dif[i-1]<=dif[i-2]+EPS):(dif[i]<dif[i-1]-EPS&&dif[i-1]>=dif[i-2]-EPS));
+ const extrema=rg=>{
+  const indices=Array.from({length:rg.end-rg.start+1},(_,j)=>rg.start+j);
+  return {close:rg.sign<0?Math.min(...indices.map(i=>bars[i].c)):Math.max(...indices.map(i=>bars[i].c)),
+   dif:rg.sign<0?Math.min(...indices.map(i=>dif[i])):Math.max(...indices.map(i=>dif[i])),
+   t:bars[rg.end].t,start:rg.start,end:rg.end};
+ };
+ for(let z=0;z<regions.length;z++){
+  const rg=regions[z],sign=rg.sign;if(!sign)continue;
+  let prior=null;
+  for(let t=z-1;t>=0;t--)if(regions[t].sign===sign){prior=regions[t];break}
+  const gap=prior?rg.start-prior.end-1:0;
+  // Only the closest same-color region is eligible. Never skip a short gap.
+  const ref=prior&&gap>=3?extrema(prior):null;
+  let mode="none",minclose=Infinity,maxclose=-Infinity,mindif=Infinity,maxdif=-Infinity;
+  for(let i=rg.start;i<=rg.end;i++){
+   minclose=Math.min(minclose,bars[i].c);maxclose=Math.max(maxclose,bars[i].c);
+   mindif=Math.min(mindif,dif[i]);maxdif=Math.max(maxdif,dif[i]);
+   if(!ref)continue;
+   const priceOK=sign<0?minclose<ref.close-EPS:maxclose>ref.close+EPS;
+   const difOK=sign<0?mindif>ref.dif+EPS:maxdif<ref.dif-EPS;
+   if(mode==="none"&&priceOK&&difOK){
+    mode="watch";events.push({type:sign<0?"watchBuy":"watchSell",i,t:bars[i].t,ref,regionStart:rg.start,gap,price:bars[i].c,dif:dif[i]});
+   }
+   if(mode==="watch"&&!difOK){
+    mode="invalid";events.push({type:"invalid",i,t:bars[i].t,ref,regionStart:rg.start,reason:"DIF破坏参考极值"});
+   }
+   if(mode==="watch"&&turning(i,sign)){
+    mode="signal";events.push({type:sign<0?"buy":"sell",i,t:bars[i].t,ref,regionStart:rg.start,price:bars[i].c,dif:dif[i]});
+   }
+  }
+  // The first opposite-color candle may complete the pending first DIF turn.
+  if(mode==="watch"&&rg.end+1<bars.length&&turning(rg.end+1,sign)){
+   const i=rg.end+1;mode="signal";
+   events.push({type:sign<0?"buy":"sell",i,t:bars[i].t,ref,regionStart:rg.start,price:bars[i].c,dif:dif[i],atCross:true});
+  }
+  if(mode==="watch"&&rg.end<bars.length-1){
+   mode="expired";events.push({type:"expired",i:rg.end+1,t:bars[rg.end+1].t,ref,regionStart:rg.start,reason:"第二同色区结束，未出现首次DIF拐头"});
+  }
+  if(rg.end===bars.length-1)active={mode,sign,regionStart:rg.start,regionEnd:rg.end,ref,gap,
+    minclose,maxclose,mindif,maxdif,eligible:!!ref,latestDif:dif.at(-1),
+    lastDiff:dif.length>1?dif.at(-1)-dif.at(-2):0};
+ }
+ const recent=events.filter(e=>e.type==="buy"||e.type==="sell"),last=recent.at(-1);
+ const invalidAfter=last&&events.some(e=>(e.type==="invalid"||e.type==="expired")&&e.regionStart===last.regionStart&&e.i>last.i);
+ const fresh=last&&bars.length-1-last.i<=2&&!invalidAfter;
+ const state=fresh?last.type:active?.mode==="watch"?(active.sign<0?"watchBuy":"watchSell"):"neutral";
+ return {events,regions,active,ref:active?.ref||null,lastSignalIndex:last?.i??-1000,age:last?bars.length-1-last.i:Infinity,recent,state};
 }
-let state="neutral",ref=watchRef;const age=bars.length-1-lastSignalIndex;
-if(current&&mode==="watch")state=current.sign<0?"watchBuy":"watchSell";
-const lastEvent=events.filter(e=>e.type==="buy"||e.type==="sell").at(-1);
-const invalidAfter=lastEvent&&events.some(e=>e.type==="invalid"&&e.i>=lastEvent.i);
-if(lastEvent&&age<=2&&!invalidAfter)state=lastEvent.type;
-const recent=events.filter(e=>e.type==="buy"||e.type==="sell");
-return {bars,dif,dea,hist,nine,events,state,ref,lastSignalIndex,age,recent}}
+function projectNext(v){
+ if(!v||!v.bars.length)return null;
+ const k=2/13-2/27,a=11/13*v.ema12.at(-1)-25/27*v.ema26.at(-1);
+ const recentDIF=v.dif.at(-1),dea=v.dea.at(-1),prevDIF=v.dif.at(-2);
+ const priceForDIF=d=>(d-a)/k;
+ const colorPrice=priceForDIF(dea); // next histogram sign = sign(next DIF - current DEA)
+ const zone=v.active;
+ const result={k,a,colorPrice,mode:"none",direction:null,lossPrice:null,turnPrice:null,formation:null};
+ if(zone?.mode==="watch"&&zone.ref){
+  result.mode="watch";result.direction=zone.sign<0?"bottom":"top";
+  result.lossPrice=priceForDIF(zone.ref.dif);
+  const canFirstTurn=zone.sign<0?recentDIF<=prevDIF+EPS:recentDIF>=prevDIF-EPS;
+  if(canFirstTurn)result.turnPrice=priceForDIF(recentDIF);
+  else result.note="DIF已连续同向运行，不能把延续算作首次拐头；须等待斜率重新转向";
+  return result;
+ }
+ // A newly closing same-color bar may create a fresh divergence.
+ // The active region may be the candidate or the immediately preceding opposite region.
+ const rg=v.regions.at(-1);
+ if(!rg)return result;
+ let targetSign=rg.sign,ref=zone?.ref,baseMin=zone?.mindif,baseMax=zone?.maxdif;
+ if(!ref&&rg.sign!==0){
+  // If the opposite region is at least 3 bars long, the NEXT bar can start a new target region.
+  const opposite=rg.sign;
+  if(rg.end-rg.start+1>=3){
+   targetSign=-opposite;
+   const prev=v.regions.slice(0,-1).reverse().find(x=>x.sign===targetSign);
+   if(prev){
+    const idx=Array.from({length:prev.end-prev.start+1},(_,q)=>prev.start+q);
+    ref={close:targetSign<0?Math.min(...idx.map(j=>v.bars[j].c)):Math.max(...idx.map(j=>v.bars[j].c)),
+      dif:targetSign<0?Math.min(...idx.map(j=>v.dif[j])):Math.max(...idx.map(j=>v.dif[j]))};
+    baseMin=Infinity;baseMax=-Infinity;
+   }
+  }
+ }
+ if(!ref||!targetSign)return result;
+ const difStillOK=targetSign<0?baseMin>ref.dif+EPS:baseMax<ref.dif-EPS;
+ if(!difStillOK)return result;
+ const refPrice=ref.close,difPrice=priceForDIF(ref.dif);
+ if(targetSign<0){
+  const lo=difPrice,hi=Math.min(refPrice,colorPrice);
+  if(lo+1e-8<hi)result.formation={side:"bottom",lo,hi,priceReference:refPrice};
+ }else{
+  const lo=Math.max(refPrice,colorPrice),hi=difPrice;
+  if(lo+1e-8<hi)result.formation={side:"top",lo,hi,priceReference:refPrice};
+ }
+ if(result.formation){result.mode="candidate";result.direction=targetSign<0?"bottom":"top"}
+ return result;
+}
+function calculate(bars){
+ if(!bars||bars.length<60)return null;
+ const closes=bars.map(b=>b.c),f=ema(closes,12),s=ema(closes,26),dif=f.map((x,i)=>x-s[i]),dea=ema(dif,9),hist=dif.map((x,i)=>2*(x-dea[i]));
+ const nine=[];let run=0,side=0;
+ for(let i=0;i<bars.length;i++){const dir=i>=4?Math.sign(closes[i]-closes[i-4]):0;
+  if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
+ const structure=scanStructure(bars,dif,hist);
+ const output={bars,dif,dea,hist,nine,ema12:f,ema26:s,...structure};
+ output.projection=projectNext(output);
+ return output;
+}
 function processAll(){store={};for(let j=0;j<4;j++){const a=raw[j];if(!a)continue;const m=filterFinal(a["15"]||[],"15"),h=filterFinal(a["60"]||[],"60"),d=filterFinal(a["101"]||[],"D"),w=filterFinal(a["102"]||[],"W");store[j]={};store[j]["15"]=calculate(m);store[j]["60"]=calculate(h.length>65?h:resample(m,4));store[j]["90"]=calculate(resample(m,6));store[j]["120"]=calculate(h.length>65?resampleHourly(h):resample(m,8));store[j].D=calculate(d);store[j].W=calculate(w)}render()}
 function getSignal(i,p){return store[i]&&store[i][p]||null}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
