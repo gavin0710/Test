@@ -45,7 +45,7 @@ function independentCheck(v,event){
   sourceGap:event.gap,sourceRefClose:f(event.ref?.close),sourceRefDIF:f(event.ref?.dif)};
  return rec;
 }
-const cases=[],problems=[],gap3=[],allBuy=[],allSell=[],rangeDump=[],signalAround=[];
+const cases=[],problems=[],gap3=[],allBuy=[],allSell=[],rangeDump=[],signalAround=[];let text2024=null;
 for(let i=0;i<4;i++){
  const base=merge(m15.data[i]["15"],latest.data[i]["15"]);
  const d=merge(daily.data[i]["101"],latest.data[i]["101"]);
