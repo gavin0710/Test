@@ -253,86 +253,122 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
  const baseByBar=new Map();
  for(const event of baseEvents){let list=baseByBar.get(event.i)||[];list.push(event);baseByBar.set(event.i,list)}
  const events=[],cycles={bottom:null,top:null},allCycles=[],trades=[],losses=[];
- let position=null,everOpened=0,unpairedSells=0;
- const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,technicalFailures:0,buy:0,sell:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,open:0};
+ let position=null,correctionPending=null,everOpened=0,unpairedSells=0;
+ const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,
+  technicalFailures:0,buy:0,sell:0,correctionBuy:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,open:0,
+  openCorrections:0,pairedBuy:0,openBuy:0};
  const push=e=>{events.push(e);return e};
  const exit=(e,kind)=>{
   if(!position)return false;
   const out={...position,exitI:e.i,exitT:e.t,exitClose:bars[e.i].c,exitType:kind,holdBars:e.i-position.entryI};
-  trades.push(out);position=null;counts.completed++;if(kind==="stop"){counts.stopExits++}else if(kind==="topSell"){counts.sellExits++}return true;
+  trades.push(out);position=null;counts.completed++;
+  if(kind==="stop"){counts.stopExits++;correctionPending=null}
+  else if(kind==="topSell"){
+   counts.sellExits++;
+   // A top-side sell is reversible only while its top structure remains structurally
+   // eligible (fewer than 3 consecutive non-red columns).
+   const ref=e.ref?.dif??e.refDIF??cycles.top?.refDIF;
+   if(Number.isFinite(ref)){
+    correctionPending={exitI:e.i,refDIF:ref,oppositeStreak:cycles.top?.oppositeStreak||0,
+     campaignI:out.campaignI,originalEntryT:out.originalEntryT,
+     originalEntryClose:out.originalEntryClose,correctionCount:out.correctionCount||0,
+     parentEntryI:out.entryI,parentExitI:e.i,parentExitT:e.t,
+     topFirstI:cycles.top?.firstI??e.i};
+   }else correctionPending=null;
+  }
+  return true;
  };
  const processSignal=e=>{
   const isBuy=["buy","secondBuy","thirdBuy","laterBuy"].includes(e.type);
   const isSell=["sell","secondSell","thirdSell","laterSell"].includes(e.type);
   if(isBuy){counts.buy++;
-   if(!position){position={entryI:e.i,entryT:e.t,entryClose:bars[e.i].c,entryType:e.type,buySignals:[{type:e.type,i:e.i}]};everOpened++}
-   else position.buySignals.push({type:e.type,i:e.i});
+   if(!position){
+    correctionPending=null;
+    position={entryI:e.i,entryT:e.t,entryClose:bars[e.i].c,entryType:e.type,
+     campaignI:e.i,originalEntryT:e.t,originalEntryClose:bars[e.i].c,
+     correctionCount:0,bottomFirstI:cycles.bottom?.firstI??e.i,
+     buySignals:[{type:e.type,i:e.i}]};everOpened++;
+   }else position.buySignals.push({type:e.type,i:e.i});
   }else if(isSell){counts.sell++;
    if(position)exit(e,"topSell");
    else{counts.unpairedSells++;unpairedSells++}
   }
  };
  for(let i=0;i<n;i++){
-  // Every completion bar updates the still-active structure, independent of isolated color waves.
+  // Rebuy after an actually paired top exit, not after an unpaired sell.
+  // All comparisons use completed-bar DIF; price-only spikes and repeated DIF
+  // turns do not qualify. Expire when >=3 consecutive non-red columns occur.
+  if(correctionPending&&i>correctionPending.exitI){
+   const pending=correctionPending;
+   if(position)correctionPending=null;
+   else{
+    pending.oppositeStreak=signAt(i)===1?0:pending.oppositeStreak+1;
+    if(pending.oppositeStreak>=3)correctionPending=null;
+    else if(dif[i]>pending.refDIF+EPS&&dif[i-1]<=pending.refDIF+EPS){
+     const number=pending.correctionCount+1;
+     const e=push({type:"correctionBuy",i,t:bars[i].t,stage:number,side:"bottom",
+      refDIF:pending.refDIF,close:bars[i].c,originalI:pending.campaignI,
+      originalT:pending.originalEntryT,originalClose:pending.originalEntryClose,
+      previousExitI:pending.parentExitI,previousExitT:pending.parentExitT,topFirstI:pending.topFirstI});
+     position={entryI:i,entryT:bars[i].t,entryClose:bars[i].c,entryType:"correctionBuy",
+      campaignI:pending.campaignI,originalEntryT:pending.originalEntryT,
+      originalEntryClose:pending.originalEntryClose,correctionCount:number,
+      bottomFirstI:null,buySignals:[{type:"correctionBuy",i}]};
+     counts.correctionBuy++;correctionPending=null;
+    }
+   }
+  }
   for(const key of ["bottom","top"]){
    const cyc=cycles[key];if(!cyc||cyc.closed||i<=cyc.firstI)continue;
    const color=signAt(i),outside=color!==cyc.sign;
    cyc.oppositeStreak=outside?cyc.oppositeStreak+1:0;
    if(cyc.oppositeStreak>=3){
-    cyc.closed=true;cyc.endedAt=i;cyc.endReason="3 opposite-color columns";
-    continue;
+    cyc.closed=true;cyc.endedAt=i;cyc.endReason="3 opposite-color columns";continue;
    }
    const broken=cyc.sign<0?dif[i]<cyc.refDIF-EPS:dif[i]>cyc.refDIF+EPS;
    if(broken){
     cyc.closed=true;cyc.endedAt=i;cyc.endReason="DIF made new reference extreme";
-    const failure=push({type:"structureFailure",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
+    push({type:"structureFailure",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
     counts.technicalFailures++;
-    // A bottom failure demands stop only when still holding the corresponding long position.
-    if(key==="bottom"&&position){
-     const stop=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c,entryI:position.entryI,entryT:position.entryT,entryClose:position.entryClose,holdBars:i-position.entryI});
+    // Avoid stopping a correction trade for a different, unrelated old bottom structure.
+    if(key==="bottom"&&position&&position.bottomFirstI===cyc.firstI){
+     const stop=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,
+      firstI:cyc.firstI,close:bars[i].c,entryI:position.entryI,entryT:position.entryT,
+      entryClose:position.entryClose,holdBars:i-position.entryI});
      counts.failStop++;losses.push(stop);exit(stop,"stop");
     }
     continue;
    }
    if(turns(i,cyc.sign)&&i>cyc.lastSignalI){
-    cyc.stage++;
-    cyc.lastSignalI=i;
-    const type=cyc.sign<0?(cyc.stage===2?"secondBuy":cyc.stage===3?"thirdBuy":"laterBuy"):(cyc.stage===2?"secondSell":cyc.stage===3?"thirdSell":"laterSell");
+    cyc.stage++;cyc.lastSignalI=i;
+    const type=cyc.sign<0?(cyc.stage===2?"secondBuy":cyc.stage===3?"thirdBuy":"laterBuy"):
+     (cyc.stage===2?"secondSell":cyc.stage===3?"thirdSell":"laterSell");
     const e=push({type,i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
-    if(cyc.stage===2)counts.second++;
-    else if(cyc.stage===3)counts.third++;
-    else counts.fourthPlus++;
+    if(cyc.stage===2)counts.second++;else if(cyc.stage===3)counts.third++;else counts.fourthPlus++;
     processSignal(e);
    }
   }
   for(const raw of baseByBar.get(i)||[]){
-   // Keep baseline divergence watch / cancellation as audited events.
    if(raw.type==="watchBuy"||raw.type==="watchSell"){counts.watch++;push({...raw});continue}
    if(raw.type==="expired"||raw.type==="invalid"){
     const hadSignal=baseEvents.some(e=>(e.type==="buy"||e.type==="sell")&&e.regionStart===raw.regionStart&&e.i<=raw.i);
-    if(!hadSignal)counts.disappeared++;
-    push({...raw});continue;
+    if(!hadSignal)counts.disappeared++;push({...raw});continue;
    }
    if(raw.type!=="buy"&&raw.type!=="sell"){push({...raw});continue}
    const key=raw.type==="buy"?"bottom":"top",sign=sideOf(raw);
    const old=cycles[key];
-   if(old&&!old.closed){
-    // A new standalone structure on the same side replaces an unfinished campaign,
-    // but cannot be counted as a duplicate first turn on its previous region.
-    old.closed=true;old.endedAt=i;old.endReason="new confirmed base structure";
-   }
+   if(old&&!old.closed){old.closed=true;old.endedAt=i;old.endReason="new confirmed base structure"}
    const cyc={side:key,sign,firstI:i,lastSignalI:i,stage:1,refDIF:raw.ref?.dif,
      refPrice:raw.ref?.close,regionStart:raw.regionStart,oppositeStreak:0,closed:false};
-   cycles[key]=cyc;allCycles.push(cyc);
-   counts.formed++;
-   const e=push({...raw,stage:1,side:key});
-   processSignal(e);
+   cycles[key]=cyc;allCycles.push(cyc);counts.formed++;
+   const e=push({...raw,stage:1,side:key});processSignal(e);
   }
  }
- counts.open=position?1:0;
- return {events,counts,cycles:allCycles,losses,trades,position,unpairedSells,everOpened};
+ counts.open=position?1:0;counts.openCorrections=position?.entryType==="correctionBuy"?1:0;
+ counts.pairedBuy=trades.filter(t=>t.exitType==="topSell").length;
+ counts.openBuy=position?1:0;
+ return {events,counts,cycles:allCycles,losses,trades,position,correctionPending,unpairedSells,everOpened};
 }
-
 /* Interim, auditable period-specific pivot direction; not SSE wave-number engine. */
 function localWave(bars){
  const out=[],pivots=[];for(let i=0;i<bars.length;i++){
