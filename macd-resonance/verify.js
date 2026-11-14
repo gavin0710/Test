@@ -172,10 +172,12 @@ equal(sold.trades[0].exitType,"topSell","Top exit tagged distinctly");
 
 // A top-side DIF breakout after a PAIRed top exit is a linked correction buy,
 // provided fewer than three consecutive non-red histogram columns elapsed.
-function topCorrection({equal=false,tooLate=false,unpaired=false,secondExit=false}={}){
+function topCorrection({equal=false,tooLate=false,unpaired=false,secondExit=false,stopOnBar23=false}={}){
  const n=40,bars=Array.from({length:n},(_,i)=>({t:"T"+String(i).padStart(3,"0"),o:100+i,c:100+i,h:101+i,l:99+i}));
  const dif=Array(n).fill(1),hist=Array(n).fill(1);
  dif[20]=2;dif[21]=2.35;dif[22]=equal?2.5:2.8;
+ dif.fill(equal?2.4:2.9,23);
+ if(stopOnBar23)dif[23]=2.5;
  const raw=[{type:"sell",i:20,t:bars[20].t,regionStart:18,ref:{dif:2.5,close:100}}];
  if(!unpaired)raw.unshift({type:"buy",i:10,t:bars[10].t,regionStart:8,ref:{dif:-2,close:90}});
  if(tooLate){hist[21]=-1;hist[22]=-1;hist[23]=-1;dif[22]=2.4;dif[23]=2.4;dif[24]=2.9}
@@ -194,6 +196,18 @@ equal(corrected.position?.correctionCount,1,"Correction sequence is named");
 equal(topCorrection({equal:true}).counts.correctionBuy,0,"DIF equal to reference high cannot trigger correction");
 equal(topCorrection({tooLate:true}).counts.correctionBuy,0,"Three opposite histogram columns invalidate correction");
 equal(topCorrection({unpaired:true}).counts.correctionBuy,0,"Unpaired top sell never opens phantom correction");
+
+const stoppedCorrection=topCorrection({stopOnBar23:true});
+equal(stoppedCorrection.counts.correctionBuy,1,"Correction buy confirmed above previous top reference");
+equal(stoppedCorrection.counts.correctionStop,1,"DIF touching reference high on next completed bar causes correction stop");
+equal(stoppedCorrection.trades.length,2,"Original top exit and correction stop are separate audited legs");
+equal(stoppedCorrection.trades[1].exitType,"correctionStop","Correction stop has dedicated exit category");
+equal(stoppedCorrection.trades[1].exitI,23,"Stop is on first completed bar after correction entry");
+equal(stoppedCorrection.trades[0].campaignI,stoppedCorrection.trades[1].campaignI,"Correction loss remains linked to same campaign");
+equal(stoppedCorrection.position,null,"Stopped correction must not remain open");
+equal(stoppedCorrection.counts.stopExits,1,"Correction stop contributes to stop exits");
+equal(stoppedCorrection.events.filter(e=>e.type==="correctionStop").length,1,"No repeated stop for a closed correction");
+equal(stoppedCorrection.counts.correctionBuy,1,"No automatic re-buy following stopped correction without new paired top sale");
 
 const pending=topCorrection();
 const expectedRef=pending.events.find(e=>e.type==="correctionBuy")?.refDIF;
