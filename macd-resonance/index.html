@@ -102,8 +102,8 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
  <section class="secondary" aria-label="辅助信息">
   <details class="fold" id="statfold" open><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>失败止损</th><th>买点</th><th>卖点</th><th>已配对</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
-    <div class="stat-disclaimer">统计范围有限；成交为信号配对示意，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>止损结束</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
+    <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
    <div class="foldbody"><div id="stoprecords"></div><div id="openrecords"></div></div>
@@ -209,12 +209,12 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
  for(const event of baseEvents){let list=baseByBar.get(event.i)||[];list.push(event);baseByBar.set(event.i,list)}
  const events=[],cycles={bottom:null,top:null},allCycles=[],trades=[],losses=[];
  let position=null,everOpened=0,unpairedSells=0;
- const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,technicalFailures:0,buy:0,sell:0,unpairedSells:0,completed:0,stopExits:0,open:0};
+ const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,technicalFailures:0,buy:0,sell:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,open:0};
  const push=e=>{events.push(e);return e};
  const exit=(e,kind)=>{
   if(!position)return false;
   const out={...position,exitI:e.i,exitT:e.t,exitClose:bars[e.i].c,exitType:kind,holdBars:e.i-position.entryI};
-  trades.push(out);position=null;counts.completed++;if(kind==="stop"){counts.stopExits++}return true;
+  trades.push(out);position=null;counts.completed++;if(kind==="stop"){counts.stopExits++}else if(kind==="topSell"){counts.sellExits++}return true;
  };
  const processSignal=e=>{
   const isBuy=["buy","secondBuy","thirdBuy","laterBuy"].includes(e.type);
@@ -295,6 +295,15 @@ function projectNext(v){
  const colorPrice=priceForDIF(dea); // next histogram sign = sign(next DIF - current DEA)
  const zone=v.active;
  const result={k,a,colorPrice,mode:"none",direction:null,lossPrice:null,turnPrice:null,formation:null};
+ const campaign=(v.cycles||[]).filter(x=>!x.closed&&Number.isFinite(x.refDIF)).at(-1);
+ if(campaign&&campaign.firstI<v.bars.length-1){
+  result.mode="campaign";result.direction=campaign.sign<0?"bottom":"top";
+  result.lossPrice=priceForDIF(campaign.refDIF);result.nextStage=campaign.stage+1;
+  result.oppositeStreak=campaign.oppositeStreak;
+  const canTurn=campaign.sign<0?recentDIF<=prevDIF+EPS:recentDIF>=prevDIF-EPS;
+  if(canTurn)result.turnPrice=priceForDIF(recentDIF);
+  return result;
+ }
  if(zone?.mode==="signal"||zone?.mode==="invalid"){
   result.mode=zone.mode;return result;
  }
@@ -407,9 +416,9 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   ctx.fillRect(startX,t,Math.max(1,w-r-startX),hh);
  }
  const proj=v.projection;
- if(proj&&(proj.mode==="watch"||proj.mode==="candidate")){
+ if(proj&&(proj.mode==="watch"||proj.mode==="candidate"||proj.mode==="campaign")){
   const guidelines=[];
-  if(proj.mode==="watch"){
+  if(proj.mode==="watch"||proj.mode==="campaign"){
    if(Number.isFinite(proj.lossPrice))guidelines.push({price:proj.lossPrice,label:"失效临界",color:"#df8993"});
    if(Number.isFinite(proj.turnPrice))guidelines.push({price:proj.turnPrice,label:proj.direction==="bottom"?"DIF买点":"DIF下拐",color:"#2eaf82"});
   }else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
@@ -424,10 +433,12 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
  bars.forEach((bar,k)=>{const up=bar.c>=bar.o,color=up?"#d95562":"#11a47a",x=xc(k);
   ctx.strokeStyle=color;ctx.lineWidth=1.15;ctx.beginPath();ctx.moveTo(x,y(bar.h));ctx.lineTo(x,y(bar.l));ctx.stroke();
   const hi=y(Math.max(bar.o,bar.c)),lo=y(Math.min(bar.o,bar.c));ctx.fillStyle=color;ctx.fillRect(x-cw/2,hi,cw,Math.max(1.35,lo-hi));
-  const list=signalMap.get(from+k)||[],buy=list.find(q=>q.type==="buy"),sell=list.find(q=>q.type==="sell"),wb=list.find(q=>q.type==="watchBuy"),ws=list.find(q=>q.type==="watchSell");
+  const list=signalMap.get(from+k)||[],buy=list.find(q=>["buy","secondBuy","thirdBuy","laterBuy"].includes(q.type)),sell=list.find(q=>["sell","secondSell","thirdSell","laterSell"].includes(q.type)),wb=list.find(q=>q.type==="watchBuy"),ws=list.find(q=>q.type==="watchSell"),stop=list.find(q=>q.type==="stopLoss");
   if(buy||sell){const bullish=!!buy,yy=bullish?Math.min(h-b-3,y(bar.l)+13):Math.max(t+7,y(bar.h)-13);ctx.fillStyle=bullish?"#129b72":"#d95762";ctx.beginPath();
    if(bullish){ctx.moveTo(x,yy-6);ctx.lineTo(x-5,yy+3);ctx.lineTo(x+5,yy+3)}else{ctx.moveTo(x,yy+6);ctx.lineTo(x-5,yy-3);ctx.lineTo(x+5,yy-3)}ctx.closePath();ctx.fill()}
   else if(wb||ws){const bullish=!!wb,yy=bullish?Math.min(h-b-5,y(bar.l)+14):Math.max(t+7,y(bar.h)-14);plotText(ctx,bullish?"底":"顶",x,yy,bullish?"#2fa988":"#cc7c78",9,"center","650")}
+  if(buy?.stage>1||sell?.stage>1){const stage=(buy||sell).stage;plotText(ctx,String(stage),x,Math.max(t+11,y(buy?bar.l:bar.h)+(buy?27:-22)),buy?"#159e78":"#d05f66",10,"center","750")}
+  if(stop){plotText(ctx,"止损",x,Math.max(t+11,y(bar.h)-15),"#d45665",10,"center","750")}
   if(Math.abs(nine[k])===9&&(k===0||Math.abs(nine[k-1])<9)){const high=nine[k]>0,yy=high?Math.max(t+11,y(bar.h)-21):Math.min(h-b-7,y(bar.l)+22);plotText(ctx,"9",x,yy,high?"#d56c70":"#199e7b",10,"center","700")}
  });
  // Current price dotted guide
@@ -458,13 +469,14 @@ function drawAll(){for(let i=0;i<4;i++){if(focusIndex>=0&&focusIndex!==i)continu
 function projectionHTML(v,label){
  if(!v||!v.projection)return '<div class="estimate"><span class="estimate-text">当前没有足够数据用于临界收盘价计算</span></div>';
  const p=v.projection;let items='';
- if(p.mode==="watch"){
+ if(p.mode==="watch"||p.mode==="campaign"){
   const side=p.direction==="bottom"?"底":"顶";
   const loss=p.direction==="bottom"?"≤":"≥",turn=p.direction==="bottom"?">":"<";
-  items+='<span class="estimate-chip watch">'+side+'钝化观察中</span>';
+  items+='<span class="estimate-chip watch">'+(p.mode==="campaign"?side+'结构已形成 · 等第'+(p.nextStage||2)+'次拐头':side+'钝化观察中')+'</span>'; 
   if(Number.isFinite(p.lossPrice))items+='<span class="estimate-chip loss">失效 '+loss+' 约'+valstr(p.lossPrice)+'</span>';
-  if(Number.isFinite(p.turnPrice))items+='<span class="estimate-chip buy">'+(p.direction==="bottom"?"买点 DIF↑":"DIF↓")+' '+turn+' 约'+valstr(p.turnPrice)+'</span>';
-  else items+='<span class="estimate-chip note">暂不能推断首次DIF拐头价</span>';
+  if(Number.isFinite(p.turnPrice))items+='<span class="estimate-chip buy">'+(p.mode==="campaign"?"第"+p.nextStage+"次":"")+(p.direction==="bottom"?"买点 DIF↑":"DIF↓")+' '+turn+' 约'+valstr(p.turnPrice)+'</span>';
+  else items+='<span class="estimate-chip note">DIF尚未回落/反转，暂无新的首次拐头临界价</span>';
+  if(p.mode==="campaign"&&p.oppositeStreak>=2)items+='<span class="estimate-chip note">若下一根仍为反色柱，则本轮结构结束</span>';
  }else if(p.mode==="candidate"&&p.formation){
   const f=p.formation;
   items+='<span class="estimate-chip watch">'+(f.side==="bottom"?"新底钝化":"新顶钝化")+'条件区间</span>';
@@ -485,7 +497,7 @@ function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 
-const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","failStop","buy","sell","completed","open"];
+const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","failStop","buy","sell","sellExits","stopExits","open"];
 function getHistoryStats(){
  const rows=[],total=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));
  for(let j=0;j<4;j++)for(const [period,label] of PERIODS){
@@ -497,11 +509,11 @@ function getHistoryStats(){
 }
 function renderStats(){
  const {rows,total}=getHistoryStats();
- const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["待卖出",total.open]];
+ const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["止损结束",total.stopExits],["待卖出",total.open]];
  byId("statsoverall").innerHTML=items.map(([name,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+name+'</span></div>').join("");
  byId("statsbody").innerHTML=rows.map(({i,period,label,v,stats:q})=>{
   const hist=v.bars,range=hist[0].t.slice(0,10)+'～'+hist.at(-1).t.slice(0,10);
-  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.failStop,q.buy,q.sell,q.completed,q.open];
+  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.failStop,q.buy,q.sell,q.sellExits,q.stopExits,q.open];
   return '<tr><td>'+IDX[i].name+'</td><td>'+label+'</td><td class="event-t">'+range+'（'+hist.length+'根）</td>'+
     cells.map((n,k)=>'<td class="'+(k===6?"fail":k===7||k===8?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
  }).join("");
