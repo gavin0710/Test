@@ -115,6 +115,20 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 #density-count{width:55px;max-width:65px;padding:4px 1px;border:0;background:transparent;font-size:12px;font-weight:750;color:#34536f;text-align:center;appearance:textfield}
 #density-count::-webkit-inner-spin-button,#density-count::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 @media(max-width:600px){.density{gap:3px}.density-btn{width:27px;height:27px}.density .faint{font-size:10px}.controls{flex-wrap:wrap}}
+
+.quickfilter{padding:12px 15px 11px;background:#fff;border:1px solid #e2e9f0;border-radius:12px;box-shadow:0 2px 9px #20344906;margin:0 0 13px;display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.quicktop{display:flex;align-items:center;gap:11px;flex-wrap:wrap}.quicktop strong{font-size:13px;color:#304a60}.quickmeta{font-size:11px;color:#7c8e9e;flex:1}
+.quicktop select,.quickjump select{padding:7px 10px;font-size:11px;background:#fff;color:#536b80;border:1px solid #dce5ed;border-radius:7px;min-width:85px}
+.quickchips{display:flex;gap:5px;overflow:auto hidden;scrollbar-width:thin;padding-bottom:3px;white-space:nowrap}
+.quickchip{padding:7px 10px;background:#f3f6f9;color:#6e8295;border:1px solid transparent;border-radius:7px;font-size:11px;font-weight:550;flex:none}
+.quickchip.active{background:#e9f2fa;border-color:#a6c5dc;color:#265c82;font-weight:750}
+.quickchip b{margin-left:5px;color:inherit;opacity:.8;font-variant-numeric:tabular-nums}
+.quickjump{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.quickjump select{min-width:120px;flex:1;max-width:790px}
+.quickjump button{background:#f3f7fa;border:1px solid #dce6ec;border-radius:7px;padding:4px 10px;font-size:18px;color:#527a9a}
+.quickdetail{font-size:10px;color:#7c8e9e}
+.quick-selected{border-color:#8baeca!important;box-shadow:0 0 0 1px #bfd5e7,0 3px 14px #446e9812!important}
+@media(max-width:650px){.quickfilter{padding:10px}.quickdetail{flex-basis:100%}.quickjump select{max-width:unset}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -131,6 +145,11 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
   <div class="history-scrubber"><span>最早</span><input id="history-slider" type="range" min="0" max="0" value="0" step="1" aria-label="历史时间轴滚动"><span>最新</span></div>
   <button class="history-reset" id="history-reset" type="button" title="回到最新K线">回最新</button>
  </div>
+ <section class="quickfilter" id="quickfilter" aria-label="K线历史关键点位快速筛选">
+  <div class="quicktop"><strong>图上关键点</strong><span class="quickmeta" id="quick-count">载入关键点位中</span><select id="quick-index" aria-label="指数范围"><option value="all">四指数</option><option value="0">上证指数</option><option value="1">深证成指</option><option value="2">创业板指</option><option value="3">科创50</option></select></div>
+  <div class="quickchips" id="quick-chips"></div>
+  <div class="quickjump"><button id="quick-prev" type="button" title="更早一个匹配点位">‹</button><select id="quick-list" aria-label="选择历史关键点位"><option value="">选择关键点定位到K线</option></select><button id="quick-next" type="button" title="更新一个匹配点位">›</button><span id="quick-detail" class="quickdetail">选中点位将自动跳转并突出显示</span></div>
+ </section>
  <div id="chartfail" class="error" hidden></div>
  <section class="chartgrid" id="chartgrid" aria-label="四大指数K线图"></section>
  <section class="secondary" aria-label="辅助信息">
@@ -492,6 +511,7 @@ function stateClass(s){return s==="buy"?"buy":s==="sell"?"sell":s==="watchBuy"?"
 
 let visibleBars=100,densityBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
 let panOffsetByPeriod={},dragSession=null;
+let quickKind="all",quickIndex="all",selectedEvent=null;
 const buyTypes=new Set(["buy","secondBuy","thirdBuy","laterBuy"]);
 const sellTypes=new Set(["sell","secondSell","thirdSell","laterSell"]);
 let signalAnchors={};
@@ -737,6 +757,120 @@ function projectionHTML(v,label){
  return '<div class="estimate"><span class="estimate-label">'+label+'推演</span>'+items+'</div>';
 }
 
+
+const QUICK_TYPES=[
+ ["all","全部"],["watch","钝化"],["disappeared","钝化消失"],["buy","买入点"],
+ ["firstBuy","买1"],["secondBuy","买2"],["thirdBuy","买3+"],
+ ["pairedBuy","买后已卖"],["openBuy","买后未卖"],["stoppedBuy","止损买点"],
+ ["correction","纠错买回"],["sell","顶部卖点"],["pairedSell","已配对卖点"],
+ ["unpairedSell","未配对卖点"],["stop","失败止损"]
+];
+const QUICK_BUYS=new Set(["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"]);
+const QUICK_SELLS=new Set(["sell","secondSell","thirdSell","laterSell"]);
+const QUICK_EVENTS=new Set([...QUICK_BUYS,...QUICK_SELLS,"watchBuy","watchSell","expired","invalid","stopLoss"]);
+function quickPairStatus(v){
+ const buys=new Map(),sells=new Set();
+ for(const t of v?.trades||[]){
+  const status=t.exitType==="topSell"?"已配对":"止损";
+  for(const b of t.buySignals||[])buys.set(b.i,{status,exitT:t.exitT,exitI:t.exitI,rootT:t.originalEntryT||t.entryT,rootI:t.campaignI??t.entryI,correction:t.entryType==="correctionBuy"});
+  if(t.exitType==="topSell")sells.add(t.exitI);
+ }
+ if(v?.position)for(const b of v.position.buySignals||[])buys.set(b.i,{status:"未配对",rootT:v.position.originalEntryT||v.position.entryT,rootI:v.position.campaignI??v.position.entryI,correction:v.position.entryType==="correctionBuy"});
+ return {buys,sells};
+}
+function matchQuickEvent(e,kind,pair){
+ const type=e.type;
+ if(!QUICK_EVENTS.has(type))return false;
+ if(kind==="all")return true;
+ if(kind==="watch")return type==="watchBuy"||type==="watchSell";
+ if(kind==="disappeared")return type==="invalid"||type==="expired";
+ if(kind==="buy")return QUICK_BUYS.has(type);
+ if(kind==="firstBuy")return type==="buy";
+ if(kind==="secondBuy")return type==="secondBuy";
+ if(kind==="thirdBuy")return type==="thirdBuy"||type==="laterBuy";
+ if(kind==="pairedBuy")return QUICK_BUYS.has(type)&&pair.buys.get(e.i)?.status==="已配对";
+ if(kind==="openBuy")return QUICK_BUYS.has(type)&&pair.buys.get(e.i)?.status==="未配对";
+ if(kind==="stoppedBuy")return QUICK_BUYS.has(type)&&pair.buys.get(e.i)?.status==="止损";
+ if(kind==="correction")return type==="correctionBuy";
+ if(kind==="sell")return QUICK_SELLS.has(type);
+ if(kind==="pairedSell")return QUICK_SELLS.has(type)&&pair.sells.has(e.i);
+ if(kind==="unpairedSell")return QUICK_SELLS.has(type)&&!pair.sells.has(e.i);
+ if(kind==="stop")return type==="stopLoss";
+ return false;
+}
+function quickName(e){
+ const t=e.type;
+ if(t==="watchBuy")return "底钝化";
+ if(t==="watchSell")return "顶钝化";
+ if(t==="expired"||t==="invalid")return "钝化消失";
+ if(t==="stopLoss")return "结构止损";
+ if(t==="correctionBuy")return "纠错买回"+(e.stage>1?e.stage:"");
+ if(t==="buy"||t==="sell")return t==="buy"?"买1":"卖1";
+ if(t==="secondBuy"||t==="secondSell")return t==="secondBuy"?"买2":"卖2";
+ if(t==="thirdBuy"||t==="thirdSell")return t==="thirdBuy"?"买3":"卖3";
+ if(t==="laterBuy"||t==="laterSell")return (t==="laterBuy"?"买":"卖")+(e.stage||"4+");
+ return t;
+}
+function quickCollect(kind=quickKind,scope=quickIndex){
+ const out=[];
+ for(let i=0;i<4;i++){
+  if(scope!=="all"&&Number(scope)!==i)continue;
+  const v=getSignal(i,selectedP);if(!v)continue;
+  const pair=quickPairStatus(v);
+  for(const e of v.events){
+   if(!matchQuickEvent(e,kind,pair))continue;
+   const trade=QUICK_BUYS.has(e.type)?pair.buys.get(e.i):null;
+   const badge=trade?.status||(QUICK_SELLS.has(e.type)?pair.sells.has(e.i)?"已配对":"未配对":"");
+   out.push({key:i+":"+e.i+":"+e.type,index:i,e,badge,trade});
+  }
+ }
+ return out.sort((a,b)=>b.e.t.localeCompare(a.e.t)||a.index-b.index||a.key.localeCompare(b.key));
+}
+function locateQuick(n){
+ const list=quickCollect();if(n<0||n>=list.length)return;
+ const item=list[n],e=item.e,i=item.index;
+ selectedEvent={key:item.key,index:i,barI:e.i,t:e.t};
+ for(let x=0;x<4;x++)delete signalAnchors[selectedP+":"+x];
+ signalAnchors[selectedP+":"+i]=e.i;
+ const master=getSignal(0,selectedP);
+ if(master?.bars?.length){
+  const end=findEndAtOrBefore(master.bars,e.t);
+  panOffsetByPeriod[selectedP]=Math.max(0,master.bars.length-end-Math.floor(viewportLength(master)/2));
+ }
+ hoverTime=e.t;hoverIndex=i;hoverPixelPrice=null;
+ render();
+}
+function quickSelect(type){
+ quickKind=type;selectedEvent=null;
+ for(let i=0;i<4;i++)delete signalAnchors[selectedP+":"+i];
+ render();
+}
+function renderQuick(){
+ const list=quickCollect(),types=QUICK_TYPES;
+ byId("quick-chips").innerHTML=types.map(([type,label])=>{
+  const n=type===quickKind?list.length:quickCollect(type).length;
+  return '<button class="quickchip '+(type===quickKind?"active":"")+'" type="button" data-kind="'+type+'" aria-pressed="'+(type===quickKind)+'">'+label+' <b>'+n+'</b></button>';
+ }).join("");
+ byId("quick-chips").querySelectorAll("button").forEach(b=>b.onclick=()=>quickSelect(b.dataset.kind));
+ const selector=byId("quick-index");selector.value=quickIndex;
+ selector.onchange=()=>{quickIndex=selector.value;selectedEvent=null;render()};
+ const entry=selectedEvent?list.findIndex(x=>x.key===selectedEvent.key):-1;
+ const shown=list.slice(0,300);
+ if(entry>=300)shown.unshift(list[entry]);
+ byId("quick-list").innerHTML='<option value="">'+(list.length?'选择具体点位，直接定位K线':'当前筛选无匹配点位')+'</option>'+
+  shown.map(x=>{
+   const pos=list.indexOf(x),desc=IDX[x.index].short+" · "+x.e.t.replace("T"," ")+" · "+quickName(x.e)+
+    (x.badge?" · "+x.badge:"")+(x.trade?.rootT&&x.e.type==="correctionBuy"?" · 原买"+x.trade.rootT.slice(0,10):"");
+   return '<option value="'+pos+'" '+(pos===entry?"selected":"")+'>'+esc(desc)+'</option>';
+  }).join("");
+ byId("quick-list").onchange=e=>{if(e.target.value!=="")locateQuick(Number(e.target.value))};
+ byId("quick-prev").disabled=!list.length||entry>=list.length-1;
+ byId("quick-next").disabled=!list.length||entry===0;
+ byId("quick-prev").onclick=()=>locateQuick(entry<0?0:Math.min(list.length-1,entry+1));
+ byId("quick-next").onclick=()=>locateQuick(entry<0?0:Math.max(0,entry-1));
+ byId("quick-count").textContent=PERIODS.find(x=>x[0]===selectedP)?.[1]+" · "+list.length+"个匹配点位"+(shown.length<list.length?" · 下拉显示最近300个":"");
+ byId("quick-detail").textContent=entry>=0?("当前 "+(entry+1)+"/"+list.length+" · "+quickName(list[entry].e)+" · "+(list[entry].badge||"")+ " · "+list[entry].e.t.replace("T"," ")):"点击点位可直达K线；买后未卖/卖点未配对均明确标示";
+}
 function buySignalEvents(v){return v?v.events.filter(e=>buyTypes.has(e.type)&&Number.isInteger(e.i)):[]}
 function navigateBuy(i,step){
  const v=getSignal(i,selectedP),buys=buySignalEvents(v);if(!buys.length)return;
@@ -767,7 +901,7 @@ function buyNavigator(i,v){
 function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v&&v.bars.at(-2),pct=last&&prev?(last.c-prev.c)/prev.c*100:0,delta=last&&prev?last.c-prev.c:0,n=v?v.nine.at(-1):0,s=v?v.state:"missing";
  const c=delta>=0?"up":"down";
  const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const latestLabel=v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const view=visible(i),isLatest=view?.bars.at(-1)?.t===v?.bars.at(-1)?.t;const projection=isLatest?projectionHTML(v,nextLabel):'<div class="estimate"><span class="estimate-text">历史浏览中 · 下一根条件推演仅对应最新K线；点击“回最新”查看</span></div>';const navigator=buyNavigator(i,v);
- return '<article class="chart-card '+(focusIndex===i?"focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>买1/2/3：DIF逐次上拐 · 卖：顶部结构 · 止损：结构失败</span><span class="latest">'+timed+'</span></div></article>'
+ return '<article class="chart-card '+(focusIndex===i?"focused":"")+(selectedEvent?.index===i?" quick-selected":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>买1/2/3：DIF逐次上拐 · 卖：顶部结构 · 止损：结构失败</span><span class="latest">'+timed+'</span></div></article>'
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 
@@ -861,7 +995,7 @@ function renderHistory(){
   return '<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.index].name+'</b><span class="mstatus '+(bullish?"buy":bear?"sell":"")+'">'+(names[e.type]||e.type)+'</span><span>'+valstr(e.price||e.close||0)+' · '+nLabel(e.nine)+'</span></div>';
  }).join("")+'</div>':'<div class="faint" style="padding:12px">当前周期尚无历史事件记录</div>';
 }
-function render(){renderPeriods();renderResonance();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
+function render(){renderPeriods();renderResonance();renderQuick();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
  grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
  grid.querySelectorAll(".buyjump").forEach(b=>b.onclick=()=>navigateBuy(Number(b.dataset.i),Number(b.dataset.step)));
  grid.querySelectorAll(".buyselect").forEach(sel=>sel.onchange=()=>{if(sel.value!=="")jumpToBuy(Number(sel.dataset.i),Number(sel.value))});
