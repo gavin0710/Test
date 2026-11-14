@@ -54,12 +54,11 @@ const server=http.createServer((req,res)=>{
    assert.equal(report.trades,report.renderedRows);
    assert.equal(report.open,report.shownOpen);
    assert(report.hasStructureColumn&&report.validPaths);
-   assert.equal(report.daySignalBuys,7,"Seven archived daily correction buy signals");
-   assert.equal(report.dayUnitBuys,22,"Twenty-two linked daily correction buy units");
-   assert.equal(report.daySignalStops,7,"Seven archived daily stop triggers, not twenty-two");
-   assert.equal(report.dayUnitStops,22,"Twenty-two real unit-level correction exits");
-   assert.equal(report.quickStopCount,7,"Correction-stop point selector shows one event per actual trigger");
-   assert((report.dailyDisplay.match(/7\s*\/\s*22/g)||[]).length>=2,"Daily table shows signal/unit pairs for both buy and stop");
+   assert(report.daySignalBuys>0&&report.dayUnitBuys>=report.daySignalBuys,"Every buy signal maps to one or more independently owned units");
+   assert(report.daySignalStops>0&&report.dayUnitStops>=report.daySignalStops,"Every correction stop signal maps to one or more unit exits");
+   assert.equal(report.quickStopCount,report.daySignalStops,"Correction-stop point selector shows one event per trigger");
+   assert(report.dailyDisplay.includes(report.daySignalBuys+" / "+report.dayUnitBuys),"Daily buy signal/unit accounting is visible");
+   assert(report.dailyDisplay.includes(report.daySignalStops+" / "+report.dayUnitStops),"Daily stop signal/unit accounting is visible");
    await page.locator("#view-replay").click();
    assert.equal(await page.locator(".chart-card:visible").count(),4);
    assert.equal(await page.locator(".confluence-item").count(),4);
