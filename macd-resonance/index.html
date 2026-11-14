@@ -244,7 +244,7 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
     counts.technicalFailures++;
     // A bottom failure demands stop only when still holding the corresponding long position.
     if(key==="bottom"&&position){
-     const stop=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c,entryI:position.entryI,entryT:position.entryT,entryClose:position.entryClose});
+     const stop=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c,entryI:position.entryI,entryT:position.entryT,entryClose:position.entryClose,holdBars:i-position.entryI});
      counts.failStop++;losses.push(stop);exit(stop,"stop");
     }
     continue;
@@ -519,8 +519,22 @@ function renderStats(){
  (open.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>买入收盘</th><th>最近K线</th><th>最新收盘</th><th>追加买点</th><th>状态</th></tr></thead><tbody>'+
   open.map(o=>'<tr><td>'+IDX[o.i].name+'</td><td>'+o.label+'</td><td>'+o.entryT.replace("T"," ")+'</td><td>'+valstr(o.entryClose)+'</td><td>'+o.lastT.replace("T"," ")+'</td><td>'+valstr(o.lastClose)+'</td><td>'+Math.max(0,o.buySignals.length-1)+'</td><td class="important">待卖出</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前历史窗口内没有尚未配对的买入头寸。</p>');
 }
-function renderHistory(){const events=[];for(let i=0;i<4;i++){const v=getSignal(i,selectedP);if(!v)continue;for(const e of v.events.filter(e=>e.type==="buy"||e.type==="sell").slice(-12))events.push({...e,i,nine:v.nine[e.i]})}
- events.sort((a,b)=>b.t.localeCompare(a.t));byId("history").innerHTML=events.length?'<div class="eventlist">'+events.slice(0,18).map(e=>'<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.i].name+'</b><span class="mstatus '+e.type+'">'+(e.type==="buy"?"↑ DIF向上拐头":"↓ DIF向下拐头")+'</span><span>'+nLabel(e.nine)+'</span></div>').join("")+'</div>':'<div class="faint" style="padding:12px">本周期尚无历史拐头记录</div>'}
+function renderHistory(){
+ const events=[];
+ const names={buy:"底部首次买",secondBuy:"底部二次买",thirdBuy:"底部三次买",laterBuy:"底部多次买",
+ sell:"顶部首次卖",secondSell:"顶部二次卖",thirdSell:"顶部三次卖",laterSell:"顶部多次卖",
+ stopLoss:"结构失败止损",structureFailure:"参考DIF破位",watchBuy:"底钝化",watchSell:"顶钝化",expired:"钝化消失",invalid:"钝化失效"};
+ for(let i=0;i<4;i++){
+  const v=getSignal(i,selectedP);if(!v)continue;
+  for(const e of v.events.filter(e=>["buy","secondBuy","thirdBuy","laterBuy","sell","secondSell","thirdSell","laterSell","stopLoss","watchBuy","watchSell","expired","invalid"].includes(e.type)).slice(-24))
+   events.push({...e,index:i,nine:v.nine[e.i]||0});
+ }
+ events.sort((a,b)=>b.t.localeCompare(a.t));
+ byId("history").innerHTML=events.length?'<div class="eventlist">'+events.slice(0,24).map(e=>{
+  const bullish=e.type.includes("Buy")||e.type==="buy",bear=e.type.includes("Sell")||e.type==="sell"||e.type==="stopLoss";
+  return '<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.index].name+'</b><span class="mstatus '+(bullish?"buy":bear?"sell":"")+'">'+(names[e.type]||e.type)+'</span><span>'+valstr(e.price||e.close||0)+' · '+nLabel(e.nine)+'</span></div>';
+ }).join("")+'</div>':'<div class="faint" style="padding:12px">当前周期尚无历史事件记录</div>';
+}
 function render(){renderPeriods();renderResonance();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
  grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
  grid.querySelectorAll("canvas").forEach(c=>{c.addEventListener("pointermove",e=>ptr(Number(c.dataset.i),e));c.addEventListener("pointerleave",()=>{hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;queueDraw()})});
