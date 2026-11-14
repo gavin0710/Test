@@ -58,6 +58,15 @@ jobs:
               assert.equal(earliest.from,0,'History slider should reach first available candle');
               assert.equal(earliest.first,earliest.fullFirst);
               console.log('EARLIEST_CANDLE',JSON.stringify(earliest));
+              const dailyApi=await page.request.get(base+'/api/history?period=101');
+              console.log('HISTORY_DAILY_API',dailyApi.status(),dailyApi.headers()['content-length']||'?');
+              if(dailyApi.ok()){
+                const dailyJson=await dailyApi.json();
+                console.log('HISTORY_DAILY_SERIES',dailyJson.data.map(x=>(x['101']||[]).length).join(','));
+                assert(dailyJson.data[0]['101'].length>=8763,'Full SSE daily index inception bars missing');
+                await page.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:55000});
+                console.log('FULL_HISTORY_READY',await page.evaluate(()=>getSignal(0,'D').bars.length));
+              }
               const intraday=await page.request.get(base+'/api/history?period=15');
               assert.equal(intraday.status(),200,'Archived 15m OHLC must load');
               const archive=await intraday.json();
