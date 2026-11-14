@@ -179,4 +179,17 @@ if(fs.existsSync(path.join(root,"data","latest.json"))){
   for(const b of bars)ok(Number.isFinite(b.c)&&Number.isFinite(b.o)&&b.h>=b.l,"OHLC integrity");
  }
 }
+
+const local=sandbox.testApi.localWave;
+const barsForWaves=[10,11,12,13,12,11,10,9,8,9,10,11,12,11,10,9,8,9,10,11,12].map((p,i)=>({t:"T"+i,c:p,o:p,h:p+.1,l:p-.1}));
+const waveData=local(barsForWaves);
+ok(waveData.at[8].direction==="down","Last confirmed high at index 3 detected only after index 6");
+ok(waveData.at[8].pivotAt===3,"Correct previous confirmed high pivot");
+ok(waveData.at[11].direction==="up","Low at index 8 only confirms on index 11");
+ok(waveData.at[10].direction==="down","No use of future right-hand bars before confirmation");
+ok(waveData.at[15].direction==="down","New high at 12 becomes confirmed index 15");
+ok(waveData.at[18].direction==="down","New low at 16 cannot confirm before index 19");
+ok(waveData.at[19].direction==="up","New low at 16 confirms index 19");
+ok(html.includes('id="wave-entry-body"'),"Wave success rate breakdown table present");
+ok(html.includes('四指数当前波段（临时）'),"Current wave table column present");
 console.log("PASS:",assertions,"assertions: close prices, >=3 separators, region-DIF, second/third structures, stop before 3 opposite bars, time-frame-local sell exits, unresolved holds, EMA thresholds and verified OHLC");
