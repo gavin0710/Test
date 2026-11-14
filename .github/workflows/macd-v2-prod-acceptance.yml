@@ -1,0 +1,82 @@
+name: MACD V2 production acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-v2-prod-acceptance.yml"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test algorithm boundary cases
+        run: node macd-resonance/verify.js
+      - name: Install browser
+        run: |
+          npm install --prefix /tmp/macd-v2 --no-save playwright
+          /tmp/macd-v2/node_modules/.bin/playwright install chromium
+      - name: Verify production charts, DIF values and price crosshair
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-v2/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+           const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+           try{
+            const base='https://macd-resonance-monitor.vercel.app';
+            const page=await browser.newPage({viewport:{width:1480,height:1000}});
+            const errors=[];page.on('pageerror',err=>errors.push(err.message));
+            const response=await page.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
+            assert.equal(response.status(),200);console.log('PRODUCTION_HTTP',response.status());
+            await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:55000});
+            assert.equal(await page.locator('canvas.kplot').count(),4);
+            assert.equal(await page.locator('canvas.mplot').count(),4);
+            console.log('MARKET_CELLS',await page.locator('#status').innerText());
+            const difs=await page.locator('.difline').allInnerTexts();
+            assert.equal(difs.length,4);assert(difs.every(d=>/DIF\s*-?\d+\.\d+/.test(d)&&/DEA/.test(d)&&/MACD柱/.test(d)),'Missing numeric DIF/DEA');
+            console.log('DIF_VALUES',JSON.stringify(difs));
+            const plots=await page.locator('canvas.kplot').evaluateAll(els=>els.map(c=>({width:c.getBoundingClientRect().width,height:c.getBoundingClientRect().height,pixels:c.width*c.height})));
+            assert(plots.every(p=>p.width>200&&p.pixels>10000));
+            const c=page.locator('#k0'),rect=await c.boundingBox();
+            await page.mouse.move(rect.x+rect.width*.45,rect.y+rect.height*.40);
+            await page.waitForTimeout(120);
+            const first=await page.evaluate(()=>({price:hoverPixelPrice,time:hoverTime,index:hoverIndex}));
+            assert(Number.isFinite(first.price)&&first.index===0&&first.time,'Price cursor did not activate');
+            await page.mouse.move(rect.x+rect.width*.45,rect.y+rect.height*.62);
+            await page.waitForTimeout(120);
+            const second=await page.evaluate(()=>({price:hoverPixelPrice,time:hoverTime,index:hoverIndex}));
+            assert(Math.abs(first.price-second.price)>.05&&first.time===second.time,'Horizontal price cursor not moving with mouse Y');
+            console.log('PRICE_CROSSHAIR',first.price.toFixed(2),'->',second.price.toFixed(2));
+            await page.locator('.periodbtn[data-p="15"]').click();
+            await page.locator('.periodbtn[data-p="W"]').click();
+            assert.equal(await page.locator('.periodbtn.active').innerText(),'周线');
+            await page.locator('.expand').first().click();
+            assert((await page.locator('#chartgrid').getAttribute('class')).includes('focus'));
+            await page.locator('.expand').first().click();
+            await page.locator('#mfold summary').click();
+            assert.equal(await page.locator('#matrixbody tr').count(),6);
+            console.log('PERIOD_FOCUS_AND_MATRIX_OK');
+            const api=await page.request.get(base+'/api/latest');
+            assert.equal(api.status(),200);
+            const json=await api.json();assert.equal(json.data.length,4);
+            console.log('DATA_SOURCE_API',api.status(),json.generated_at_utc);
+            assert.deepEqual(errors,[]);console.log('JS_ERRORS_0');
+            await page.screenshot({path:'/tmp/macd-v2-desktop.png',fullPage:true});
+            const mobile=await browser.newPage({viewport:{width:390,height:844}});
+            mobile.on('pageerror',e=>errors.push('mobile '+e.message));
+            const mob=await mobile.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
+            assert.equal(mob.status(),200);
+            await mobile.waitForSelector('canvas.kplot');
+            assert.equal(await mobile.locator('.difline').count(),4);
+            console.log('MOBILE_OK');
+            console.log('ALL_PASS');
+           }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
