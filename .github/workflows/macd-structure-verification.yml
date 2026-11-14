@@ -1,0 +1,19 @@
+name: MACD strict divergence regression tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/index.html"
+      - "macd-resonance/verify.js"
+      - ".github/workflows/macd-structure-verification.yml"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all closed-price divergence rules and MACD projections
+        run: node macd-resonance/verify.js
