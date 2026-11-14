@@ -1,13 +1,9 @@
 name: Deploy MACD resonance dashboard
 
+# Legacy GitHub Pages publishing is not configured in this repository.
+# Production release uses the existing Vercel project; do not fail master pushes on Pages 404.
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - "macd-resonance/index.html"
-      - "macd-resonance/data/latest.json"
-      - ".github/workflows/macd-resonance-pages.yml"
 
 permissions:
   contents: read
