@@ -11,7 +11,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: macd-resonance-data
+  group: macd-history-backfill
   cancel-in-progress: false
 jobs:
   backfill:
