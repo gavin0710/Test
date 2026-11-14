@@ -218,7 +218,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   <div class="replay-controls">
    <label>复盘案例<select id="replay-kind" aria-label="复盘分类">
     <option value="all">全部交易轮次</option><option value="correction">有纠错买回</option>
-    <option value="candidateStop">拟纠错止损 · 待验证</option><option value="stop">结构止损</option>
+    <option value="correctionStop">纠错止损</option><option value="stop">结构止损</option>
     <option value="topSell">正常顶部卖出</option><option value="open">买后未配对</option>
     <option value="unpairedSell">顶部卖点未配对</option>
    </select></label>
@@ -233,7 +233,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
    <span id="replay-number" class="faint">—</span></div>
   
   <div class="replay-chain">
-   <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>正式信号实线 · 拟止损虚线</span></div>
+   <div class="replay-chain-title"><strong>交易事件链 · 点击任一节点，K线定位到当时</strong><span>交易事件实线 · 后续对照虚线</span></div>
    <div id="replay-nodes" class="replay-nodes"></div>
   </div>
   <div id="replay-confluence" class="replay-confluence" aria-label="同周期四指数历史信号共振"></div>
@@ -252,7 +252,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
     <div class="foldbody">
      <div class="stat-overall" id="win-overall"></div>
      <p class="stats-explain">统计范围为当前真实归档全历史；同一指数、同一周期独立统计。成功率=退出收盘价高于买入收盘价的已完成交易÷已完成交易；止损退出纳入失败或成功实测，未配对不参与成功率。平均盈利幅度只统计盈利交易的单次涨幅；平均每笔收益包含亏损，均未扣手续费或滑点。一次钝化可转化为买点，买1/买2等也是买点子集，所以各列不应全部相加。</p>
-     <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
+     <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>纠错止损</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
      <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>优先验证历史共振与买卖点有效性，暂不应用波浪分类结果</span></div>
      <details class="fold" id="win-index-fold" style="margin-top:9px"><summary>四指数 × 六周期的交易明细 <span class="faint">24组，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1050px"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完成交易</th><th>盈利</th><th>亏损</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>纠错买回</th><th>未配对买入</th><th>未配对卖点</th></tr></thead><tbody id="win-index-body"></tbody></table></div></details>
      <details class="fold" style="margin-top:9px"><summary>逐笔买卖及纠错关联 <span class="faint">原始买入 / 纠错买回 / 退出收益，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1080px"><thead><tr><th>指数</th><th>周期</th><th>原始买入K线</th><th>本次开仓K线</th><th>本次退出K线</th><th>开仓收盘</th><th>退出收盘</th><th>交易类型</th><th>本次收益</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
@@ -261,7 +261,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   </details>
   <details class="fold" id="statfold"><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>纠错止损</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
     <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
@@ -602,7 +602,7 @@ function calculate(bars){
  for(let i=0;i<bars.length;i++){const dir=i>=4?Math.sign(closes[i]-closes[i-4]):0;
   if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
  const structure=scanStructure(bars,dif,hist);
- const lifecycle=analyzeLifecycle(bars,dif,hist,structure.events);
+ const lifecycle=analyzeLifecycle(bars,dif,hist,structure.events,{enableCorrectionStop:true});
  const wave=localWave(bars),trades=lifecycle.trades.map(t=>({...t,entryWave:wave.at[t.entryI]?.direction||'unknown'}));
  const output={bars,dif,dea,hist,nine,ema12:f,ema26:s,...structure,
    events:lifecycle.events,stats:lifecycle.counts,losses:lifecycle.losses,
@@ -775,7 +775,7 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
    if(Number.isFinite(proj.lossPrice))guidelines.push({price:proj.lossPrice,label:"失效临界",color:"#df8993"});
    if(Number.isFinite(proj.turnPrice))guidelines.push({price:proj.turnPrice,label:proj.direction==="bottom"?"DIF买点":"DIF下拐",color:"#2eaf82"});
   }else if(proj.mode==="correction"&&Number.isFinite(proj.rebuyPrice))guidelines.push({price:proj.rebuyPrice,label:"纠错买回",color:"#8662b7"});
-  else if(proj.mode==="correctionHolding"&&Number.isFinite(proj.stopPrice))guidelines.push({price:proj.stopPrice,label:"拟止损·未启用",color:"#9b8295"});
+  else if(proj.mode==="correctionHolding"&&Number.isFinite(proj.stopPrice))guidelines.push({price:proj.stopPrice,label:"纠错止损",color:"#d26573"});
   else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
   for(const g of guidelines)if(g.price>=mn&&g.price<=mx){
    const gy=y(g.price);ctx.lineWidth=1;ctx.strokeStyle=g.color;ctx.setLineDash([2,5]);
@@ -902,7 +902,7 @@ function projectionHTML(v,label){
   if(p.mode==="campaign"&&p.oppositeStreak>=2)items+='<span class="estimate-chip note">若下一根仍为反色柱，则本轮结构结束</span>';
  }else if(p.mode==="correctionHolding"){
   items+='<span class="estimate-chip watch">纠错买回持有中</span>';
-  if(Number.isFinite(p.stopPrice))items+='<span class="estimate-chip note">研究候选：下根收盘 ≤ 约'+valstr(p.stopPrice)+'，DIF跌回参考高点（不作为正式止损）</span>';
+  if(Number.isFinite(p.stopPrice))items+='<span class="estimate-chip loss">纠错止损：下根收盘 ≤ 约'+valstr(p.stopPrice)+'（DIF跌回参考高点）</span>';
  }else if(p.mode==="correction"){
   items+='<span class="estimate-chip watch">顶部已卖 · 纠错观察中</span>';
   if(Number.isFinite(p.rebuyPrice))items+='<span class="estimate-chip buy">DIF突破原高点：收盘 &gt; 约'+valstr(p.rebuyPrice)+'</span>';
@@ -1075,17 +1075,6 @@ function replayBuildCases(){
      const name=entry.type==="secondBuy"?"二次买点":entry.type==="thirdBuy"?"三次买点":"追加买点";
      pushNode(entry.i,name,"buy",{trade:leg});
     }
-    if(leg.entryType==="correctionBuy"&&Number.isFinite(leg.correctionRefDIF)){
-     // Hypothetical counterfactual only. Never mutate the active trade or its statistics.
-     const horizon=Number.isInteger(leg.exitI)?leg.exitI:v.bars.length-1;
-     for(let j=leg.entryI+1;j<=horizon;j++){
-      if(v.dif[j]<=leg.correctionRefDIF+EPS){
-       pushNode(j,"拟纠错止损 · 待验证","stop",{reference:true,trade:leg,
-        ev:{type:"candidateCorrectionStop",refDIF:leg.correctionRefDIF}});
-       break;
-      }
-     }
-    }
     if(Number.isInteger(leg.exitI)){
      const kind=leg.exitType==="topSell"?"sell":"stop",name=leg.exitType==="topSell"?"顶部卖出":leg.exitType==="correctionStop"?"纠错止损":"结构止损";
      pushNode(leg.exitI,name,kind,{trade:leg});
@@ -1099,7 +1088,6 @@ function replayBuildCases(){
    }
    c.nodes.sort((a,b)=>a.i-b.i||Number(a.reference)-Number(b.reference));
    c.lastT=v.bars[c.lastI]?.t||v.bars.at(-1).t;
-   c.hasCandidateStop=c.nodes.some(n=>n.ev?.type==="candidateCorrectionStop");
    c.hasCorrection=c.legs.some(t=>t.entryType==="correctionBuy");
    c.hasCorrectionStop=c.legs.some(t=>t.exitType==="correctionStop");
    c.hasStop=c.legs.some(t=>t.exitType==="stop"||t.exitType==="correctionStop");
@@ -1126,7 +1114,7 @@ function replayFiltered(){
   (replayPeriod==="all"||replayPeriod===c.period)&&
   (replayKind==="all"||
    replayKind==="correction"&&c.hasCorrection||
-   replayKind==="candidateStop"&&c.hasCandidateStop||
+   replayKind==="correctionStop"&&c.hasCorrectionStop||
    replayKind==="stop"&&c.hasStop||
    replayKind==="topSell"&&c.hasTopSell||
    replayKind==="open"&&c.hasOpen||
@@ -1244,7 +1232,7 @@ function renderReplay(){
  const idx=all.findIndex(x=>x.id===c.id);
  byId("replay-number").textContent=(idx+1)+" / "+all.length+"笔";
  byId("replay-case").innerHTML=all.map((x,i)=>'<option value="'+esc(x.id)+'" '+(x.id===c.id?"selected":"")+'>'+
-  esc(IDX[x.index].short+" · "+x.label+" · "+x.lastT.slice(0,10)+" · "+(x.unpairedSell?"卖点未配对":x.hasCandidateStop?"含拟止损":x.hasCorrection?"有纠错":x.hasStop?"结构止损":x.hasOpen?"未配对":"顶部退出"))+'</option>').join("");
+  esc(IDX[x.index].short+" · "+x.label+" · "+x.lastT.slice(0,10)+" · "+(x.unpairedSell?"卖点未配对":x.hasCorrectionStop?"纠错止损":x.hasCorrection?"有纠错":x.hasStop?"结构止损":x.hasOpen?"未配对":"顶部退出"))+'</option>').join("");
  byId("replay-case").onchange=e=>replaySetCase(e.target.value);
  byId("replay-prev").disabled=idx<=0;byId("replay-next").disabled=idx>=all.length-1;
  byId("replay-prev").onclick=()=>replaySetCase(all[Math.max(0,idx-1)].id);
@@ -1255,7 +1243,7 @@ function renderReplay(){
   ["所属交易轮次",c.unpairedSell?"孤立顶部卖点":(c.v.bars[c.root]?.t||"—").slice(0,10)],
   ["实际进出段数",c.legs.filter(t=>Number.isInteger(t.exitI)).length],
   ["纠错买回",c.legs.filter(t=>t.entryType==="correctionBuy").length+"次"],
-  ["待验证拟止损",c.nodes.filter(n=>n.ev?.type==="candidateCorrectionStop").length+"次"],
+  ["纠错止损",c.legs.filter(t=>t.exitType==="correctionStop").length+"次"],
   ["各段收益率简单相加",c.returns.length?replayPct(sum):"未配对"]
  ];
  byId("replay-overview").innerHTML=metrics.map(([k,v])=>'<div class="replay-metric"><span>'+esc(k)+'</span><b class="'+(typeof v==="string"&&v[0]==="+"?"positive":typeof v==="string"&&v[0]==="−"?"negative":"")+'">'+esc(v)+'</b></div>').join("");
@@ -1267,16 +1255,18 @@ function renderReplay(){
  renderReplayResonance(c,c.nodes[replayNodeIndex]||c.nodes[0]);
  const corrections=c.legs.filter(t=>t.entryType==="correctionBuy"),comparisons=[];
  for(const leg of corrections){
-  const candidate=c.nodes.find(n=>n.ev?.type==="candidateCorrectionStop"&&n.trade?.entryI===leg.entryI);
-  if(!candidate)continue;
-  const proposed=(candidate.close/leg.entryClose-1)*100;
-  const actual=Number.isInteger(leg.exitI)?(leg.exitClose/leg.entryClose-1)*100:null;
-  const difference=actual===null?"正式交易仍未配对":'比正式退出 '+replayPct(proposed-actual)+'（百分点）';
-  comparisons.push('纠错 '+leg.entryT.slice(0,10)+' · 拟DIF止损 '+candidate.t.slice(0,10)+'：'+replayPct(proposed)+
-   '；原规则'+(leg.exitType==="topSell"?"顶部退出":"尚未退出")+'：'+replayPct(actual)+'；'+difference);
+  if(leg.exitType!=="correctionStop")continue;
+  const actual=(leg.exitClose/leg.entryClose-1)*100;
+  const future=c.nodes.find(n=>n.reference&&n.ev&&REPLAY_SELLS.has(n.ev.type)&&n.i>leg.exitI);
+  if(future){
+   const later=(future.close/leg.entryClose-1)*100;
+   comparisons.push('纠错 '+leg.entryT.slice(0,10)+' → 止损 '+leg.exitT.slice(0,10)+
+    '：'+replayPct(actual)+'；后续顶部信号 '+future.t.slice(0,10)+'：'+replayPct(later)+
+    '；两者差 '+(actual-later).toFixed(2)+' 个百分点');
+  }else comparisons.push('纠错 '+leg.entryT.slice(0,10)+' → 止损 '+leg.exitT.slice(0,10)+'：'+replayPct(actual));
  }
- byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>规则对照（未启用）：</b>'+esc(x)+'</div>').join(""):"<span>点击交易链节点定位四张历史K线。没有符合条件的拟止损点时不生成虚拟退出。</span>")+
-  '<div class="faint">虚线拟止损仅供对照研究，不计入正式买卖信号、交易次数及成功率。收益基于历史信号收盘价，未计成交费用。</div>';
+ byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>纠错止损复盘：</b>'+esc(x)+'</div>').join(""):"<span>点击交易链节点可同步定位四张历史K线；未发生纠错止损时不会虚构退出。</span>")+
+  '<div class="faint">纠错止损计入正式交易配对；止损后的顶部信号仅用于分析离场后的走势，不算实际退出。收益以信号收盘价计算，未计费用与滑点。</div>';
 }
 
 function buySignalEvents(v){return v?v.events.filter(e=>buyTypes.has(e.type)&&Number.isInteger(e.i)):[]}
@@ -1357,7 +1347,7 @@ function renderWinRates(){
  const totalStats=sum(rows);
  byId("win-overall").innerHTML=[
   ["关键点位",totalStats.points],["全部钝化",totalStats.watch],["买入点",totalStats.buy],
-  ["纠错买回",totalStats.correctionBuy],["顶部卖点",totalStats.sell],
+  ["纠错买回",totalStats.correctionBuy],["纠错止损",totalStats.correctionStop],["顶部卖点",totalStats.sell],
   ["完成交易",totalStats.completed],["成功率",fmt(totalStats.winRate)],
   ["盈利平均幅度",fmt(totalStats.avgProfit,true)],["未配对买入",totalStats.open],
   ["未配对卖点",totalStats.unpairedSells]
@@ -1365,10 +1355,10 @@ function renderWinRates(){
  byId("win-period-body").innerHTML=PERIODS.map(([p,label])=>{
   const q=sum(rows.filter(r=>r.period===p));
   const cells=[q.points,q.watch,q.disappeared,q.formed,q.second,q.third+q.fourthPlus,
-   q.correctionBuy,q.buy,q.sell,q.failStop,q.completed,q.wins,fmt(q.winRate),
+   q.correctionBuy,q.correctionStop,q.buy,q.sell,q.failStop,q.completed,q.wins,fmt(q.winRate),
    fmt(q.avgProfit,true),fmt(q.avgReturn,true),q.open,q.unpairedSells];
   return '<tr><td><strong>'+label+'</strong></td><td class="event-t">'+q.span+'</td>'+
-   cells.map((v,k)=>'<td class="'+(k===12?"important":k===9?"fail":"")+'">'+v+'</td>').join("")+'</tr>';
+   cells.map((v,k)=>'<td class="'+(k===13?"important":[7,10].includes(k)?"fail":"")+'">'+v+'</td>').join("")+'</tr>';
  }).join("");
  byId("win-index-body").innerHTML=rows.map(r=>{
   const v=r.v,q=tradeSummary(v.trades||[]);
@@ -1400,13 +1390,13 @@ function getHistoryStats(){
 }
 function renderStats(){
  const {rows,total}=getHistoryStats();
- const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["买后未配对",total.open]];
+ const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy],["纠错止损",total.correctionStop],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["买后未配对",total.open]];
  byId("statsoverall").innerHTML=items.map(([name,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+name+'</span></div>').join("");
  byId("statsbody").innerHTML=rows.map(({i,period,label,v,stats:q})=>{
   const hist=v.bars,range=hist[0].t.slice(0,10)+'～'+hist.at(-1).t.slice(0,10);
-  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.correctionBuy,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
+  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.correctionBuy,q.correctionStop,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
   return '<tr><td>'+IDX[i].name+'</td><td>'+label+'</td><td class="event-t">'+range+'（'+hist.length+'根）</td>'+
-    cells.map((n,k)=>'<td class="'+(k===7?"fail":[8,9].includes(k)?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
+    cells.map((n,k)=>'<td class="'+([7,8].includes(k)?"fail":[9,10].includes(k)?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
  }).join("");
  const stops=[],open=[];
  for(const {i,label,v} of rows){
