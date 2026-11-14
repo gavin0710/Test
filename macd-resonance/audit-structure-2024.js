@@ -132,4 +132,27 @@ console.log("AUDIT_SSE_2024",JSON.stringify(text2024));
 console.log("AUDIT_EVENTS_2024",JSON.stringify(signalAround));
 console.log("AUDIT_GAP3",JSON.stringify(gap3));
 console.log("AUDIT_PROBLEMS",JSON.stringify(problems));
+
+const sseD=merge(daily.data[0]["101"],latest.data[0]["101"]),sseV=calculate(sseD);
+const febIndex=sseD.findIndex(b=>b.t.slice(0,10)==="2024-02-02");
+const rowsFeb=sseD.map((bar,i)=>({bar,i})).filter(x=>x.bar.t>="2024-01-15"&&x.bar.t<="2024-02-23").map(({bar,i})=>({
+ date:bar.t,close:f(bar.c),dif:f(sseV.dif[i]),prevDIF:f(sseV.dif[i-1]),dea:f(sseV.dea[i]),hist:f(sseV.hist[i]),green:sseV.hist[i]<0,
+ events:sseV.events.filter(e=>e.i===i).map(e=>({type:e.type,refDIF:f(e.ref?.dif??e.refDIF),firstI:e.firstI,t:e.t}))
+}));
+const earlyEvents=sseV.events.filter(e=>e.t>="2023-08-01"&&e.t<="2024-04-15").map(e=>({
+ type:e.type,t:e.t,i:e.i,stage:e.stage,refDIF:f(e.ref?.dif??e.refDIF),regionStart:e.regionStart,
+ price:f(e.price??e.close),firstI:e.firstI,reason:e.reason
+}));
+const earlyTrades=sseV.trades.filter(t=>t.entryT<="2024-04-15"&&t.exitT>="2023-08-01").map(t=>({
+ entryT:t.entryT,entryClose:f(t.entryClose),entryType:t.entryType,exitT:t.exitT,
+ exitClose:f(t.exitClose),exitType:t.exitType,bottomFirstI:t.bottomFirstI,rootBuy:t.originalEntryT
+}));
+const before=sseV.events.filter(e=>e.i<=febIndex&&["buy","secondBuy","thirdBuy","laterBuy","stopLoss","sell","structureFailure"].includes(e.type)).at(-1);
+console.log("FEB_2024_SUMMARY",JSON.stringify({onDate:sseD[febIndex],dif:f(sseV.dif[febIndex]),difPrev:f(sseV.dif[febIndex-1]),hist:f(sseV.hist[febIndex]),
+ eventsOnDate:sseV.events.filter(e=>e.i===febIndex),lastTradingEventBeforeOrOn:before,completedTradePrior:sseV.trades.filter(t=>t.exitI<=febIndex).at(-1),
+ range:sseD.length}));
+console.log("FEB_2024_BARS",JSON.stringify(rowsFeb));
+console.log("FEB_2024_EVENTS",JSON.stringify(earlyEvents));
+console.log("FEB_2024_TRADES",JSON.stringify(earlyTrades));
+
 console.log("AUDIT_DONE");
