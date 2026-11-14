@@ -108,6 +108,8 @@ jobs:
               const mobile=await browser.newPage({viewport:{width:390,height:844}});
               assert.equal((await mobile.goto(base,{waitUntil:'domcontentloaded',timeout:45000})).status(),200);
               await mobile.waitForSelector('#view-replay');
+              await mobile.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:60000});
+              await mobile.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:60000});
               await mobile.locator('#view-replay').click();
               assert(await mobile.locator('#replay-panel').isVisible(),'Mobile replay unavailable');
               assert.equal(await mobile.locator('.chart-card:visible').count(),1,'Mobile must show focused single chart');
