@@ -174,6 +174,93 @@ function scanStructure(bars,dif,hist){
  const state=fresh?last.type:active?.mode==="watch"?(active.sign<0?"watchBuy":"watchSell"):"neutral";
  return {events,regions,active,ref:active?.ref||null,lastSignalIndex:last?.i??-1000,age:last?bars.length-1-last.i:Infinity,recent,state};
 }
+
+function analyzeLifecycle(bars,dif,hist,baseEvents){
+ const n=bars.length,sideOf=e=>e.type==="buy"?-1:e.type==="sell"?1:0;
+ const signAt=i=>hist[i]<-EPS?-1:hist[i]>EPS?1:0;
+ const turns=(i,sign)=>i>=2&&(sign<0?dif[i]>dif[i-1]+EPS&&dif[i-1]<=dif[i-2]+EPS:dif[i]<dif[i-1]-EPS&&dif[i-1]>=dif[i-2]-EPS);
+ const baseByBar=new Map();
+ for(const event of baseEvents){let list=baseByBar.get(event.i)||[];list.push(event);baseByBar.set(event.i,list)}
+ const events=[],cycles={bottom:null,top:null},allCycles=[],trades=[],losses=[];
+ let position=null,everOpened=0,unpairedSells=0;
+ const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,technicalFailures:0,buy:0,sell:0,unpairedSells:0,completed:0,stopExits:0,open:0};
+ const push=e=>{events.push(e);return e};
+ const exit=(e,kind)=>{
+  if(!position)return false;
+  const out={...position,exitI:e.i,exitT:e.t,exitClose:bars[e.i].c,exitType:kind,holdBars:e.i-position.entryI};
+  trades.push(out);position=null;counts.completed++;if(kind==="stop"){counts.stopExits++}return true;
+ };
+ const processSignal=e=>{
+  const isBuy=["buy","secondBuy","thirdBuy","laterBuy"].includes(e.type);
+  const isSell=["sell","secondSell","thirdSell","laterSell"].includes(e.type);
+  if(isBuy){counts.buy++;
+   if(!position){position={entryI:e.i,entryT:e.t,entryClose:bars[e.i].c,entryType:e.type,buySignals:[{type:e.type,i:e.i}]};everOpened++}
+   else position.buySignals.push({type:e.type,i:e.i});
+  }else if(isSell){counts.sell++;
+   if(position)exit(e,"topSell");
+   else{counts.unpairedSells++;unpairedSells++}
+  }
+ };
+ for(let i=0;i<n;i++){
+  // Every completion bar updates the still-active structure, independent of isolated color waves.
+  for(const key of ["bottom","top"]){
+   const cyc=cycles[key];if(!cyc||cyc.closed||i<=cyc.firstI)continue;
+   const color=signAt(i),outside=color!==cyc.sign;
+   cyc.oppositeStreak=outside?cyc.oppositeStreak+1:0;
+   if(cyc.oppositeStreak>=3){
+    cyc.closed=true;cyc.endedAt=i;cyc.endReason="3 opposite-color columns";
+    continue;
+   }
+   const broken=cyc.sign<0?dif[i]<cyc.refDIF-EPS:dif[i]>cyc.refDIF+EPS;
+   if(broken){
+    cyc.closed=true;cyc.endedAt=i;cyc.endReason="DIF made new reference extreme";
+    const failure=push({type:"structureFailure",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
+    counts.technicalFailures++;
+    // A bottom failure demands stop only when still holding the corresponding long position.
+    if(key==="bottom"&&position){
+     const stop=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c,entryI:position.entryI,entryT:position.entryT,entryClose:position.entryClose});
+     counts.failStop++;losses.push(stop);exit(stop,"stop");
+    }
+    continue;
+   }
+   if(turns(i,cyc.sign)&&i>cyc.lastSignalI){
+    cyc.stage++;
+    cyc.lastSignalI=i;
+    const type=cyc.sign<0?(cyc.stage===2?"secondBuy":cyc.stage===3?"thirdBuy":"laterBuy"):(cyc.stage===2?"secondSell":cyc.stage===3?"thirdSell":"laterSell");
+    const e=push({type,i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
+    if(cyc.stage===2)counts.second++;
+    else if(cyc.stage===3)counts.third++;
+    else counts.fourthPlus++;
+    processSignal(e);
+   }
+  }
+  for(const raw of baseByBar.get(i)||[]){
+   // Keep baseline divergence watch / cancellation as audited events.
+   if(raw.type==="watchBuy"||raw.type==="watchSell"){counts.watch++;push({...raw});continue}
+   if(raw.type==="expired"||raw.type==="invalid"){
+    const hadSignal=baseEvents.some(e=>(e.type==="buy"||e.type==="sell")&&e.regionStart===raw.regionStart&&e.i<=raw.i);
+    if(!hadSignal)counts.disappeared++;
+    push({...raw});continue;
+   }
+   if(raw.type!=="buy"&&raw.type!=="sell"){push({...raw});continue}
+   const key=raw.type==="buy"?"bottom":"top",sign=sideOf(raw);
+   const old=cycles[key];
+   if(old&&!old.closed){
+    // A new standalone structure on the same side replaces an unfinished campaign,
+    // but cannot be counted as a duplicate first turn on its previous region.
+    old.closed=true;old.endedAt=i;old.endReason="new confirmed base structure";
+   }
+   const cyc={side:key,sign,firstI:i,lastSignalI:i,stage:1,refDIF:raw.ref?.dif,
+     refPrice:raw.ref?.close,regionStart:raw.regionStart,oppositeStreak:0,closed:false};
+   cycles[key]=cyc;allCycles.push(cyc);
+   counts.formed++;
+   const e=push({...raw,stage:1,side:key});
+   processSignal(e);
+  }
+ }
+ counts.open=position?1:0;
+ return {events,counts,cycles:allCycles,losses,trades,position,unpairedSells,everOpened};
+}
 function projectNext(v){
  if(!v||!v.bars.length)return null;
  const k=2/13-2/27,a=11/13*v.ema12.at(-1)-25/27*v.ema26.at(-1);
@@ -233,7 +320,10 @@ function calculate(bars){
  for(let i=0;i<bars.length;i++){const dir=i>=4?Math.sign(closes[i]-closes[i-4]):0;
   if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
  const structure=scanStructure(bars,dif,hist);
- const output={bars,dif,dea,hist,nine,ema12:f,ema26:s,...structure};
+ const lifecycle=analyzeLifecycle(bars,dif,hist,structure.events);
+ const output={bars,dif,dea,hist,nine,ema12:f,ema26:s,...structure,
+   events:lifecycle.events,stats:lifecycle.counts,losses:lifecycle.losses,
+   trades:lifecycle.trades,position:lifecycle.position,cycles:lifecycle.cycles};
  output.projection=projectNext(output);
  return output;
 }
