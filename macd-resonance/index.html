@@ -87,6 +87,16 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .event-table{min-width:850px}
 .event-table td{font-size:11px}
 .event-t{color:#8f9daa;font-size:11px}
+
+.buynav{padding:9px 16px 11px;display:flex;align-items:center;gap:7px;border-top:1px solid #eef2f5;min-width:0}
+.buynav-meta{white-space:nowrap;font-size:11px;color:#8495a3}
+.buynav-meta b{color:#168c69;font-weight:760;font-variant-numeric:tabular-nums}
+.buyselect{flex:1;min-width:40px;border:1px solid #dce7ed;border-radius:7px;padding:7px 7px;color:#526d82;background:#fff;font-size:11px}
+.buyselect:focus{outline:2px solid #8fb9ce;outline-offset:1px}
+.buyjump{border:1px solid #e0e8ef;border-radius:6px;background:#f7fafb;color:#427a9c;padding:5px 11px;font-size:17px;font-weight:750;line-height:1}
+.buyrecent{border:0;background:transparent;color:#6d8397;font-size:11px;white-space:nowrap;padding:6px 2px}
+.chart-card .chartfoot{padding-top:8px}
+@media(max-width:560px){.buynav{padding:9px 10px;gap:4px}.buynav-meta{font-size:10px}.buyjump{padding:5px 8px}.buyrecent{font-size:10px}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -95,7 +105,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
  </header>
  <nav class="toolbar" aria-label="行情操作">
   <div class="periodbar" id="periodbar"></div>
-  <div class="controls"><div class="resblock" id="resonance"></div><span class="faint">最近</span><button class="winbtn" data-n="60">60根</button><button class="winbtn active" data-n="100">100根</button></div>
+  <div class="controls"><div class="resblock" id="resonance"></div><span class="faint">最近</span><button class="winbtn" data-n="60">60根</button><button class="winbtn active" data-n="100">100根</button><button class="winbtn" data-n="0">全部</button></div>
  </nav>
  <div id="chartfail" class="error" hidden></div>
  <section class="chartgrid" id="chartgrid" aria-label="四大指数K线图"></section>
@@ -387,6 +397,9 @@ function stateClass(s){return s==="buy"?"buy":s==="sell"?"sell":s==="watchBuy"?"
 
 
 let visibleBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
+const buyTypes=new Set(["buy","secondBuy","thirdBuy","laterBuy"]);
+const sellTypes=new Set(["sell","secondSell","thirdSell","laterSell"]);
+let signalAnchors={};
 const IDXCODE=["000001","399001","399006","000688"];
 function paintState(s){return ({buy:"↑ DIF上拐",sell:"↓ DIF下拐",watchBuy:"底钝化",watchSell:"顶钝化",stop:"结构止损",neutral:"暂无信号"})[s]||"数据缺失"}
 function valstr(n,d=2){return Number.isFinite(n)?n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}):"—"}
@@ -394,7 +407,7 @@ function signclass(s){return s==="neutral"||!s?"":s==="buy"?"buy":s==="sell"||s=
 function stateHTML(i,p){const v=getSignal(i,p);return v?'<span class="mstatus '+signclass(v.state)+'">'+paintState(v.state)+'</span><span class="faint"> · '+nLabel(v.nine.at(-1))+'</span>':"—"}
 function renderPeriods(){byId("periodbar").innerHTML=PERIODS.map(([p,n])=>'<button class="periodbtn '+(selectedP===p?"active":"")+'" data-p="'+p+'" aria-pressed="'+(selectedP===p)+'">'+n+'</button>').join("");
  byId("periodbar").querySelectorAll("button").forEach(b=>b.onclick=()=>{selectedP=b.dataset.p;hoverTime=null;render()});
- document.querySelectorAll(".winbtn").forEach(b=>{b.classList.toggle("active",Number(b.dataset.n)===visibleBars);b.onclick=()=>{visibleBars=Number(b.dataset.n);hoverTime=null;render()}});
+ document.querySelectorAll(".winbtn").forEach(b=>{b.classList.toggle("active",Number(b.dataset.n)===visibleBars);b.onclick=()=>{visibleBars=Number(b.dataset.n);signalAnchors={};hoverTime=null;render()}});
 }
 function renderResonance(){let b=0,s=0;for(let i=0;i<4;i++){const v=getSignal(i,selectedP);if(v&&v.state==="buy")b++;if(v&&v.state==="sell")s++}
  byId("resonance").innerHTML=(b||s?'<span class="faint">共振</span><span class="resnum '+(b?"":"empty")+'">↑ '+b+'/4</span><span class="resnum '+(s?"down":"empty")+'">↓ '+s+'/4</span>':'<span class="faint">当前无同向拐头共振</span>');
@@ -405,7 +418,15 @@ function canvasSize(el){const b=el.getBoundingClientRect(),w=Math.max(160,Math.f
 }
 function plotText(ctx,str,x,y,color="#9ba7b3",size=10,align="left",weight="400"){ctx.font=weight+" "+size+"px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif";ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(str,x,y)}
 function dims(w,h){return {l:15,r:64,t:16,b:27,ww:w-79,hh:h-43}}
-function visible(i){const v=getSignal(i,selectedP);if(!v)return null;const length=Math.min(visibleBars,v.bars.length),from=v.bars.length-length;return {v,from,bars:v.bars.slice(from),dif:v.dif.slice(from),dea:v.dea.slice(from),hist:v.hist.slice(from),nine:v.nine.slice(from)}}
+function visible(i){
+ const v=getSignal(i,selectedP);if(!v)return null;
+ const length=visibleBars===0?v.bars.length:Math.min(visibleBars,v.bars.length);
+ const anchor=signalAnchors[selectedP+":"+i];
+ const from=Number.isInteger(anchor)&&visibleBars!==0?
+ Math.max(0,Math.min(v.bars.length-length,anchor-Math.floor(length*.5))):
+ v.bars.length-length;
+ return {v,from,bars:v.bars.slice(from,from+length),dif:v.dif.slice(from,from+length),dea:v.dea.slice(from,from+length),hist:v.hist.slice(from,from+length),nine:v.nine.slice(from,from+length)}
+}
 function ptr(i,ev){
  const data=visible(i),el=ev.currentTarget;if(!data)return;
  const rect=el.getBoundingClientRect(),dim=dims(rect.width,rect.height);
@@ -514,10 +535,38 @@ function projectionHTML(v,label){
  }
  return '<div class="estimate"><span class="estimate-label">'+label+'推演</span>'+items+'</div>';
 }
+
+function buySignalEvents(v){return v?v.events.filter(e=>buyTypes.has(e.type)&&Number.isInteger(e.i)):[]}
+function navigateBuy(i,step){
+ const v=getSignal(i,selectedP),buys=buySignalEvents(v);if(!buys.length)return;
+ const key=selectedP+":"+i,at=signalAnchors[key];
+ let idx=buys.findIndex(e=>e.i===at);
+ if(idx<0)idx=step<0?buys.length: -1;
+ idx=Math.max(0,Math.min(buys.length-1,idx+step));
+ visibleBars=visibleBars===0?100:visibleBars;
+ signalAnchors[key]=buys[idx].i;hoverTime=buys[idx].t;hoverIndex=i;hoverPixelPrice=null;
+ render();
+}
+function jumpToBuy(i,index){
+ const v=getSignal(i,selectedP);if(!v||!buySignalEvents(v).some(e=>e.i===index))return;
+ visibleBars=visibleBars===0?100:visibleBars;
+ signalAnchors[selectedP+":"+i]=index;hoverTime=v.bars[index].t;hoverIndex=i;hoverPixelPrice=null;
+ render();
+}
+function buyNavigator(i,v){
+ const buys=buySignalEvents(v),key=selectedP+":"+i,active=signalAnchors[key],idx=buys.findIndex(e=>e.i===active);
+ const stageName=e=>e.stage===1?"首次":e.stage===2?"二次":e.stage===3?"三次":"第"+e.stage+"次";
+ const options=buys.map(e=>'<option value="'+e.i+'" '+(e.i===active?"selected":"")+'>'+stageName(e)+' · '+e.t.replace("T"," ")+' · '+valstr(v.bars[e.i].c)+'</option>').join("");
+ return '<div class="buynav" data-chart="'+i+'"><span class="buynav-meta">历史买点 <b>'+buys.length+'</b> 个</span>'+
+  '<button class="buyjump prev" data-i="'+i+'" data-step="-1" '+(!buys.length||idx===0?"disabled":"")+' title="上一个买点">‹</button>'+
+  '<select class="buyselect" data-i="'+i+'" aria-label="'+IDX[i].name+'历史买点定位" '+(!buys.length?"disabled":"")+'><option value="">'+(buys.length?"选择任一买点，定位K线":"当前历史暂无买点")+'</option>'+options+'</select>'+
+  '<button class="buyjump next" data-i="'+i+'" data-step="1" '+(!buys.length||idx===buys.length-1?"disabled":"")+' title="下一个买点">›</button>'+
+  '<button class="buyrecent" data-i="'+i+'">最新K线</button></div>';
+}
 function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v&&v.bars.at(-2),pct=last&&prev?(last.c-prev.c)/prev.c*100:0,delta=last&&prev?last.c-prev.c:0,n=v?v.nine.at(-1):0,s=v?v.state:"missing";
  const c=delta>=0?"up":"down";
- const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const latestLabel=v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const projection=projectionHTML(v,nextLabel);
- return '<article class="chart-card '+(focusIndex===i?"focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+projection+'<div class="chartfoot"><span>收盘价突破 · DIF波段极值 · 反色柱≥3</span><span class="latest">'+timed+'</span></div></article>'
+ const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const latestLabel=v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const projection=projectionHTML(v,nextLabel);const navigator=buyNavigator(i,v);
+ return '<article class="chart-card '+(focusIndex===i?"focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>收盘价突破 · DIF波段极值 · 反色柱≥3</span><span class="latest">'+timed+'</span></div></article>'
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 
@@ -612,6 +661,9 @@ function renderHistory(){
 }
 function render(){renderPeriods();renderResonance();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
  grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
+ grid.querySelectorAll(".buyjump").forEach(b=>b.onclick=()=>navigateBuy(Number(b.dataset.i),Number(b.dataset.step)));
+ grid.querySelectorAll(".buyselect").forEach(sel=>sel.onchange=()=>{if(sel.value!=="")jumpToBuy(Number(sel.dataset.i),Number(sel.value))});
+ grid.querySelectorAll(".buyrecent").forEach(b=>b.onclick=()=>{delete signalAnchors[selectedP+":"+b.dataset.i];hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
  grid.querySelectorAll("canvas").forEach(c=>{c.addEventListener("pointermove",e=>ptr(Number(c.dataset.i),e));c.addEventListener("pointerleave",()=>{hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;queueDraw()})});
  renderMatrix();renderHistory();renderStats();renderWinRates();requestAnimationFrame(drawAll)}
 
