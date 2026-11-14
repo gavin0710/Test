@@ -255,16 +255,16 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
      <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>纠错止损</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
      <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>优先验证历史共振与买卖点有效性，暂不应用波浪分类结果</span></div>
      <details class="fold" id="win-index-fold" style="margin-top:9px"><summary>四指数 × 六周期的交易明细 <span class="faint">24组，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1050px"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完成交易</th><th>盈利</th><th>亏损</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>纠错买回</th><th>未配对买入</th><th>未配对卖点</th></tr></thead><tbody id="win-index-body"></tbody></table></div></details>
-     <details class="fold" style="margin-top:9px"><summary>逐笔买卖及纠错关联 <span class="faint">原始买入 / 纠错买回 / 退出收益，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1080px"><thead><tr><th>指数</th><th>周期</th><th>原始买入K线</th><th>本次开仓K线</th><th>本次退出K线</th><th>开仓收盘</th><th>退出收盘</th><th>交易类型</th><th>本次收益</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
+     <details class="fold" style="margin-top:9px"><summary>逐笔买卖及纠错关联 <span class="faint">原始买入 / 纠错买回 / 退出收益，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1080px"><thead><tr><th>指数</th><th>周期</th><th>结构ID</th><th>原始买入K线</th><th>本次开仓K线</th><th>本次退出K线</th><th>开仓收盘</th><th>退出收盘</th><th>交易类型</th><th>本次收益</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
      <p class="stat-disclaimer">数据是历史信号的收盘价配对演示，并非真实可成交的回测；分钟线仍然存在历史覆盖不足的问题。纠错买回与最初买入共用交易轮次标识，但每次再次开仓的收益单独记录，避免将两次资金进出虚构成一笔成交。</p>
     </div>
   </details>
   <details class="fold" id="statfold"><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
-    <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
+    <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，多个结构风险单元按同一指数同一周期分别归属。</p><div class="stat-overall" id="statsoverall"></div>
     <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>纠错止损</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
     <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同结构买2/3不新建独立单元；新结构买1会建立新的独立单元。若同时存在多个单元，顶部卖点会结束所有仍持有单元，卖点数与退出交易数不必相等。配对是信号层模拟，不代表实际下单、组合回测或可成交性。存在买入后未出现顶部卖点或其他正式退出条件的情况，会标为“未配对”，不自动补卖点。</div></div>
   </details>
-  <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
+  <details class="fold" id="stopfold"><summary>独立结构止损与未配对风险单元 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
    <div class="foldbody"><div id="stoprecords"></div><div id="openrecords"></div></div>
   </details>
   <details class="fold" id="mfold"><summary>全部周期信号对照 <span class="faint">6周期 × 4指数</span></summary>
@@ -1007,8 +1007,8 @@ function quickCollect(kind=quickKind,scope=quickIndex){
   for(const e of v.events){
    if(!matchQuickEvent(e,kind,pair))continue;
    const trade=QUICK_BUYS.has(e.type)?pair.buys.get(e.i):null;
-   const badge=trade?.status||(QUICK_SELLS.has(e.type)?pair.sells.has(e.i)?"已配对":"未配对":"");
-   out.push({key:i+":"+e.i+":"+e.type,index:i,e,badge,trade});
+   const badge=trade?.status||(e.unexecuted?"仅技术信号":QUICK_SELLS.has(e.type)?pair.sells.has(e.i)?"已配对":"未配对":"");
+   out.push({key:i+":"+e.i+":"+e.type+":"+(e.structureId||""),index:i,e,badge,trade});
   }
  }
  return out.sort((a,b)=>b.e.t.localeCompare(a.e.t)||a.index-b.index||a.key.localeCompare(b.key));
@@ -1046,7 +1046,7 @@ function renderQuick(){
  if(entry>=300)shown.unshift(list[entry]);
  byId("quick-list").innerHTML='<option value="">'+(list.length?'选择具体点位，直接定位K线':'当前筛选无匹配点位')+'</option>'+
   shown.map(x=>{
-   const pos=list.indexOf(x),desc=IDX[x.index].short+" · "+x.e.t.replace("T"," ")+" · "+quickName(x.e)+
+   const pos=list.indexOf(x),desc=IDX[x.index].short+" · "+x.e.t.replace("T"," ")+" · "+quickName(x.e)+(x.e.structureId?" · "+x.e.structureId:"")+
     (x.badge?" · "+x.badge:"")+(x.trade?.rootT&&x.e.type==="correctionBuy"?" · 原买"+x.trade.rootT.slice(0,10):"");
    return '<option value="'+pos+'" '+(pos===entry?"selected":"")+'>'+esc(desc)+'</option>';
   }).join("");
@@ -1383,7 +1383,7 @@ function renderWinRates(){
  byId("win-index-body").innerHTML=rows.map(r=>{
   const v=r.v,q=tradeSummary(v.trades||[]);
   const cells=[v.bars.length,q.completed,q.wins,q.losses,fmt(q.winRate),
-   fmt(q.avgProfit,true),fmt(q.avgReturn,true),v.stats.correctionBuy||0,v.position?1:0,v.stats.unpairedSells||0];
+   fmt(q.avgProfit,true),fmt(q.avgReturn,true),v.stats.correctionBuy||0,v.positions?.length||0,v.stats.unpairedSells||0];
   return '<tr><td>'+IDX[r.i].name+'</td><td>'+r.label+'</td>'+
    cells.map((x,k)=>'<td class="'+(k===4?"important":"")+'">'+x+'</td>').join("")+'</tr>';
  }).join("");
@@ -1391,7 +1391,7 @@ function renderWinRates(){
  byId("win-trades-body").innerHTML=ordered.map(t=>{
   const result=t.ret>0?"盈利":t.ret<0?"亏损":"持平";
   const name=t.entryType==="correctionBuy"?"纠错买回第"+t.correctionCount+"次":"结构买1";
-  return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+(t.originalEntryT||t.entryT).replace("T"," ")+'</td><td>'+t.entryT.replace("T"," ")+'</td>'+
+  return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+esc(t.structureId||"—")+'</td><td>'+(t.originalEntryT||t.entryT).replace("T"," ")+'</td><td>'+t.entryT.replace("T"," ")+'</td>'+
    '<td>'+t.exitT.replace("T"," ")+'</td><td>'+valstr(t.entryClose)+'</td><td>'+valstr(t.exitClose)+'</td><td>'+name+'</td>'+
    '<td class="'+(t.ret>0?"important":t.ret<0?"fail":"")+'">'+fmt(t.ret,true)+'</td>'+
    '<td>'+(t.exitType==="topSell"?"顶部结构卖出":t.exitType==="correctionStop"?"纠错止损":"结构失败止损")+'</td><td>'+result+'</td></tr>';
@@ -1424,13 +1424,13 @@ function renderStats(){
   for(const p of v.positions||[])open.push({...p,index:i,label,lastT:v.bars.at(-1).t,lastClose:v.bars.at(-1).c});
  }
  stops.sort((a,b)=>b.t.localeCompare(a.t));open.sort((a,b)=>b.entryT.localeCompare(a.entryT));
- byId("stopsbadge").textContent=stops.length+"次止损退出 / "+open.length+"个未配对买入";
+ byId("stopsbadge").textContent=stops.length+"次风险单元止损 / "+open.length+"个待退出单元";
  byId("stoprecords").innerHTML='<h3 class="stat-section-head">结构失败止损 · 按发生时间倒序</h3>'+
- (stops.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>止损K线</th><th>买入收盘</th><th>止损收盘</th><th>DIF参考值</th><th>止损类型</th><th>持有根数</th></tr></thead><tbody>'+
-  stops.map(l=>'<tr><td>'+IDX[l.index].name+'</td><td>'+l.label+'</td><td>'+l.entryT.replace("T"," ")+'</td><td>'+l.t.replace("T"," ")+'</td><td>'+valstr(l.entryClose)+'</td><td class="fail">'+valstr(l.close)+'</td><td>'+valstr(l.refDIF,4)+'</td><td>'+(l.type==="correctionStop"?"纠错止损":"结构止损")+'</td><td>'+(l.holdBars??0)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前已加载历史范围内没有这类止损记录。</p>');
+ (stops.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>结构ID</th><th>买入K线</th><th>止损K线</th><th>买入收盘</th><th>止损收盘</th><th>DIF参考值</th><th>止损类型</th><th>持有根数</th></tr></thead><tbody>'+
+  stops.map(l=>'<tr><td>'+IDX[l.index].name+'</td><td>'+l.label+'</td><td>'+esc(l.structureId||"—")+'</td><td>'+l.entryT.replace("T"," ")+'</td><td>'+l.t.replace("T"," ")+'</td><td>'+valstr(l.entryClose)+'</td><td class="fail">'+valstr(l.close)+'</td><td>'+valstr(l.refDIF,4)+'</td><td>'+(l.type==="correctionStop"?"纠错止损":"结构止损")+'</td><td>'+(l.holdBars??0)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前已加载历史范围内没有这类止损记录。</p>');
  byId("openrecords").innerHTML='<h3 class="stat-section-head">买入后未配对 · 逐指数/周期</h3>'+
- (open.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>买入收盘</th><th>最近K线</th><th>最新收盘</th><th>追加买点</th><th>入场类型</th><th>关联首次买入</th><th>状态</th></tr></thead><tbody>'+
-  open.map(o=>'<tr><td>'+IDX[o.index].name+'</td><td>'+o.label+'</td><td>'+o.entryT.replace("T"," ")+'</td><td>'+valstr(o.entryClose)+'</td><td>'+o.lastT.replace("T"," ")+'</td><td>'+valstr(o.lastClose)+'</td><td>'+Math.max(0,o.buySignals.length-1)+'</td><td>'+(o.entryType==="correctionBuy"?"纠错买回":"常规买入")+'</td><td>'+(o.originalEntryT||o.entryT).replace("T"," ")+'</td><td class="important">未配对</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前历史窗口内没有尚未配对的买入头寸。</p>');
+ (open.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>结构ID</th><th>结构保护</th><th>买入K线</th><th>买入收盘</th><th>最近K线</th><th>最新收盘</th><th>追加买点</th><th>入场类型</th><th>关联首次买入</th><th>状态</th></tr></thead><tbody>'+
+  open.map(o=>'<tr><td>'+IDX[o.index].name+'</td><td>'+o.label+'</td><td>'+esc(o.structureId||"—")+'</td><td>'+(o.entryType==="correctionBuy"?"纠错独立DIF止损":getSignal(o.index,PERIODS.find(p=>p[1]===o.label)?.[0])?.structureLedger?.find(x=>x.structureId===o.structureId)?.endI===null?"参考DIF保护中":"结构保护已结束")+'</td><td>'+o.entryT.replace("T"," ")+'</td><td>'+valstr(o.entryClose)+'</td><td>'+o.lastT.replace("T"," ")+'</td><td>'+valstr(o.lastClose)+'</td><td>'+Math.max(0,o.buySignals.length-1)+'</td><td>'+(o.entryType==="correctionBuy"?"纠错买回":"常规买入")+'</td><td>'+(o.originalEntryT||o.entryT).replace("T"," ")+'</td><td class="important">未配对</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前历史窗口内没有尚未配对的买入头寸。</p>');
 }
 function renderHistory(){
  const events=[];
