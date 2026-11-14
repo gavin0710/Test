@@ -90,13 +90,13 @@ const groups=subsets.map(x=>({index:x.index,period:x.period,total:x.episodes.len
  rows:keys.map(key=>({name:key,...summary(x.episodes,key)}))}));
 const matching=data.filter(e=>keys.every(k=>Number.isFinite(e.methods[k].returnPct)));
 const matched=keys.map(key=>({name:key,n:matching.length,mean:round(matching.reduce((n,r)=>n+r.methods[key].returnPct,0)/matching.length)}));
-const differences=data.filter(r=>r.methods.activeOnly.returnPct!==null&&r.methods.transferATR3.returnPct!==null).map(r=>({
- index:r.index,period:r.period,entryT:r.entryT,diff:round(r.methods.transferATR3.returnPct-r.methods.activeOnly.returnPct),
- baseline:r.methods.activeOnly.returnPct,transferred:r.methods.transferATR3.returnPct,
+const differences=data.filter(r=>r.methods.activeOnly.returnPct!==null&&r.methods.rearmActiveNew.returnPct!==null).map(r=>({
+ index:r.index,period:r.period,entryT:r.entryT,diff:round(r.methods.rearmActiveNew.returnPct-r.methods.activeOnly.returnPct),
+ baseline:r.methods.activeOnly.returnPct,transferred:r.methods.rearmActiveNew.returnPct,
  expiry:r.cycleEndT,endReason:r.cycleEndReason
 }));
 const sig=weeklySSE.episodes.filter(e=>e.entryT==='2022-11-04'||e.entryT==='2023-12-29').map(e=>({...e,methods:Object.fromEntries(Object.entries(e.methods).map(([k,v])=>[k,{...v,returnPct:round(v.returnPct),closeReturnPct:round(v.closeReturnPct)}]))}));
-const five=data.filter(e=>e.cycleEndReason==='3 opposite-color columns'&&e.methods.activeOnly.reason==='topSell'&&e.methods.transferATR3.reason==='transferredATR');
+const five=data.filter(e=>e.cycleEndReason==='3 opposite-color columns'&&e.methods.activeOnly.reason==='topSell'&&e.methods.rearmActiveNew.reason==='oldFloorRearmedActive');
 console.log('TRANCHE_SUMMARY',JSON.stringify({asOf:latest.generated_at_utc,total:data.length,groups:subsets.length,per:compare,matched,flatStart:matching.length,
  cycleExpiredCount:data.filter(e=>e.cycleEndReason==='3 opposite-color columns').length,
  stopAfterExpiryCount:five.length,
