@@ -54,6 +54,15 @@ for(let index=0;index<4;index++){
    assert(trade||open,'Correction event must have matching open or completed position');
    const limit=trade?.exitI??bars.length-1;
    const stopIdx=firstFallAt(v.dif,e.refDIF,e.i,limit);
+   let confirmStopIdx=-1,belowRun=0;
+   for(let j=e.i+1;j<=limit;j++){
+    belowRun=v.dif[j]<=e.refDIF+1e-9?belowRun+1:0;
+    if(belowRun>=2){confirmStopIdx=j;break;}
+   }
+   const optionBExitIdx=confirmStopIdx>=0?confirmStopIdx:trade?.exitI??null;
+   const optionBReturn=optionBExitIdx===null?null:pct(bars[optionBExitIdx].c,bars[e.i].c);
+   const difRebreakWithin=(lookback)=>stopIdx>=0?
+    v.dif.slice(stopIdx+1,Math.min(v.dif.length,stopIdx+1+lookback)).some(d=>d>e.refDIF+1e-9):false;
    const prior=v.trades.filter(t=>t.exitType==='topSell'&&t.exitI<e.i&&t.campaignI===e.originalI).at(-1);
    assert(prior,'Correction must link to an original paired sale');
    assert(v.dif[e.i]>e.refDIF+1e-9,'Correction entry must break reference high strictly');
@@ -76,6 +85,10 @@ for(let index=0;index<4;index++){
     legacyReturnPct:trade?round(pct(trade.exitClose,bars[e.i].c)):null,
     proposedExitMode:exitMode,proposedReturnPct:exitI!==null?round(pct(exitC,bars[e.i].c)):null,
     counterfactualVsLegacyPct:trade&&trigger?round(pct(bars[stopIdx].c,bars[e.i].c)-pct(trade.exitClose,bars[e.i].c)):null,
+    confirmStopDate:confirmStopIdx>=0?bars[confirmStopIdx].t:null,
+    confirmStopClose:confirmStopIdx>=0?round(bars[confirmStopIdx].c,2):null,
+    twoBarExitReturnPct:optionBReturn===null?null:round(optionBReturn),
+    rebreakDIFWithin5Bars:difRebreakWithin(5),rebreakDIFWithin10Bars:difRebreakWithin(10),
     maxCloseDrawdownPct:round(maxDrawdown),
     maxClose10BarsAfterStopPct:trigger?round(pct(futureMax,bars[stopIdx].c)):null,
     status:trade?'历史已退出':open?'历史未退出':'未知',
@@ -98,6 +111,14 @@ const summary={
  asOf:snap.generated_at_utc,series:nByPeriod.length,correctionCount:result.length,
  correctionByPeriod:Object.fromEntries(PER.map(([p,label])=>[label,result.filter(r=>r.period===label).length])),
  stoppedBeforeExistingExit:earlyStop.length,stopAtOrBeforeExistingExit:stopEvents.length,
+ difRebreakWithin5Bars:result.filter(r=>r.rebreakDIFWithin5Bars).length,
+ difRebreakWithin10Bars:result.filter(r=>r.rebreakDIFWithin10Bars).length,
+ twoBarConfirmed:result.filter(r=>r.confirmStopDate).length,
+ twoBarCompleted:result.filter(r=>r.twoBarExitReturnPct!==null).length,
+ twoBarWinRatePct:result.filter(r=>r.twoBarExitReturnPct!==null).length?
+  round(result.filter(r=>r.twoBarExitReturnPct>0).length/result.filter(r=>r.twoBarExitReturnPct!==null).length*100,2):null,
+ twoBarMeanReturnPct:result.filter(r=>r.twoBarExitReturnPct!==null).length?
+  round(result.filter(r=>r.twoBarExitReturnPct!==null).reduce((n,r)=>n+r.twoBarExitReturnPct,0)/result.filter(r=>r.twoBarExitReturnPct!==null).length):null,
  noStopBeforeExistingExit:noStop.length,
  proposalClosed:closed.length,proposalUnclosed:result.length-closed.length,
  proposalProfitable:gain.length,proposalWinRatePct:closed.length?round(gain.length/closed.length*100,2):null,
@@ -109,8 +130,8 @@ console.log('RESULT_BEGIN');
 console.log(JSON.stringify({summary,records:result,periods:nByPeriod},null,2));
 console.log('RESULT_END');
 console.log('SUMMARY',JSON.stringify(summary));
-console.log('CASE_ROWS_HEADER',"指数\t周期\t原买入\t先前顶部卖出\t纠错买回\t参考DIF\t买回DIF\t纠错收盘\t新止损日期\t止损DIF\t止损收盘\t持有K线\t纠错收益%\t原规则退出\t原收益%\t是否先行止损\t止损后10根最高涨幅%");
+console.log('CASE_ROWS_HEADER',"指数\t周期\t原买入\t先前顶部卖出\t纠错买回\t参考DIF\t买回DIF\t纠错收盘\t新止损日期\t止损DIF\t止损收盘\t持有K线\t纠错收益%\t原规则退出\t原收益%\t是否先行止损\t止损后10根最高涨幅%\t5根内DIF复破\t10根内DIF复破\t双柱确认退出\t双柱收益%");
 for(const r of result)console.log('CASE_ROW',[
  r.index,r.period,r.originalBuy,r.priorSell,r.correctionBuy,r.referenceDIF,r.entryDIF,r.correctionClose,r.stopT||'未触发',
  r.stopDIF??'—',r.stopClose??'—',r.barsToStop??'—',r.proposedReturnPct??'未退出',r.legacyExitT||'未退出',
- r.legacyReturnPct??'未退出',r.proposedExitMode,r.maxClose10BarsAfterStopPct??'—'].join('\t'));
+ r.legacyReturnPct??'未退出',r.proposedExitMode,r.maxClose10BarsAfterStopPct??'—',r.rebreakDIFWithin5Bars,r.rebreakDIFWithin10Bars,r.confirmStopDate||'未触发',r.twoBarExitReturnPct??'未退出'].join('\t'));
