@@ -46,6 +46,28 @@ def fetch_all(secid,period,count=20000):
     if len(result)<65:raise RuntimeError("Only "+str(len(result))+" valid bars")
     return result
 
+
+def weekly_from_daily(daily):
+    """Calendar week OHLC constructed exclusively from verified daily OHLC."""
+    result=[]
+    wk=None
+    for b in daily:
+        try:
+            day=dt.date.fromisoformat(str(b["t"])[:10])
+            group=(day.isocalendar().year,day.isocalendar().week)
+        except (ValueError,KeyError,TypeError):
+            continue
+        if wk is None or group!=wk:
+            result.append({"t":b["t"][:10],"o":b["o"],"c":b["c"],"h":b["h"],"l":b["l"]})
+            wk=group
+        else:
+            prev=result[-1]
+            prev["t"]=b["t"][:10]
+            prev["c"]=b["c"]
+            prev["h"]=max(prev["h"],b["h"])
+            prev["l"]=min(prev["l"],b["l"])
+    return result
+
 def run():
     old=json.loads(LATEST.read_text("utf-8")) if LATEST.exists() else {"data":[{}]*4}
     data=old.get("data") or [{} for _ in INDICES]
@@ -60,7 +82,21 @@ def run():
             baseline=data[i].get(period,[])
             best=merge(previous,baseline)
             success=False
-            for attempt in range(4):
+            if period=="102":
+                dailyArchive=json.loads((DIR/"history-101.json").read_text("utf-8"))
+                dailyRows=dailyArchive["data"][i]["101"]
+                derived=weekly_from_daily(dailyRows)
+                if len(derived)>=65 and derived[0]["t"]<=baseline[0]["t"]:
+                    best=derived
+                    success=True
+                    successes+=1
+                    print("DERIVED_WEEKLY",name,period,len(best),best[0]["t"],best[-1]["t"],flush=True)
+            if period=="101" and len(previous)>900 and baseline and previous[-1]["t"]>=baseline[-1]["t"]:
+                best=merge(previous,baseline)
+                success=True
+                successes+=1
+                print("REUSE_COMPLETE_DAILY",name,len(best),best[0]["t"],best[-1]["t"],flush=True)
+            for attempt in range(0 if success else 4):
                 try:
                     remote=fetch_all(secid,period)
                     # Historical source should never replace longer valid archive with less.
@@ -76,7 +112,7 @@ def run():
                 print("PRESERVE_EXISTING",name,period,len(best),best[0]["t"] if best else "-",flush=True)
             result.append({period:best})
             time.sleep(5+random.random()*2)
-        payload={"source":"Eastmoney public index K-lines; fallback previous verified archive",
+        payload={"source":("Weekly OHLC derived from verified full-history daily bars" if period=="102" else "Eastmoney public index daily K-lines; fallback prior verified archive"),
                  "generated_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
                  "period":period,"data":result,
                  "counts":[len(r.get(period,[])) for r in result]}
