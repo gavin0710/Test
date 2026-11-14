@@ -251,7 +251,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   <details class="fold" id="winfold" open><summary>六周期 · 关键点位与交易结果 <span class="faint">数量 / 成功率 / 平均盈利幅度 / 未配对</span></summary>
     <div class="foldbody">
      <div class="stat-overall" id="win-overall"></div>
-     <p class="stats-explain">统计范围为当前真实归档全历史；同一指数、同一周期独立统计。成功率=退出收盘价高于买入收盘价的已完成交易÷已完成交易；止损退出纳入失败或成功实测，未配对不参与成功率。平均盈利幅度只统计盈利交易的单次涨幅；平均每笔收益包含亏损，均未扣手续费或滑点。一次钝化可转化为买点，买1/买2等也是买点子集，所以各列不应全部相加。</p>
+     <p class="stats-explain">按独立底部结构风险单元统计：新结构买1新建单元，同结构买2/3只追加信号；结构失效仅退出本单元，旧结构保护期结束后止损不再重启。顶部卖点可以结束多个单元。成功率=盈利的已完成单元交易÷已完成单元交易；收益按信号收盘价估算，未含交易费用、滑点及成交可行性。不能将各单元收益率相加视为组合实盘收益。</p>
      <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>纠错止损</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
      <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>优先验证历史共振与买卖点有效性，暂不应用波浪分类结果</span></div>
      <details class="fold" id="win-index-fold" style="margin-top:9px"><summary>四指数 × 六周期的交易明细 <span class="faint">24组，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1050px"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完成交易</th><th>盈利</th><th>亏损</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>纠错买回</th><th>未配对买入</th><th>未配对卖点</th></tr></thead><tbody id="win-index-body"></tbody></table></div></details>
@@ -262,7 +262,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   <details class="fold" id="statfold"><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
     <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>纠错止损</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
-    <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点或其他正式退出条件的情况，会标为“未配对”，不自动补卖点。</div></div>
+    <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同结构买2/3不新建独立单元；新结构买1会建立新的独立单元。若同时存在多个单元，顶部卖点会结束所有仍持有单元，卖点数与退出交易数不必相等。配对是信号层模拟，不代表实际下单、组合回测或可成交性。存在买入后未出现顶部卖点或其他正式退出条件的情况，会标为“未配对”，不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
    <div class="foldbody"><div id="stoprecords"></div><div id="openrecords"></div></div>
@@ -364,87 +364,90 @@ function analyzeLifecycle(bars,dif,hist,baseEvents,options={}){
  const n=bars.length,sideOf=e=>e.type==="buy"?-1:e.type==="sell"?1:0;
  const signAt=i=>hist[i]<-EPS?-1:hist[i]>EPS?1:0;
  const turns=(i,sign)=>i>=2&&(sign<0?dif[i]>dif[i-1]+EPS&&dif[i-1]<=dif[i-2]+EPS:dif[i]<dif[i-1]-EPS&&dif[i-1]>=dif[i-2]-EPS);
- const baseByBar=new Map();
- for(const event of baseEvents){let list=baseByBar.get(event.i)||[];list.push(event);baseByBar.set(event.i,list)}
+ const byBar=new Map();
+ for(const e of baseEvents){const a=byBar.get(e.i)||[];a.push(e);byBar.set(e.i,a)}
  const events=[],cycles={bottom:null,top:null},allCycles=[],trades=[],losses=[];
- let position=null,correctionPending=null,everOpened=0,unpairedSells=0;
+ // Each confirmed bottom structure gets its own risk unit, even when older units remain held.
+ let positions=[],correctionPendings=[],everOpened=0,unpairedSells=0;
  const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,correctionStop:0,
-  technicalFailures:0,buy:0,sell:0,correctionBuy:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,open:0,
-  openCorrections:0,pairedBuy:0,openBuy:0};
- const push=e=>{events.push(e);return e};
- const exit=(e,kind)=>{
-  if(!position)return false;
-  const out={...position,exitI:e.i,exitT:e.t,exitClose:bars[e.i].c,exitType:kind,holdBars:e.i-position.entryI};
-  trades.push(out);position=null;counts.completed++;
-  if(kind==="stop"||kind==="correctionStop"){counts.stopExits++;correctionPending=null}
-  else if(kind==="topSell"){
-   counts.sellExits++;
-   // A top-side sell is reversible only while its top structure remains structurally
-   // eligible (fewer than 3 consecutive non-red columns).
-   const ref=e.ref?.dif??e.refDIF??cycles.top?.refDIF;
-   if(Number.isFinite(ref)){
-    correctionPending={exitI:e.i,refDIF:ref,oppositeStreak:cycles.top?.oppositeStreak||0,
-     campaignI:out.campaignI,originalEntryT:out.originalEntryT,
-     originalEntryClose:out.originalEntryClose,correctionCount:out.correctionCount||0,
-     parentEntryI:out.entryI,parentExitI:e.i,parentExitT:e.t,
-     topFirstI:cycles.top?.firstI??e.i};
-   }else correctionPending=null;
-  }
-  return true;
+ technicalFailures:0,buy:0,sell:0,correctionBuy:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,
+ open:0,openCorrections:0,pairedBuy:0,openBuy:0};
+ const push=e=>(events.push(e),e);
+ const exitUnit=(p,e,kind)=>{
+  if(!positions.includes(p))return null;
+  const t={...p,exitI:e.i,exitT:e.t,exitClose:bars[e.i].c,exitType:kind,holdBars:e.i-p.entryI};
+  trades.push(t);positions=positions.filter(x=>x!==p);
+  counts.completed++;if(kind==="topSell")counts.sellExits++;else counts.stopExits++;
+  return t;
  };
- const processSignal=e=>{
-  const isBuy=["buy","secondBuy","thirdBuy","laterBuy"].includes(e.type);
-  const isSell=["sell","secondSell","thirdSell","laterSell"].includes(e.type);
-  if(isBuy){counts.buy++;
-   if(!position){
-    correctionPending=null;
-    position={entryI:e.i,entryT:e.t,entryClose:bars[e.i].c,entryType:e.type,
-     campaignI:e.i,originalEntryT:e.t,originalEntryClose:bars[e.i].c,
-     correctionCount:0,bottomFirstI:cycles.bottom?.firstI??e.i,
-     buySignals:[{type:e.type,i:e.i}]};everOpened++;
-   }else position.buySignals.push({type:e.type,i:e.i});
-  }else if(isSell){counts.sell++;
-   if(position)exit(e,"topSell");
-   else{counts.unpairedSells++;unpairedSells++}
+ const signal=e=>{
+  if(["buy","secondBuy","thirdBuy","laterBuy"].includes(e.type)){
+   counts.buy++;
+   const firstI=e.firstI??e.i,id="B:"+firstI;e.structureId=id;
+   if(e.type==="buy"){
+    correctionPendings=[];
+    positions.push({structureId:id,entryI:e.i,entryT:e.t,entryClose:bars[e.i].c,
+      entryType:e.type,campaignI:e.i,originalEntryT:e.t,originalEntryClose:bars[e.i].c,
+      correctionCount:0,bottomFirstI:firstI,buySignals:[{type:e.type,i:e.i}]});
+    everOpened++;
+   }else{
+    const owner=positions.find(p=>p.structureId===id&&p.entryType!=="correctionBuy");
+    if(owner)owner.buySignals.push({type:e.type,i:e.i});
+    else e.unexecuted=true;
+   }
+  }else if(["sell","secondSell","thirdSell","laterSell"].includes(e.type)){
+   counts.sell++;
+   if(!positions.length){counts.unpairedSells++;unpairedSells++;return}
+   const ref=e.ref?.dif??e.refDIF??cycles.top?.refDIF;
+   const closed=positions.slice().map(p=>exitUnit(p,e,"topSell")).filter(Boolean);
+   e.matchedStructureIds=closed.map(x=>x.structureId);
+   correctionPendings=Number.isFinite(ref)?closed.map(t=>({
+    structureId:t.structureId,exitI:e.i,refDIF:ref,oppositeStreak:cycles.top?.oppositeStreak||0,
+    campaignI:t.campaignI,originalEntryT:t.originalEntryT,originalEntryClose:t.originalEntryClose,
+    correctionCount:t.correctionCount||0,parentExitI:e.i,parentExitT:e.t,
+    topFirstI:cycles.top?.firstI??e.i
+   })):[];
   }
  };
  for(let i=0;i<n;i++){
-  // A completed bar is used for confirmation; a correction never stops on its entry bar.
-  // This independent exit has priority over later top-side signals on the same bar.
-  if(options.enableCorrectionStop===true&&position?.entryType==="correctionBuy"&&i>position.entryI&&Number.isFinite(position.correctionRefDIF)&&dif[i]<=position.correctionRefDIF+EPS){
-   const stop=push({type:"correctionStop",i,t:bars[i].t,side:"bottom",refDIF:position.correctionRefDIF,
-    originalI:position.campaignI,originalT:position.originalEntryT,entryI:position.entryI,
-    entryT:position.entryT,entryClose:position.entryClose,close:bars[i].c,
-    holdBars:i-position.entryI});
-   counts.correctionStop++;losses.push(stop);exit(stop,"correctionStop");
+  if(options.enableCorrectionStop===true)for(const p of positions.slice()){
+   if(p.entryType!=="correctionBuy"||i<=p.entryI||
+      !Number.isFinite(p.correctionRefDIF)||dif[i]>p.correctionRefDIF+EPS)continue;
+   const st=push({type:"correctionStop",i,t:bars[i].t,side:"bottom",
+    structureId:p.structureId,refDIF:p.correctionRefDIF,
+    originalI:p.campaignI,originalT:p.originalEntryT,
+    entryI:p.entryI,entryT:p.entryT,entryClose:p.entryClose,
+    close:bars[i].c,holdBars:i-p.entryI});
+   losses.push(st);exitUnit(p,st,"correctionStop");counts.correctionStop++;
   }
-  // Rebuy after an actually paired top exit, not after an unpaired sell.
-  // All comparisons use completed-bar DIF; price-only spikes and repeated DIF
-  // turns do not qualify. Expire when >=3 consecutive non-red columns occur.
-  if(correctionPending&&i>correctionPending.exitI){
-   const pending=correctionPending;
-   if(position)correctionPending=null;
-   else{
-    pending.oppositeStreak=signAt(i)===1?0:pending.oppositeStreak+1;
-    if(pending.oppositeStreak>=3)correctionPending=null;
-    else if(dif[i]>pending.refDIF+EPS&&dif[i-1]<=pending.refDIF+EPS){
-     const number=pending.correctionCount+1;
-     const e=push({type:"correctionBuy",i,t:bars[i].t,stage:number,side:"bottom",
-      refDIF:pending.refDIF,close:bars[i].c,originalI:pending.campaignI,
-      originalT:pending.originalEntryT,originalClose:pending.originalEntryClose,
-      previousExitI:pending.parentExitI,previousExitT:pending.parentExitT,topFirstI:pending.topFirstI});
-     position={entryI:i,entryT:bars[i].t,entryClose:bars[i].c,entryType:"correctionBuy",
-      campaignI:pending.campaignI,originalEntryT:pending.originalEntryT,
-      originalEntryClose:pending.originalEntryClose,correctionCount:number,
-      bottomFirstI:null,correctionRefDIF:pending.refDIF,correctionFromExitI:pending.parentExitI,
-      buySignals:[{type:"correctionBuy",i}]};
-     counts.correctionBuy++;correctionPending=null;
+  if(correctionPendings.length){
+   if(positions.length)correctionPendings=[];
+   else if(i>correctionPendings[0].exitI){
+    for(const p of correctionPendings)p.oppositeStreak=signAt(i)===1?0:p.oppositeStreak+1;
+    const first=correctionPendings[0];
+    if(first.oppositeStreak>=3)correctionPendings=[];
+    else if(dif[i]>first.refDIF+EPS&&dif[i-1]<=first.refDIF+EPS){
+     const parents=correctionPendings.slice();
+     push({type:"correctionBuy",i,t:bars[i].t,stage:first.correctionCount+1,
+      side:"bottom",refDIF:first.refDIF,close:bars[i].c,originalI:first.campaignI,
+      originalT:first.originalEntryT,originalClose:first.originalEntryClose,
+      previousExitI:first.parentExitI,previousExitT:first.parentExitT,
+      topFirstI:first.topFirstI,linkedStructureIds:parents.map(p=>p.structureId)});
+     for(const p of parents)positions.push({
+      structureId:p.structureId,entryI:i,entryT:bars[i].t,entryClose:bars[i].c,
+      entryType:"correctionBuy",campaignI:p.campaignI,
+      originalEntryT:p.originalEntryT,originalEntryClose:p.originalEntryClose,
+      correctionCount:p.correctionCount+1,bottomFirstI:null,
+      correctionRefDIF:p.refDIF,correctionFromExitI:p.parentExitI,
+      buySignals:[{type:"correctionBuy",i}]
+     });
+     counts.correctionBuy++;correctionPendings=[];
     }
    }
   }
   for(const key of ["bottom","top"]){
    const cyc=cycles[key];if(!cyc||cyc.closed||i<=cyc.firstI)continue;
-   const color=signAt(i),outside=color!==cyc.sign;
+   const outside=signAt(i)!==cyc.sign;
    cyc.oppositeStreak=outside?cyc.oppositeStreak+1:0;
    if(cyc.oppositeStreak>=3){
     cyc.closed=true;cyc.endedAt=i;cyc.endReason="3 opposite-color columns";continue;
@@ -452,14 +455,18 @@ function analyzeLifecycle(bars,dif,hist,baseEvents,options={}){
    const broken=cyc.sign<0?dif[i]<cyc.refDIF-EPS:dif[i]>cyc.refDIF+EPS;
    if(broken){
     cyc.closed=true;cyc.endedAt=i;cyc.endReason="DIF made new reference extreme";
-    push({type:"structureFailure",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
+    push({type:"structureFailure",i,t:bars[i].t,stage:cyc.stage,side:key,
+     structureId:cyc.structureId,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
     counts.technicalFailures++;
-    // Avoid stopping a correction trade for a different, unrelated old bottom structure.
-    if(key==="bottom"&&position&&position.bottomFirstI===cyc.firstI){
-     const stop=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,
-      firstI:cyc.firstI,close:bars[i].c,entryI:position.entryI,entryT:position.entryT,
-      entryClose:position.entryClose,holdBars:i-position.entryI});
-     counts.failStop++;losses.push(stop);exit(stop,"stop");
+    if(key==="bottom"){
+     const owner=positions.find(p=>p.structureId===cyc.structureId&&p.entryType!=="correctionBuy");
+     if(owner){
+      const st=push({type:"stopLoss",i,t:bars[i].t,stage:cyc.stage,side:key,
+       structureId:cyc.structureId,refDIF:cyc.refDIF,firstI:cyc.firstI,
+       close:bars[i].c,entryI:owner.entryI,entryT:owner.entryT,
+       entryClose:owner.entryClose,holdBars:i-owner.entryI});
+      losses.push(st);exitUnit(owner,st,"stop");counts.failStop++;
+     }
     }
     continue;
    }
@@ -467,31 +474,43 @@ function analyzeLifecycle(bars,dif,hist,baseEvents,options={}){
     cyc.stage++;cyc.lastSignalI=i;
     const type=cyc.sign<0?(cyc.stage===2?"secondBuy":cyc.stage===3?"thirdBuy":"laterBuy"):
      (cyc.stage===2?"secondSell":cyc.stage===3?"thirdSell":"laterSell");
-    const e=push({type,i,t:bars[i].t,stage:cyc.stage,side:key,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
+    const e=push({type,i,t:bars[i].t,stage:cyc.stage,side:key,
+     structureId:cyc.structureId,refDIF:cyc.refDIF,firstI:cyc.firstI,close:bars[i].c});
     if(cyc.stage===2)counts.second++;else if(cyc.stage===3)counts.third++;else counts.fourthPlus++;
-    processSignal(e);
+    signal(e);
    }
   }
-  for(const raw of baseByBar.get(i)||[]){
+  for(const raw of byBar.get(i)||[]){
    if(raw.type==="watchBuy"||raw.type==="watchSell"){counts.watch++;push({...raw});continue}
    if(raw.type==="expired"||raw.type==="invalid"){
-    const hadSignal=baseEvents.some(e=>(e.type==="buy"||e.type==="sell")&&e.regionStart===raw.regionStart&&e.i<=raw.i);
-    if(!hadSignal)counts.disappeared++;push({...raw});continue;
+    const formed=baseEvents.some(e=>(e.type==="buy"||e.type==="sell")&&e.regionStart===raw.regionStart&&e.i<=raw.i);
+    if(!formed)counts.disappeared++;push({...raw});continue;
    }
    if(raw.type!=="buy"&&raw.type!=="sell"){push({...raw});continue}
    const key=raw.type==="buy"?"bottom":"top",sign=sideOf(raw);
    const old=cycles[key];
    if(old&&!old.closed){old.closed=true;old.endedAt=i;old.endReason="new confirmed base structure"}
-   const cyc={side:key,sign,firstI:i,lastSignalI:i,stage:1,refDIF:raw.ref?.dif,
-     refPrice:raw.ref?.close,regionStart:raw.regionStart,oppositeStreak:0,closed:false};
+   const cyc={side:key,sign,firstI:i,lastSignalI:i,stage:1,
+    structureId:(key==="bottom"?"B:":"T:")+i,refDIF:raw.ref?.dif,
+    refPrice:raw.ref?.close,regionStart:raw.regionStart,oppositeStreak:0,closed:false};
    cycles[key]=cyc;allCycles.push(cyc);counts.formed++;
-   const e=push({...raw,stage:1,side:key});processSignal(e);
+   const e=push({...raw,stage:1,side:key,firstI:i,structureId:cyc.structureId});signal(e);
   }
  }
- counts.open=position?1:0;counts.openCorrections=position?.entryType==="correctionBuy"?1:0;
+ counts.open=positions.length;
+ counts.openCorrections=positions.filter(p=>p.entryType==="correctionBuy").length;
  counts.pairedBuy=trades.filter(t=>t.exitType==="topSell").length;
- counts.openBuy=position?1:0;
- return {events,counts,cycles:allCycles,losses,trades,position,correctionPending,unpairedSells,everOpened};
+ counts.openBuy=positions.length;
+ const structureLedger=allCycles.filter(c=>c.side==="bottom").map(c=>({
+  structureId:c.structureId,firstI:c.firstI,firstT:bars[c.firstI].t,
+  refDIF:c.refDIF,endI:c.endedAt??null,endReason:c.endReason||null,
+  open:positions.some(p=>p.structureId===c.structureId),
+  trades:trades.filter(t=>t.structureId===c.structureId)
+ }));
+ return {events,counts,cycles:allCycles,losses,trades,positions,
+  position:positions.at(-1)||null,structureLedger,
+  correctionPending:correctionPendings[0]||null,
+  correctionPendings,unpairedSells,everOpened};
 }
 /* Interim, auditable period-specific pivot direction; not SSE wave-number engine. */
 function localWave(bars){
@@ -606,7 +625,7 @@ function calculate(bars){
  const wave=localWave(bars),trades=lifecycle.trades.map(t=>({...t,entryWave:wave.at[t.entryI]?.direction||'unknown'}));
  const output={bars,dif,dea,hist,nine,ema12:f,ema26:s,...structure,
    events:lifecycle.events,stats:lifecycle.counts,losses:lifecycle.losses,
-   trades,position:lifecycle.position,cycles:lifecycle.cycles,correctionPending:lifecycle.correctionPending,localWave:wave};
+   trades,positions:lifecycle.positions,position:lifecycle.position,structureLedger:lifecycle.structureLedger,cycles:lifecycle.cycles,correctionPending:lifecycle.correctionPending,localWave:wave};
  output.projection=projectNext(output);
  const latestTradeEvent=lifecycle.events.filter(e=>["buy","secondBuy","thirdBuy","laterBuy","sell","secondSell","thirdSell","laterSell","stopLoss","correctionBuy","correctionStop"].includes(e.type)).at(-1);
  if(latestTradeEvent&&bars.length-1-latestTradeEvent.i<=2){
@@ -941,7 +960,7 @@ function quickPairStatus(v){
   for(const b of t.buySignals||[])buys.set(b.i,{status,exitT:t.exitT,exitI:t.exitI,rootT:t.originalEntryT||t.entryT,rootI:t.campaignI??t.entryI,correction:t.entryType==="correctionBuy"});
   if(t.exitType==="topSell")sells.add(t.exitI);
  }
- if(v?.position)for(const b of v.position.buySignals||[])buys.set(b.i,{status:"未配对",rootT:v.position.originalEntryT||v.position.entryT,rootI:v.position.campaignI??v.position.entryI,correction:v.position.entryType==="correctionBuy"});
+ for(const p of v?.positions||[])for(const b of p.buySignals||[])buys.set(b.i,{status:"未配对",rootT:p.originalEntryT||p.entryT,rootI:p.campaignI??p.entryI,correction:p.entryType==="correctionBuy",structureId:p.structureId});
  return {buys,sells};
 }
 function matchQuickEvent(e,kind,pair){
@@ -1050,7 +1069,7 @@ function replayBuildCases(){
   const v=getSignal(i,period);if(!v)continue;
   const campaigns=new Map();
   const complete=[...(v.trades||[])];
-  if(v.position)complete.push({...v.position,exitI:null,exitT:null,exitClose:null,exitType:"open"});
+  for(const p of v.positions||[])complete.push({...p,exitI:null,exitT:null,exitClose:null,exitType:"open"});
   for(const t of complete){
    const root=t.campaignI??t.entryI,id=i+":"+period+":"+root;
    if(!campaigns.has(id))campaigns.set(id,{id,index:i,period,label,root,legs:[],v});
@@ -1240,6 +1259,7 @@ function renderReplay(){
  const sum=c.returns.reduce((a,x)=>a+x,0);
  const metrics=[
   ["指数 / 周期",IDX[c.index].short+" · "+c.label],
+  ["独立结构ID",c.unpairedSell?"—":("B:"+c.root)],
   ["所属交易轮次",c.unpairedSell?"孤立顶部卖点":(c.v.bars[c.root]?.t||"—").slice(0,10)],
   ["实际进出段数",c.legs.filter(t=>Number.isInteger(t.exitI)).length],
   ["纠错买回",c.legs.filter(t=>t.entryType==="correctionBuy").length+"次"],
@@ -1308,7 +1328,7 @@ function cardHTML(i){
   n=v&&last?(reviewNode?v.nine[histAt]:v.nine.at(-1)):0,s=reviewNode?"neutral":v?v.state:"missing";
  const c=delta>=0?"up":"down";
  const timed=last?(reviewNode?"复盘时点 ":"")+last.t.replace("T"," ").slice(0,16):reviewNode?"该历史时点无数据":"K线数据缺失";const latestLabel=!last?"无同期数据":reviewNode?"历史复盘":v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const isLatest=!reviewNode&&view?.bars.at(-1)?.t===v?.bars.at(-1)?.t;const projection=isLatest?projectionHTML(v,nextLabel):replayMode?'<div class="estimate"><span class="estimate-text">历史共振对照 · 同周期同时间窗；纠错止损已纳入正式配对</span></div>':'<div class="estimate"><span class="estimate-text">历史浏览中 · 下一根条件推演仅对应最新K线；点击“回最新”查看</span></div>';const navigator=buyNavigator(i,v);
- return '<article class="chart-card '+(focusIndex===i?"focused":"")+(selectedEvent?.index===i?" quick-selected":"")+(replayMode&&replayCurrent()?.index===i?" review-focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>买1/2/3：DIF逐次上拐 · 卖：顶部结构 · 止损：结构失败</span><span class="latest">'+timed+'</span></div></article>'
+ return '<article class="chart-card '+(focusIndex===i?"focused":"")+(selectedEvent?.index===i?" quick-selected":"")+(replayMode&&replayCurrent()?.index===i?" review-focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>新结构买1独立 · 买2/3同结构 · 止损不连坐</span><span class="latest">'+timed+'</span></div></article>'
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 
@@ -1370,7 +1390,7 @@ function renderWinRates(){
  const ordered=rows.flatMap(r=>(r.v.trades||[]).map(t=>({...t,index:r.i,period:r.label,ret:(t.exitClose/t.entryClose-1)*100}))).sort((a,b)=>b.exitT.localeCompare(a.exitT));
  byId("win-trades-body").innerHTML=ordered.map(t=>{
   const result=t.ret>0?"盈利":t.ret<0?"亏损":"持平";
-  const name=t.entryType==="correctionBuy"?"纠错买回第"+t.correctionCount+"次":"首次买入";
+  const name=t.entryType==="correctionBuy"?"纠错买回第"+t.correctionCount+"次":"结构买1";
   return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+(t.originalEntryT||t.entryT).replace("T"," ")+'</td><td>'+t.entryT.replace("T"," ")+'</td>'+
    '<td>'+t.exitT.replace("T"," ")+'</td><td>'+valstr(t.entryClose)+'</td><td>'+valstr(t.exitClose)+'</td><td>'+name+'</td>'+
    '<td class="'+(t.ret>0?"important":t.ret<0?"fail":"")+'">'+fmt(t.ret,true)+'</td>'+
@@ -1401,7 +1421,7 @@ function renderStats(){
  const stops=[],open=[];
  for(const {i,label,v} of rows){
   for(const loss of v.losses||[])stops.push({...loss,index:i,label});
-  if(v.position)open.push({...v.position,index:i,label,lastT:v.bars.at(-1).t,lastClose:v.bars.at(-1).c});
+  for(const p of v.positions||[])open.push({...p,index:i,label,lastT:v.bars.at(-1).t,lastClose:v.bars.at(-1).c});
  }
  stops.sort((a,b)=>b.t.localeCompare(a.t));open.sort((a,b)=>b.entryT.localeCompare(a.entryT));
  byId("stopsbadge").textContent=stops.length+"次止损退出 / "+open.length+"个未配对买入";
