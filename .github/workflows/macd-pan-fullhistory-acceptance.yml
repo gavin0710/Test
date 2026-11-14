@@ -1,4 +1,5 @@
 name: Verify full-history draggable K-line production
+# Revalidate after production date-aligned pan and full weekly derivation.
 on:
   workflow_dispatch:
   push:
