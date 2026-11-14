@@ -7,7 +7,7 @@ assert(script,"Dashboard script missing");new vm.Script(script,{filename:"dashbo
 const cut=script.indexOf('byId("refresh").onclick=load;');assert(cut>0,"Engine isolation failed");
 const sandbox={window:{},document:{},console};
 vm.createContext(sandbox);
-vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema,localWave};",sandbox,{timeout:3000});
+vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,projectionHTML,isFocusedProjection,resample,resampleHourly,ema,localWave};",sandbox,{timeout:3000});
 const {calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema}=sandbox.testApi;
 let assertions=0;
 function ok(value,label){assert(value,label);assertions++}
@@ -310,4 +310,27 @@ equal(overlapTop.counts.sellExits,2,"Two independent exit units counted");
 equal(overlapTop.events.find(e=>e.type==="sell")?.matchedStructureIds?.length,2,
  "Top signal audits all exited units");
 ok(overlapTop.trades.every(t=>t.exitType==="topSell"),"Both exits are real top-sell links");
+
+// Projections are a focused visual aid, not a permanent dashboard footer.
+// The underlying MACD trading/signal engine remains unchanged.
+const {projectionHTML,isFocusedProjection}=sandbox.testApi;
+for(const mode of ["none","candidate","signal","invalid","correction","correctionHolding"]){
+ equal(isFocusedProjection({mode}),false,"No projection panel outside confirmed divergence: "+mode);
+ equal(projectionHTML({projection:{mode}},"下一交易日"),"","Projection is hidden for "+mode);
+}
+equal(projectionHTML(null,"下一交易日"),"","Missing data does not generate filler projection");
+for(const mode of ["watch","campaign"]){
+ const proj={mode,direction:"bottom",lossPrice:90,turnPrice:101,nextStage:2,oppositeStreak:0};
+ ok(isFocusedProjection(proj),"Confirmed divergence focus is display-eligible: "+mode);
+ const panel=projectionHTML({projection:proj},"下一交易日");
+ ok(panel.includes("下一交易日推演")&&panel.includes("失效")&&panel.includes("DIF买点"),
+  "Focused projection displays actionable levels: "+mode);
+}
+ok(!script.includes("历史浏览中 · 下一根条件推演")&&!script.includes("历史共振对照 · 同周期同时间窗"),
+ "Historical/replay projection placeholders have been removed");
+ok(script.includes('const projection=isLatest&&!replayMode?projectionHTML(v,nextLabel):"";'),
+ "Current projection only in latest normal market view");
+ok(script.includes('if(isFocusedProjection(proj)){'),
+ "Projected dotted lines are hidden when no confirmed divergence is being watched");
+
 console.log("PASS:",assertions,"assertions: close-price divergence, 3 opposite bars, linked buy-sell trade, enabled correction stop, four-chart replay");
