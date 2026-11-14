@@ -71,6 +71,16 @@ for(let index=0;index<4;index++){
    const exitI=trigger?stopIdx:trade?.exitI??null;
    const exitMode=trigger&&stopIdx<trade?.exitI?'纠错止损':trigger&&stopIdx===trade?.exitI?'同根止损/顶部卖':trade?'原顶部卖出':'尚未退出';
    const exitC=exitI===null?null:bars[exitI].c;
+   // A completed-bar DIF is only known after bar close. A practical signal-to-fill
+   // proxy must use the NEXT bar open for both entry and exit consistently.
+   const nextOpenEntry=e.i+1<bars.length?bars[e.i+1].o:null;
+   const nextOpenStop=stopIdx>=0&&stopIdx+1<bars.length?bars[stopIdx+1].o:null;
+   const nextOpenOld=trade?.exitI+1<bars.length?bars[trade.exitI+1].o:null;
+   const nextOpenBuyAvailable=Number.isFinite(nextOpenEntry)&&nextOpenEntry>0;
+   const newStopNextOpenPct=nextOpenBuyAvailable&&Number.isFinite(nextOpenStop)?
+     pct(nextOpenStop,nextOpenEntry):null;
+   const oldTopNextOpenPct=nextOpenBuyAvailable&&Number.isFinite(nextOpenOld)?
+     pct(nextOpenOld,nextOpenEntry):null;
    const recent=bars.slice(e.i,limit+1);
    const futureMax=trigger?Math.max(...bars.slice(stopIdx+1,Math.min(bars.length,stopIdx+11)).map(b=>b.c),bars[stopIdx].c):null;
    let peak=bars[e.i].c,maxDrawdown=0;
@@ -89,6 +99,11 @@ for(let index=0;index<4;index++){
     confirmStopClose:confirmStopIdx>=0?round(bars[confirmStopIdx].c,2):null,
     twoBarExitReturnPct:optionBReturn===null?null:round(optionBReturn),
     rebreakDIFWithin5Bars:difRebreakWithin(5),rebreakDIFWithin10Bars:difRebreakWithin(10),
+    signalNextOpenEntry:round(nextOpenEntry,2),
+    signalNextOpenStop:round(nextOpenStop,2),
+    signalNextOpenLegacyExit:round(nextOpenOld,2),
+    correctionStopNextOpenReturnPct:round(newStopNextOpenPct),
+    legacyNextOpenReturnPct:round(oldTopNextOpenPct),
     maxCloseDrawdownPct:round(maxDrawdown),
     maxClose10BarsAfterStopPct:trigger?round(pct(futureMax,bars[stopIdx].c)):null,
     status:trade?'历史已退出':open?'历史未退出':'未知',
@@ -124,13 +139,18 @@ const summary={
  proposalProfitable:gain.length,proposalWinRatePct:closed.length?round(gain.length/closed.length*100,2):null,
  proposalMeanReturnPct:closed.length?round(closed.reduce((sum,r)=>sum+returnOf(r),0)/closed.length):null,
  originalClosed:result.filter(r=>r.legacyReturnPct!==null).length,
- originalMeanReturnPct:result.filter(r=>r.legacyReturnPct!==null).length?round(result.filter(r=>r.legacyReturnPct!==null).reduce((n,r)=>n+r.legacyReturnPct,0)/result.filter(r=>r.legacyReturnPct!==null).length):null
+ originalMeanReturnPct:result.filter(r=>r.legacyReturnPct!==null).length?round(result.filter(r=>r.legacyReturnPct!==null).reduce((n,r)=>n+r.legacyReturnPct,0)/result.filter(r=>r.legacyReturnPct!==null).length):null,
+ nextOpenModeled:result.filter(r=>r.correctionStopNextOpenReturnPct!==null).length,
+ nextOpenStopMeanReturnPct:result.filter(r=>r.correctionStopNextOpenReturnPct!==null).length?
+  round(result.filter(r=>r.correctionStopNextOpenReturnPct!==null).reduce((n,r)=>n+r.correctionStopNextOpenReturnPct,0)/result.filter(r=>r.correctionStopNextOpenReturnPct!==null).length):null,
+ nextOpenLegacyMeanReturnPct:result.filter(r=>r.legacyNextOpenReturnPct!==null).length?
+  round(result.filter(r=>r.legacyNextOpenReturnPct!==null).reduce((n,r)=>n+r.legacyNextOpenReturnPct,0)/result.filter(r=>r.legacyNextOpenReturnPct!==null).length):null
 };
 console.log('RESULT_BEGIN');
 console.log(JSON.stringify({summary,records:result,periods:nByPeriod},null,2));
 console.log('RESULT_END');
 console.log('SUMMARY',JSON.stringify(summary));
-console.log('CASE_ROWS_HEADER',"指数\t周期\t原买入\t先前顶部卖出\t纠错买回\t参考DIF\t买回DIF\t纠错收盘\t新止损日期\t止损DIF\t止损收盘\t持有K线\t纠错收益%\t原规则退出\t原收益%\t是否先行止损\t止损后10根最高涨幅%\t5根内DIF复破\t10根内DIF复破\t双柱确认退出\t双柱收益%");
+console.log('CASE_ROWS_HEADER',"指数\t周期\t原买入\t先前顶部卖出\t纠错买回\t参考DIF\t买回DIF\t纠错收盘\t新止损日期\t止损DIF\t止损收盘\t持有K线\t纠错收益%\t原规则退出\t原收益%\t是否先行止损\t止损后10根最高涨幅%\t5根内DIF复破\t10根内DIF复破\t双柱确认退出\t双柱收益%\t次根开盘纠错收益%\t次根开盘旧退出收益%");
 for(const r of result)console.log('CASE_ROW',[
  r.index,r.period,r.originalBuy,r.priorSell,r.correctionBuy,r.referenceDIF,r.entryDIF,r.correctionClose,r.stopT||'未触发',
  r.stopDIF??'—',r.stopClose??'—',r.barsToStop??'—',r.proposedReturnPct??'未退出',r.legacyExitT||'未退出',
