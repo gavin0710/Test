@@ -1,0 +1,20 @@
+name: Independent audit of 2024-07-09 MACD zones and all historic structure signals
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/audit-structure-2024.js"
+      - ".github/workflows/macd-audit-2024-zones.yml"
+permissions: {contents: read}
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Audit independently reconstructed historic K-line MACD structure regions
+        run: node macd-resonance/audit-structure-2024.js
