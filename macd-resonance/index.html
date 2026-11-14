@@ -234,7 +234,7 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
      <div class="stat-overall" id="win-overall"></div>
      <p class="stats-explain">统计范围为当前真实归档全历史；同一指数、同一周期独立统计。成功率=退出收盘价高于买入收盘价的已完成交易÷已完成交易；止损退出纳入失败或成功实测，未配对不参与成功率。平均盈利幅度只统计盈利交易的单次涨幅；平均每笔收益包含亏损，均未扣手续费或滑点。一次钝化可转化为买点，买1/买2等也是买点子集，所以各列不应全部相加。</p>
      <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>纠错止损</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
-     <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>本阶段先优化MACD买卖点、纠错与配对规则，不显示波浪背景细分胜率</span></div>
+     <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>优先验证历史共振与买卖点有效性，暂不应用波浪分类结果</span></div>
      <details class="fold" id="win-index-fold" style="margin-top:9px"><summary>四指数 × 六周期的交易明细 <span class="faint">24组，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1050px"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完成交易</th><th>盈利</th><th>亏损</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>纠错买回</th><th>未配对买入</th><th>未配对卖点</th></tr></thead><tbody id="win-index-body"></tbody></table></div></details>
      <details class="fold" style="margin-top:9px"><summary>逐笔买卖及纠错关联 <span class="faint">原始买入 / 纠错买回 / 退出收益，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1080px"><thead><tr><th>指数</th><th>周期</th><th>原始买入K线</th><th>本次开仓K线</th><th>本次退出K线</th><th>开仓收盘</th><th>退出收盘</th><th>交易类型</th><th>本次收益</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
      <p class="stat-disclaimer">数据是历史信号的收盘价配对演示，并非真实可成交的回测；分钟线仍然存在历史覆盖不足的问题。纠错买回与最初买入共用交易轮次标识，但每次再次开仓的收益单独记录，避免将两次资金进出虚构成一笔成交。</p>
@@ -855,7 +855,7 @@ function drawMacd(i,data){const el=byId("m"+i);if(!el||el.getBoundingClientRect(
  if(diflabel)diflabel.innerHTML='DIF <b>'+difValue.toFixed(4)+'</b>　 DEA <span class="dea">'+deaValue.toFixed(4)+'</span>　 MACD柱 <span class="hist">'+histValue.toFixed(4)+'</span>';
  
 }
-function drawAll(){for(let i=0;i<4;i++){if(focusIndex>=0&&focusIndex!==i)continue;const data=visible(i);drawPrice(i,data);drawMacd(i,data)}}
+function drawAll(){for(let i=0;i<4;i++){if(!replayMode&&focusIndex>=0&&focusIndex!==i)continue;const data=visible(i);drawPrice(i,data);drawMacd(i,data)}}
 function projectionHTML(v,label){
  if(!v||!v.projection)return '<div class="estimate"><span class="estimate-text">当前没有足够数据用于临界收盘价计算</span></div>';
  const p=v.projection;let items='';
@@ -1007,7 +1007,7 @@ function renderQuick(){
  byId("quick-detail").textContent=entry>=0?("当前 "+(entry+1)+"/"+list.length+" · "+quickName(list[entry].e)+" · "+(list[entry].badge||"")+ " · "+list[entry].e.t.replace("T"," ")):"点位直接跳到K线，已配对/未配对在选择项中标明";
 }
 
-let replayMode=false,replayKind="correctionStop",replayIndex="all",replayPeriod="all",replayCaseId=null,replayNodeIndex=0,replayCache=null;
+let replayMode=false,replayKind="correction",replayIndex="all",replayPeriod="all",replayCaseId=null,replayNodeIndex=0,replayCache=null;
 const REPLAY_BUYS=new Set(["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"]);
 const REPLAY_SELLS=new Set(["sell","secondSell","thirdSell","laterSell"]);
 function replayBuildCases(){
@@ -1042,6 +1042,17 @@ function replayBuildCases(){
      const name=entry.type==="secondBuy"?"二次买点":entry.type==="thirdBuy"?"三次买点":"追加买点";
      pushNode(entry.i,name,"buy",{trade:leg});
     }
+    if(leg.entryType==="correctionBuy"&&Number.isFinite(leg.correctionRefDIF)){
+     // Hypothetical counterfactual only. Never mutate the active trade or its statistics.
+     const horizon=Number.isInteger(leg.exitI)?leg.exitI:v.bars.length-1;
+     for(let j=leg.entryI+1;j<=horizon;j++){
+      if(v.dif[j]<=leg.correctionRefDIF+EPS){
+       pushNode(j,"拟纠错止损 · 待验证","stop",{reference:true,trade:leg,
+        ev:{type:"candidateCorrectionStop",refDIF:leg.correctionRefDIF}});
+       break;
+      }
+     }
+    }
     if(Number.isInteger(leg.exitI)){
      const kind=leg.exitType==="topSell"?"sell":"stop",name=leg.exitType==="topSell"?"顶部卖出":leg.exitType==="correctionStop"?"纠错止损":"结构止损";
      pushNode(leg.exitI,name,kind,{trade:leg});
@@ -1055,6 +1066,7 @@ function replayBuildCases(){
    }
    c.nodes.sort((a,b)=>a.i-b.i||Number(a.reference)-Number(b.reference));
    c.lastT=v.bars[c.lastI]?.t||v.bars.at(-1).t;
+   c.hasCandidateStop=c.nodes.some(n=>n.ev?.type==="candidateCorrectionStop");
    c.hasCorrection=c.legs.some(t=>t.entryType==="correctionBuy");
    c.hasCorrectionStop=c.legs.some(t=>t.exitType==="correctionStop");
    c.hasStop=c.legs.some(t=>t.exitType==="stop"||t.exitType==="correctionStop");
@@ -1081,7 +1093,7 @@ function replayFiltered(){
   (replayPeriod==="all"||replayPeriod===c.period)&&
   (replayKind==="all"||
    replayKind==="correction"&&c.hasCorrection||
-   replayKind==="correctionStop"&&c.hasCorrectionStop||
+   replayKind==="candidateStop"&&c.hasCandidateStop||
    replayKind==="stop"&&c.hasStop||
    replayKind==="topSell"&&c.hasTopSell||
    replayKind==="open"&&c.hasOpen||
@@ -1103,7 +1115,10 @@ function replayGoNode(index){
  replayCaseId=c.id;replayNodeIndex=index;
  const node=c.nodes[index];
  selectedP=c.period;focusIndex=c.index;quickIndex="all";quickKind="all";
- signalAnchors={};signalAnchors[selectedP+":"+c.index]=node.i;
+ signalAnchors={};
+ const master=getSignal(0,selectedP);
+ if(master){const centeredEnd=findEndAtOrBefore(master.bars,node.t)+Math.floor(viewportLength(master)/2);
+  panOffsetByPeriod[selectedP]=Math.max(0,Math.min(maxPanOffset(),master.bars.length-centeredEnd));}
  const desired=60;
  if(visibleBars===0||visibleBars>90){visibleBars=desired;densityBars=desired}
  hoverTime=node.t;hoverIndex=c.index;hoverPixelPrice=null;
@@ -1115,17 +1130,6 @@ function replaySetMode(active){
   const cases=replayFiltered(),first=cases.find(c=>c.id===replayCaseId)||cases[0];
   if(first)replaySetCase(first.id);else render();
  }else{focusIndex=-1;signalAnchors={};render()}
-}
-function replayNoteKey(c){return "macd-review-note-v1:"+c.id}
-function replayNoteRead(c){
- try{return JSON.parse(localStorage.getItem(replayNoteKey(c))||"{}")}catch(e){return {}}
-}
-function replayNoteSave(c){
- try{
-  const obj={tag:byId("replay-tag").value,memo:byId("replay-memo").value,updated:new Date().toISOString()};
-  localStorage.setItem(replayNoteKey(c),JSON.stringify(obj));
-  byId("replay-save-status").textContent="已保存在当前浏览器 · "+obj.updated.slice(0,16).replace("T"," ");
- }catch(e){byId("replay-save-status").textContent="保存失败：本浏览器可能禁止本地存储"}
 }
 function replayPct(n){return Number.isFinite(n)?(n>0?"+":"")+n.toFixed(2)+"%":"未配对"}
 function renderReplay(){
@@ -1155,19 +1159,18 @@ function renderReplay(){
   byId("replay-overview").textContent="暂无历史案例";
   byId("replay-nodes").innerHTML="";
   byId("replay-compare").innerHTML="";
-  document.querySelector(".replay-note").hidden=true;
   return;
  }
  replayCaseId=c.id;
  if(focusIndex<0||selectedP!==c.period){
   selectedP=c.period;focusIndex=c.index;
   const node=c.nodes[Math.min(replayNodeIndex,c.nodes.length-1)];
-  if(node)signalAnchors[selectedP+":"+c.index]=node.i;
+  if(node){const master=getSignal(0,selectedP);if(master){const centeredEnd=findEndAtOrBefore(master.bars,node.t)+Math.floor(viewportLength(master)/2);panOffsetByPeriod[selectedP]=Math.max(0,Math.min(maxPanOffset(),master.bars.length-centeredEnd));}}
  }
  const idx=all.findIndex(x=>x.id===c.id);
  byId("replay-number").textContent=(idx+1)+" / "+all.length+"笔";
  byId("replay-case").innerHTML=all.map((x,i)=>'<option value="'+esc(x.id)+'" '+(x.id===c.id?"selected":"")+'>'+
-  esc(IDX[x.index].short+" · "+x.label+" · "+x.lastT.slice(0,10)+" · "+(x.unpairedSell?"卖点未配对":x.hasCorrectionStop?"纠错止损":x.hasCorrection?"有纠错":x.hasStop?"结构止损":x.hasOpen?"未配对":"顶部退出"))+'</option>').join("");
+  esc(IDX[x.index].short+" · "+x.label+" · "+x.lastT.slice(0,10)+" · "+(x.unpairedSell?"卖点未配对":x.hasCandidateStop?"含拟止损":x.hasCorrection?"有纠错":x.hasStop?"结构止损":x.hasOpen?"未配对":"顶部退出"))+'</option>').join("");
  byId("replay-case").onchange=e=>replaySetCase(e.target.value);
  byId("replay-prev").disabled=idx<=0;byId("replay-next").disabled=idx>=all.length-1;
  byId("replay-prev").onclick=()=>replaySetCase(all[Math.max(0,idx-1)].id);
@@ -1178,7 +1181,7 @@ function renderReplay(){
   ["所属交易轮次",c.unpairedSell?"孤立顶部卖点":(c.v.bars[c.root]?.t||"—").slice(0,10)],
   ["实际进出段数",c.legs.filter(t=>Number.isInteger(t.exitI)).length],
   ["纠错买回",c.legs.filter(t=>t.entryType==="correctionBuy").length+"次"],
-  ["纠错止损",c.legs.filter(t=>t.exitType==="correctionStop").length+"次"],
+  ["待验证拟止损",c.nodes.filter(n=>n.ev?.type==="candidateCorrectionStop").length+"次"],
   ["各段收益率简单相加",c.returns.length?replayPct(sum):"未配对"]
  ];
  byId("replay-overview").innerHTML=metrics.map(([k,v])=>'<div class="replay-metric"><span>'+esc(k)+'</span><b class="'+(typeof v==="string"&&v[0]==="+"?"positive":typeof v==="string"&&v[0]==="−"?"negative":"")+'">'+esc(v)+'</b></div>').join("");
@@ -1198,12 +1201,6 @@ function renderReplay(){
  }
  byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>退出对照：</b>'+esc(x)+'</div>').join(""):"<span>选择时间线任一节点即可在K线图中定位；未配对不虚构卖点。</span>")+
   '<div class="faint">比较仅使用信号K线收盘价、未计手续费或滑点；后续顶部点是反事实观察，不是实际退出。</div>';
- document.querySelector(".replay-note").hidden=false;
- const note=replayNoteRead(c);
- byId("replay-tag").value=note.tag||"";
- byId("replay-memo").value=note.memo||"";
- byId("replay-save-status").textContent=note.updated?"已存于当前浏览器 · "+note.updated.slice(0,16).replace("T"," "):"仅存于当前浏览器，不上传服务器";
- byId("replay-save").onclick=()=>replayNoteSave(c);
 }
 
 function buySignalEvents(v){return v?v.events.filter(e=>buyTypes.has(e.type)&&Number.isInteger(e.i)):[]}
@@ -1356,7 +1353,7 @@ function renderHistory(){
   return '<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.index].name+'</b><span class="mstatus '+(bullish?"buy":bear?"sell":"")+'">'+(names[e.type]||e.type)+'</span><span>'+valstr(e.price||e.close||0)+' · '+nLabel(e.nine)+'</span></div>';
  }).join("")+'</div>':'<div class="faint" style="padding:12px">当前周期尚无历史事件记录</div>';
 }
-function render(){renderPeriods();renderResonance();renderQuick();renderReplay();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
+function render(){renderPeriods();renderResonance();renderQuick();renderReplay();const grid=byId("chartgrid");grid.className="chartgrid"+(!replayMode&&focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
  grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
  grid.querySelectorAll(".buyjump").forEach(b=>b.onclick=()=>navigateBuy(Number(b.dataset.i),Number(b.dataset.step)));
  grid.querySelectorAll(".buyselect").forEach(sel=>sel.onchange=()=>{if(sel.value!=="")jumpToBuy(Number(sel.dataset.i),Number(sel.value))});
