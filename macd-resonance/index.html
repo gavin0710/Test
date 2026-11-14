@@ -97,7 +97,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .buyrecent{border:0;background:transparent;color:#6d8397;font-size:11px;white-space:nowrap;padding:6px 2px}
 .chart-card .chartfoot{padding-top:8px}
 @media(max-width:560px){.buynav{padding:9px 10px;gap:4px}.buynav-meta{font-size:10px}.buyjump{padding:5px 8px}.buyrecent{font-size:10px}}
-</style></head><body>
+.wave-tag{white-space:nowrap;font-size:11px;padding:4px 7px;border-radius:5px;background:#f3f5f7;color:#748494}.wave-tag.up{background:#fff0f0;color:#c26268}.wave-tag.down{background:#eaf8f1;color:#178967}.wave-note{font-size:11px;color:#798b9d;line-height:1.7;margin:12px 3px} </style></head><body>
 <main class="shell">
  <header class="head">
   <div class="brand"><div class="brandmark">↗</div><div><h1>四指共振 · K线看板</h1><div class="brand-sub">MACD × 九转 · 四指数同步观察</div></div></div>
@@ -114,10 +114,10 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
    <div class="foldbody">
     <p class="stats-explain">以同一指数、同一周期的一次首次底部买入作为开仓，到首次顶部卖出或结构失败止损作为平仓。退出收盘价高于首次买入收盘价算成功，持平记为未成功；二/三次信号不新增独立交易。只统计已平仓，未配对的买卖点和未平仓持仓不进入分母。未计交易费用、滑点或盘中可成交性。</p>
     <div class="stat-overall" id="win-overall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>波段级别</th><th>有效历史</th><th>完成交易</th><th>盈利笔数</th><th>亏损笔数</th><th>持平笔数</th><th>成功率</th><th>顶部卖出完成</th><th>结构止损完成</th><th>待卖出</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
-    <h3 class="stat-section-head">分指数 × 周期</h3>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完整交易</th><th>盈利</th><th>亏损</th><th>持平</th><th>成功率</th><th>顶部卖出</th><th>止损退出</th><th>未退出</th></tr></thead><tbody id="win-index-body"></tbody></table></div>
-    <details class="fold" style="margin-top:12px"><summary>完整交易逐笔记录 <span class="faint">买入、退出收盘价及收益</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:960px"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>退出K线</th><th>买入收盘</th><th>退出收盘</th><th>收益率</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>周期级别</th><th>四指数当前波段（临时）</th><th>有效历史</th><th>完成交易</th><th>盈利笔数</th><th>亏损笔数</th><th>持平笔数</th><th>成功率</th><th>顶部卖出完成</th><th>结构止损完成</th><th>待卖出</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
+    <h3 class="stat-section-head">买入时波段背景与MACD成功率（临时口径）</h3><p class="wave-note">研究提醒：后续需与上一个波段看板的大波／主波／子波结构严格对齐，再按浪级、推动／调整、顺势／逆势分别验证成功率。当前仅使用本周期收盘价经左右各3根K线确认的端点判断上行／下行观察段，不是原波段算法；无未来数据穿越，未确认则显示“未确认”。样本少于10笔不做优劣结论。</p><div class="stats-scroll"><table class="stats-table"><thead><tr><th>周期</th><th>买入时波段</th><th>完成交易</th><th>盈利</th><th>非盈利</th><th>成功率</th><th>样本</th></tr></thead><tbody id="wave-entry-body"></tbody></table></div><h3 class="stat-section-head">分指数 × 周期</h3>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>当前波段（临时）</th><th>历史根数</th><th>完整交易</th><th>盈利</th><th>亏损</th><th>持平</th><th>成功率</th><th>顶部卖出</th><th>止损退出</th><th>未退出</th></tr></thead><tbody id="win-index-body"></tbody></table></div>
+    <details class="fold" style="margin-top:12px"><summary>完整交易逐笔记录 <span class="faint">买入、退出收盘价及收益</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:960px"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>退出K线</th><th>买入收盘</th><th>退出收盘</th><th>买入时波段</th><th>收益率</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
     <p class="stat-disclaimer">警示：这里是有限历史样本的信号配对统计，不构成已验证的历史回测。分钟线可用数据较短，各周期样本起止时间不同；样本过少时成功率只能作为事实记录，不支持推断未来胜率。</p>
    </div>
   </details>
@@ -308,6 +308,39 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
  counts.open=position?1:0;
  return {events,counts,cycles:allCycles,losses,trades,position,unpairedSells,everOpened};
 }
+
+/* Interim, auditable period-specific pivot direction; not SSE wave-number engine. */
+function localWave(bars){
+ const out=[],pivots=[];for(let i=0;i<bars.length;i++){
+  let k=i-3;
+  if(k>=3){
+   const close=bars[k].c,left=bars.slice(k-3,k),right=bars.slice(k+1,k+4);
+   const high=left.every(b=>close>b.c+EPS)&&right.every(b=>close>b.c+EPS);
+   const low=left.every(b=>close<b.c-EPS)&&right.every(b=>close<b.c-EPS);
+   if(high||low){const type=high?"high":"low",last=pivots.at(-1),pivot={type,k,confirmed:i,close};
+    if(!last||last.type!==type)pivots.push(pivot);
+    else if((high&&close>last.close)||(low&&close<last.close))pivots[pivots.length-1]=pivot;
+   }
+  }
+  const last=pivots.at(-1);
+  out.push({direction:!last?"unknown":last.type==="low"?"up":"down",pivotAt:last?.k??null,confirmedAt:last?.confirmed??null});
+ }
+ return {at:out,pivots,latest:out.at(-1)};
+}
+function waveName(direction){return direction==="up"?"上行观察":direction==="down"?"下行观察":"未确认"}
+function waveCell(v){
+ const w=v?.localWave?.latest,dir=w?.direction||"unknown",pivot=w?.pivotAt;
+ return '<span class="wave-tag '+dir+'" title="'+(pivot===null||pivot===undefined?"无已确认价格端点":"本周期收盘拐点 "+esc(v.bars[pivot].t)+"，需右侧3根收盘K线确认")+'">'+(dir==="up"?"↗ ":dir==="down"?"↘ ":"· ")+waveName(dir)+'</span>';
+}
+function renderWaveGroups(rows){
+ const items=rows.flatMap(r=>(r.v.trades||[]).map(t=>({...t,period:r.period}))),cells=[];
+ for(const [p,label] of PERIODS)for(const dir of ["up","down","unknown"]){
+  const group=items.filter(t=>t.period===p&&t.entryWave===dir),won=group.filter(t=>t.exitClose>t.entryClose).length;
+  cells.push('<tr><td>'+label+'</td><td>'+waveName(dir)+'</td><td>'+group.length+'</td><td>'+won+'</td><td>'+(group.length-won)+'</td><td>'+(group.length?(100*won/group.length).toFixed(1)+"%":"—")+'</td><td class="event-t">'+(group.length<10?"样本少于10笔":"有限历史窗口")+'</td></tr>');
+ }
+ byId("wave-entry-body").innerHTML=cells.join("");
+}
+
 function projectNext(v){
  if(!v||!v.bars.length)return null;
  const k=2/13-2/27,a=11/13*v.ema12.at(-1)-25/27*v.ema26.at(-1);
@@ -377,9 +410,10 @@ function calculate(bars){
   if(dir&&dir===side)run=Math.min(run+1,9);else{run=dir?1:0;side=dir}nine.push(side*run)}
  const structure=scanStructure(bars,dif,hist);
  const lifecycle=analyzeLifecycle(bars,dif,hist,structure.events);
+ const wave=localWave(bars),trades=lifecycle.trades.map(t=>({...t,entryWave:wave.at[t.entryI]?.direction||'unknown'}));
  const output={bars,dif,dea,hist,nine,ema12:f,ema26:s,...structure,
    events:lifecycle.events,stats:lifecycle.counts,losses:lifecycle.losses,
-   trades:lifecycle.trades,position:lifecycle.position,cycles:lifecycle.cycles};
+   trades,position:lifecycle.position,cycles:lifecycle.cycles,localWave:wave};
  output.projection=projectNext(output);
  const latestTradeEvent=lifecycle.events.filter(e=>["buy","secondBuy","thirdBuy","laterBuy","sell","secondSell","thirdSell","laterSell","stopLoss"].includes(e.type)).at(-1);
  if(latestTradeEvent&&bars.length-1-latestTradeEvent.i<=2){
@@ -616,16 +650,17 @@ function renderWinRates(){
   .map(([label,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+label+'</span></div>').join("");
  byId("win-period-body").innerHTML=periods.map(({p,items})=>{
   const q=summaryLines(items),span=items.length?items.map(r=>r.v.bars[0].t.slice(0,10)).sort().at(0)+"～"+items.map(r=>r.v.bars.at(-1).t.slice(0,10)).sort().at(-1):"—";
-  return '<tr><td>'+grade(p)+'</td><td class="event-t">'+span+'</td><td>'+q.completed+'</td><td class="important">'+q.wins+'</td><td>'+q.losses+'</td><td>'+q.flats+'</td><td class="'+(q.completed?"important":"")+'">'+pct(q)+'</td><td>'+q.sellExits+'</td><td>'+q.stopExits+'</td><td>'+q.open+'</td></tr>';
+  return '<tr><td>'+grade(p)+'</td><td>'+items.map(r=>IDX[r.i].short+' '+waveCell(r.v)).join('　')+'</td><td class="event-t">'+span+'</td><td>'+q.completed+'</td><td class="important">'+q.wins+'</td><td>'+q.losses+'</td><td>'+q.flats+'</td><td class="'+(q.completed?"important":"")+'">'+pct(q)+'</td><td>'+q.sellExits+'</td><td>'+q.stopExits+'</td><td>'+q.open+'</td></tr>';
  }).join("");
  byId("win-index-body").innerHTML=rows.map(r=>{
   const q=tradeSummary(r.v.trades);
-  return '<tr><td>'+IDX[r.i].name+'</td><td>'+r.label+'</td><td>'+r.v.bars.length+'</td><td>'+q.completed+'</td><td class="important">'+q.wins+'</td><td>'+q.losses+'</td><td>'+q.flats+'</td><td class="'+(q.completed?"important":"")+'">'+pct(q)+'</td><td>'+q.sellExits+'</td><td>'+q.stopExits+'</td><td>'+(r.v.position?1:0)+'</td></tr>';
+  return '<tr><td>'+IDX[r.i].name+'</td><td>'+r.label+'</td><td>'+waveCell(r.v)+'</td><td>'+r.v.bars.length+'</td><td>'+q.completed+'</td><td class="important">'+q.wins+'</td><td>'+q.losses+'</td><td>'+q.flats+'</td><td class="'+(q.completed?"important":"")+'">'+pct(q)+'</td><td>'+q.sellExits+'</td><td>'+q.stopExits+'</td><td>'+(r.v.position?1:0)+'</td></tr>';
  }).join("");
  const ordered=rows.flatMap(r=>(r.v.trades||[]).map(t=>({...t,index:r.i,period:r.label,ret:(t.exitClose/t.entryClose-1)*100}))).sort((a,b)=>b.exitT.localeCompare(a.exitT));
+ renderWaveGroups(rows);
  byId("win-trades-body").innerHTML=ordered.map(t=>{
   const result=t.ret>0?"盈利":t.ret<0?"亏损":"持平";
-  return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+t.entryT.replace("T"," ")+'</td><td>'+t.exitT.replace("T"," ")+'</td><td>'+valstr(t.entryClose)+'</td><td>'+valstr(t.exitClose)+'</td><td class="'+(t.ret>0?"important":t.ret<0?"fail":"")+'">'+(t.ret>0?"+":"")+t.ret.toFixed(2)+'%</td><td>'+(t.exitType==="topSell"?"顶部结构卖出":"结构失败止损")+'</td><td>'+result+'</td></tr>';
+  return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+t.entryT.replace("T"," ")+'</td><td>'+t.exitT.replace("T"," ")+'</td><td>'+valstr(t.entryClose)+'</td><td>'+valstr(t.exitClose)+'</td><td>'+waveName(t.entryWave)+'</td><td class="'+(t.ret>0?"important":t.ret<0?"fail":"")+'">'+(t.ret>0?"+":"")+t.ret.toFixed(2)+'%</td><td>'+(t.exitType==="topSell"?"顶部结构卖出":"结构失败止损")+'</td><td>'+result+'</td></tr>';
  }).join("");
 }
 const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","failStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
