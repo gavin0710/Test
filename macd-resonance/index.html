@@ -519,17 +519,17 @@ function renderStats(){
  }).join("");
  const stops=[],open=[];
  for(const {i,label,v} of rows){
-  for(const loss of v.losses||[])stops.push({i,label,...loss});
-  if(v.position)open.push({i,label,...v.position,lastT:v.bars.at(-1).t,lastClose:v.bars.at(-1).c});
+  for(const loss of v.losses||[])stops.push({...loss,index:i,label});
+  if(v.position)open.push({...v.position,index:i,label,lastT:v.bars.at(-1).t,lastClose:v.bars.at(-1).c});
  }
  stops.sort((a,b)=>b.t.localeCompare(a.t));open.sort((a,b)=>b.entryT.localeCompare(a.entryT));
  byId("stopsbadge").textContent=stops.length+"次失败止损 / "+open.length+"个待卖出";
  byId("stoprecords").innerHTML='<h3 class="stat-section-head">结构失败止损 · 按发生时间倒序</h3>'+
  (stops.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>止损K线</th><th>买入收盘</th><th>止损收盘</th><th>DIF参考低点</th><th>持有根数</th></tr></thead><tbody>'+
-  stops.map(l=>'<tr><td>'+IDX[l.i].name+'</td><td>'+l.label+'</td><td>'+l.entryT.replace("T"," ")+'</td><td>'+l.t.replace("T"," ")+'</td><td>'+valstr(l.entryClose)+'</td><td class="fail">'+valstr(l.close)+'</td><td>'+valstr(l.refDIF,4)+'</td><td>'+((l.i??0)||0)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前已加载历史范围内没有这类止损记录。</p>');
+  stops.map(l=>'<tr><td>'+IDX[l.index].name+'</td><td>'+l.label+'</td><td>'+l.entryT.replace("T"," ")+'</td><td>'+l.t.replace("T"," ")+'</td><td>'+valstr(l.entryClose)+'</td><td class="fail">'+valstr(l.close)+'</td><td>'+valstr(l.refDIF,4)+'</td><td>'+((l.i??0)||0)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前已加载历史范围内没有这类止损记录。</p>');
  byId("openrecords").innerHTML='<h3 class="stat-section-head">买入后尚无顶部卖点 · 逐指数/周期</h3>'+
  (open.length?'<div class="stats-scroll"><table class="event-table"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>买入收盘</th><th>最近K线</th><th>最新收盘</th><th>追加买点</th><th>状态</th></tr></thead><tbody>'+
-  open.map(o=>'<tr><td>'+IDX[o.i].name+'</td><td>'+o.label+'</td><td>'+o.entryT.replace("T"," ")+'</td><td>'+valstr(o.entryClose)+'</td><td>'+o.lastT.replace("T"," ")+'</td><td>'+valstr(o.lastClose)+'</td><td>'+Math.max(0,o.buySignals.length-1)+'</td><td class="important">待卖出</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前历史窗口内没有尚未配对的买入头寸。</p>');
+  open.map(o=>'<tr><td>'+IDX[o.index].name+'</td><td>'+o.label+'</td><td>'+o.entryT.replace("T"," ")+'</td><td>'+valstr(o.entryClose)+'</td><td>'+o.lastT.replace("T"," ")+'</td><td>'+valstr(o.lastClose)+'</td><td>'+Math.max(0,o.buySignals.length-1)+'</td><td class="important">待卖出</td></tr>').join("")+'</tbody></table></div>':'<p class="event-t">当前历史窗口内没有尚未配对的买入头寸。</p>');
 }
 function renderHistory(){
  const events=[];
