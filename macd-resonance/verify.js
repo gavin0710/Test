@@ -194,6 +194,16 @@ equal(corrected.position?.correctionCount,1,"Correction sequence is named");
 equal(topCorrection({equal:true}).counts.correctionBuy,0,"DIF equal to reference high cannot trigger correction");
 equal(topCorrection({tooLate:true}).counts.correctionBuy,0,"Three opposite histogram columns invalidate correction");
 equal(topCorrection({unpaired:true}).counts.correctionBuy,0,"Unpaired top sell never opens phantom correction");
+
+const pending=topCorrection();
+const expectedRef=pending.events.find(e=>e.type==="correctionBuy")?.refDIF;
+ok(Number.isFinite(expectedRef),"Synthetic top correction has original DIF reference high");
+const projectionCorrection=projectNext({bars:[{c:101}],dif:[1.2,1.9],dea:[1.2,1.4],
+ ema12:[100],ema26:[102],cycles:[],position:null,
+ correctionPending:{refDIF:2.5,originalEntryT:"T010",oppositeStreak:1}});
+equal(projectionCorrection.mode,"correction","Unfinished linked top exit displays next-close correction condition");
+ok(Math.abs((projectionCorrection.a+projectionCorrection.k*projectionCorrection.rebuyPrice)-2.5)<1e-8,
+ "Correction trigger reverse-solves the original top area DIF high");
 const soldAgain=topCorrection({secondExit:true});
 equal(soldAgain.trades.length,2,"Rebuy and second top sell form two auditable legs");
 equal(soldAgain.trades[0].campaignI,soldAgain.trades[1].campaignI,"Both legs link the same original buy");
