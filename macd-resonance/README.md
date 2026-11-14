@@ -37,55 +37,7 @@ DIF(next) = (11/13) × E12 − (25/27) × E26 + (28/351) × P。
 
 技术文件：macd-resonance/index.html，macd-resonance/api/latest.js，macd-resonance/verify.js；自动验收位于.github/workflows/macd-v2-prod-acceptance.yml。
 
----
 
-上证指数、深证成指、创业板指、科创50；15/60/90/120分钟、日、周六周期。历史旧版资料在后文，仅供追溯，以本页 V2.0 规则为准。
+## 历史与数据完整性
 
-## K线主看板新版（2026-11-14 完成部署与验收）
-
-正式地址：https://macd-resonance-monitor.vercel.app/
-
-首页改为四大指数2×2 K线图，默认日线、六周期统一切换、对应MACD副图和K线历史钝化／DIF拐头／九转标记；支持60／100根显示范围、单图聚焦、跨图同步时间指示。共振摘要位于周期切换栏，原信号矩阵、历史信号及计算口径全部折叠到页面下方。真实 Chromium 云端验收 [#43533526140](https://github.com/gavin0710/Test/actions/runs/43533526140)：4张主K线不为空、4张MACD、日/15分钟/周周期切换、单图聚焦、6周期信号对照、手机加载、行情API 200及无JS运行错误均通过。
-
-## 旧版部署记录（2026-11-13）
-
-**https://macd-resonance-monitor.vercel.app/**
-
-生产部署状态 READY（deployment `dpl_8U3QbJMG8y3Q7nNrpmVefRzoSUMv`）。第三方 GitHub 云端浏览器验收 [#43531069871](https://github.com/gavin0710/Test/actions/runs/43531069871)：主页HTTP200、24/24周期有数据、行情API HTTP200、创业板日/周切换正常、零JavaScript运行时错误。Vercel API `/api/latest` 从 GitHub 行情归档获取真实K线，仓库定时采集成功提交后无需重新部署前端即可生效。**网页代码更新目前需要通过Vercel重新部署**，Vercel与GitHub尚未建立自动部署链接。
-
-## 临时预览入口（已通过独立的外网验收）
-
-[直接打开已托管看板](https://raw.githack.com/gavin0710/Test/master/macd-resonance/index.html)
-
-2026-11-13 的 GitHub Actions 外网验收 [#43529680707](https://github.com/gavin0710/Test/actions/runs/43529680707) 验证页面返回 HTTP 200、Content-Type 为 text/html、且数据归档 JSON 可以读取。此访问使用第三方 RawGitHack 开发版代理（官方声明 HTML 首次浏览可能需要安全确认，后续会按分钟级缓存，无法保证长期 SLA），不是 GitHub Pages 正式域名。此项可作临时访问链接，不应视为有可靠 SLA 的生产部署。
-
-浏览器自动化验收 [#43530057034](https://github.com/gavin0710/Test/actions/runs/43530057034)：真实Chromium浏览器显示24/24周期，点击创业板日线格子切换成功，周线Tab切换成功，JavaScript运行时错误为0。
-
-## GitHub Pages 正式入口（待管理员启用）
-打开 `index.html`，或启用 GitHub Pages (Settings → Pages → Source: GitHub Actions) 后使用站点地址。该项目放在仓库的 `macd-resonance/` 目录，不修改现有抓取任务。
-
-## 数据
-
-- 使用东方财富公开指数K线，接口失败时采集器回退腾讯公开指数K线。两者均为非官方公开API、可能断连或限制访问。
-- 页面优先直连公开指数行情接口；失败时读取 `data/latest.json`。自动采集程序写入快照，失败不制造模拟数据。
-- 上证指数 `1.000001`；深证成指 `0.399001`；创业板指 `0.399006`；科创50 `1.000688`。
-- 15分钟和60分钟分别取原生K线。90分钟按每天90/90/60交易分钟分段，从已完成15分钟K线合成。120分钟由每日上午与下午各两根60分钟合成。日线和周线取原生周期K线。
-- 分钟图必须等K线结束，日线当日15:08北京时间后认为收盘，周线周五15:08后或当周结束后确认。节假日提早收市及盘后行情修正需额外校验。保留数据最后K线时间。
-
-## 指标与有限状态机
-
-MACD参数12、26、9：EMA12、EMA26计算DIF，DEA为DIF的EMA9，柱值为2×(DIF−DEA)。**使用同一MACD色柱波段的价格极值和DIF极值**：在完整的同方向上一波之后，必须经过相反颜色MACD波段；当前负柱段价格新低但DIF最低值高于前负柱段最低值 → 底钝化；顶部取对称条件。要求当前色柱至少2根。此实现属于明确的可复现定义，不保证与任一券商软件的“钝化结构”完全相同。
-
-发生钝化后，DIF第一次上拐/下拐触发对应信号；如钝化刚成立时DIF已有同向转折，将该根K线记作组合首次成立。若DIF恰在MACD柱翻色时首次转向，仍保留一次触发。钝化失效则撤销监测（历史信号保留）。仅最近2根已完成K线内的有效方向信号进入同周期跨指数共振计数。
-
-九转：收盘与第4根之前收盘比较，连续同方向满足1~9次；达到9不重复重置，直至条件失效。该指标只提供背景，不改变MACD触发条件。
-
-## 自动刷新
-
-GitHub Action：`.github/workflows/macd-resonance-data.yml`，北京时间工作日09:00到15:59期间每15分钟尝试采集一次，自动更新归档快照。GitHub定时执行可能延迟或丢失，实际数据时间以页面展示为准。前端浏览器在打开期间每5分钟尝试刷新；不会每秒产生正式K线信号。
-
-部署Action：`.github/workflows/macd-resonance-pages.yml`。启用Pages的GitHub Actions发布源后重新运行该Action，网站才会生效。未启用前的部署会报404，这是环境未开通而非HTML构建成功就意味着上线。
-
-## 验收与局限
-
-已通过JS语法与基础数值/交易时段分桶的程序性检查。需要在实际网页环境持续验证行情接口、跨源K线对齐以及指标与交易软件的显示差异。信号不是行情反转或收益保证。此项目不发交易订单，不替代独立止损、仓位管理与系统回测。
+原始行情归档：macd-resonance/data/latest.json，定时采集：.github/workflows/macd-resonance-data.yml。前端直接请求数据归档代理并尝试行情直连，不将未完成K线当成正式收盘信号。GitHub Pages 未启用，因此正式发布以 Vercel 生产站点为准。
