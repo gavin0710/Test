@@ -1,0 +1,31 @@
+name: MACD structure ledger v2 branch regression
+on:
+  push:
+    branches:
+      - feature/macd-structure-ledger-v2
+    paths:
+      - 'macd-resonance/index.html'
+      - 'macd-resonance/verify.js'
+      - '.github/workflows/macd-ledger-v2-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify all original indicator and lifecycle assertions plus independent structure risk units
+        run: node macd-resonance/verify.js
+      - name: JavaScript parse validation
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const s=fs.readFileSync('macd-resonance/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)?.[1];
+          assert(s,'script missing');
+          new vm.Script(s);console.log('FULL_SCRIPT_PARSE_PASS');
+          NODE
