@@ -4,7 +4,7 @@ export default async function handler(req,res){
  const period=String(req.query?.period||"");
  if(!["15","101","102"].includes(period))return res.status(400).json({error:"Unsupported history period"});
  res.setHeader("Access-Control-Allow-Origin","*");
- res.setHeader("Cache-Control","public, s-maxage=300, stale-while-revalidate=600");
+ res.setHeader("Cache-Control","no-store, max-age=0");
  const file="macd-resonance/data/history-"+period+".json";
  const urls=[
   "https://raw.githubusercontent.com/gavin0710/Test/master/"+file,
@@ -15,7 +15,7 @@ export default async function handler(req,res){
   try{
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
    let upstream;
-   try{upstream=await fetch(u,{signal:controller.signal,cache:"no-store"})}
+   try{upstream=await fetch(u+"?ts="+Date.now(),{signal:controller.signal,cache:"no-store"})}
    finally{clearTimeout(timer)}
    if(!upstream.ok)throw Error("Upstream "+upstream.status);
    const payload=await upstream.json();
