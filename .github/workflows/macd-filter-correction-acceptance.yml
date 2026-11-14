@@ -1,0 +1,96 @@
+name: MACD event filter density and correction production acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-filter-correction-acceptance.yml"
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Validate strict MACD structure and correction edge cases
+        run: node macd-resonance/verify.js
+      - name: Install Chromium
+        run: |
+          npm install --prefix /tmp/macd-filter --no-save playwright
+          /tmp/macd-filter/node_modules/.bin/playwright install chromium
+      - name: Exercise production six-period stats and price-chart event filters
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-filter/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({args:['--no-sandbox']});
+            try{
+              const base='https://macd-resonance-monitor.vercel.app';
+              const page=await browser.newPage({viewport:{width:1460,height:960}});
+              page.setDefaultTimeout(15000);
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              const r=await page.goto(base,{waitUntil:'domcontentloaded',timeout:50000});
+              assert.equal(r.status(),200);
+              await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:55000});
+              await page.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:60000});
+              const initial=await page.evaluate(()=>({density:visibleBars,loaded:getSignal(0,'D').bars.length,stats:getHistoryStats().rows.length,filter:quickKind}));
+              console.log('INITIAL',JSON.stringify(initial));
+              assert.equal(initial.density,100);assert.equal(initial.stats,24);
+              assert.equal(await page.locator('#quick-chips button').count(),15);
+              assert.equal(await page.locator('#win-period-body tr').count(),6);
+              assert.equal(await page.locator('#win-index-body tr').count(),24);
+              assert.equal(await page.locator('#statfold').getAttribute('open'),null,'Detailed 24-row panel should start collapsed');
+              assert.equal(await page.locator('#wave-entry-body').count(),0,'Wave winrate details should be removed');
+              assert(await page.locator('.wave-pending').innerText().then(t=>t.includes('波浪周期成功了待验证')));
+              const firstStats=await page.locator('#win-period-body tr').allInnerTexts();
+              console.log('SIX_PERIOD_COUNTS',JSON.stringify(firstStats));
+              const total=await page.evaluate(()=>{const rows=getHistoryStats().rows;return {points:rows.reduce((n,x)=>n+x.v.events.filter(e=>QUICK_EVENTS.has(e.type)).length,0),buys:rows.reduce((n,x)=>n+x.stats.buy,0),sells:rows.reduce((n,x)=>n+x.stats.sell,0),corrections:rows.reduce((n,x)=>n+x.stats.correctionBuy,0),matched:rows.reduce((n,x)=>n+x.v.trades.length,0),open:rows.reduce((n,x)=>n+(x.v.position?1:0),0)}}); 
+              console.log('TOTAL_EVENTS',JSON.stringify(total));
+              const inc=await page.locator('#density-count').inputValue();assert.equal(inc,'100');
+              await page.locator('#density-minus').click();assert.equal(await page.locator('#density-count').inputValue(),'90');
+              assert.equal(await page.evaluate(()=>visible(0).bars.length),90);
+              await page.locator('#density-plus').click();assert.equal(await page.locator('#density-count').inputValue(),'100');
+              await page.locator('#density-count').fill('73');await page.locator('#density-count').press('Enter');
+              assert.equal(await page.evaluate(()=>visibleBars),73);
+              assert.equal(await page.evaluate(()=>visible(0).bars.length),73);
+              console.log('DENSITY_CONTROLS_OK',await page.evaluate(()=>visibleBars));
+              await page.locator('.quickchip[data-kind="buy"]').click();
+              const buyN=await page.evaluate(()=>quickCollect().length);
+              assert(buyN>0);assert.equal(await page.evaluate(()=>quickKind),'buy');
+              console.log('BUY_FILTER_COUNT',buyN);
+              const opts=await page.locator('#quick-list option').count();assert(opts>1);
+              await page.locator('#quick-list').selectOption('0');
+              assert(await page.evaluate(()=>!!selectedEvent),'Selecting a historical event must navigate');
+              const state=await page.evaluate(()=>({key:selectedEvent?.key,date:selectedEvent?.t,focused:visible(selectedEvent.index).bars.some(b=>b.t===selectedEvent.t),p:selectedP}));
+              console.log('EVENT_LOCATED',JSON.stringify(state));assert(state.focused);
+              await page.locator('.quickchip[data-kind="pairedBuy"]').click();
+              const paired=await page.evaluate(()=>quickCollect().slice(0,5).map(x=>x.badge));
+              assert(paired.every(x=>x==='已配对'));console.log('PAIRED_BUY_FILTER',JSON.stringify(paired));
+              await page.locator('.quickchip[data-kind="openBuy"]').click();
+              const unmatched=await page.evaluate(()=>quickCollect().slice(0,5).map(x=>x.badge));
+              assert(unmatched.every(x=>x==='未配对'));console.log('UNPAIRED_BUY_FILTER',JSON.stringify(unmatched));
+              await page.locator('.quickchip[data-kind="unpairedSell"]').click();
+              const sellUnmatched=await page.evaluate(()=>quickCollect().slice(0,5).map(x=>x.badge));
+              assert(sellUnmatched.every(x=>x==='未配对'));console.log('UNPAIRED_SELL_FILTER',JSON.stringify(sellUnmatched));
+              await page.locator('.quickchip[data-kind="correction"]').click();
+              const corr=await page.evaluate(()=>quickCollect().slice(0,5).map(x=>({type:x.e.type,origin:x.e.originalT,ref:x.e.refDIF})));
+              assert(corr.every(x=>x.type==='correctionBuy'));console.log('CORRECTION_FILTER',JSON.stringify(corr));
+              await page.locator('.quickchip[data-kind="all"]').click();
+              await page.locator('#quick-index').selectOption('2');
+              assert.equal(await page.evaluate(()=>quickIndex),'2');
+              assert((await page.evaluate(()=>quickCollect())).every(x=>x.index===2));
+              console.log('INDEX_SCOPE_OK');
+              await page.screenshot({path:'/tmp/macd-filter-desktop.png',fullPage:true});
+              assert.deepEqual(errors,[]);console.log('JS_ERRORS_0');
+              const mob=await browser.newPage({viewport:{width:390,height:844}});
+              const m=await mob.goto(base,{waitUntil:'domcontentloaded',timeout:45000});assert.equal(m.status(),200);
+              await mob.waitForSelector('.quickfilter');assert(await mob.locator('#density-plus').isVisible());
+              await mob.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:55000});
+              console.log('MOBILE_OK');
+              console.log('ALL_PASS');
+            }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
