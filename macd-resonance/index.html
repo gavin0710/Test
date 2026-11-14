@@ -516,7 +516,7 @@ function stateClass(s){return s==="buy"?"buy":s==="sell"?"sell":s==="watchBuy"?"
 let visibleBars=100,densityBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
 let panOffsetByPeriod={},dragSession=null;
 let quickKind="all",quickIndex="all",selectedEvent=null;
-const buyTypes=new Set(["buy","secondBuy","thirdBuy","laterBuy"]);
+const buyTypes=new Set(["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"]);
 const sellTypes=new Set(["sell","secondSell","thirdSell","laterSell"]);
 let signalAnchors={};
 const IDXCODE=["000001","399001","399006","000688"];
@@ -672,21 +672,21 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   }
  }
  const step=ww/bars.length,cw=Math.max(2,Math.min(11,step*.7)),xc=k=>l+(k+.5)*step;
- const signalMap=new Map();for(const e of v.events){if(e.i<from||e.i>=v.bars.length)continue;const list=signalMap.get(e.i)||[];list.push(e);signalMap.set(e.i,list)}
+ const signalMap=new Map(),pairInfo=quickPairStatus(v);for(const e of v.events){if(e.i<from||e.i>=v.bars.length)continue;if(quickKind!=="all"&&!matchQuickEvent(e,quickKind,pairInfo))continue;const list=signalMap.get(e.i)||[];list.push(e);signalMap.set(e.i,list)}
  bars.forEach((bar,k)=>{const up=bar.c>=bar.o,color=up?"#d95562":"#11a47a",x=xc(k);
   ctx.strokeStyle=color;ctx.lineWidth=1.15;ctx.beginPath();ctx.moveTo(x,y(bar.h));ctx.lineTo(x,y(bar.l));ctx.stroke();
   const hi=y(Math.max(bar.o,bar.c)),lo=y(Math.min(bar.o,bar.c));ctx.fillStyle=color;ctx.fillRect(x-cw/2,hi,cw,Math.max(1.35,lo-hi));
-  const list=signalMap.get(from+k)||[],buy=list.find(q=>["buy","secondBuy","thirdBuy","laterBuy"].includes(q.type)),sell=list.find(q=>["sell","secondSell","thirdSell","laterSell"].includes(q.type)),wb=list.find(q=>q.type==="watchBuy"),ws=list.find(q=>q.type==="watchSell"),stop=list.find(q=>q.type==="stopLoss");
+  const list=signalMap.get(from+k)||[],buy=list.find(q=>["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"].includes(q.type)),sell=list.find(q=>["sell","secondSell","thirdSell","laterSell"].includes(q.type)),wb=list.find(q=>q.type==="watchBuy"),ws=list.find(q=>q.type==="watchSell"),stop=list.find(q=>q.type==="stopLoss");
   if(buy||sell){
    const bullish=!!buy,e=buy||sell,stage=Number(e.stage)||1,fy=y(bullish?bar.l:bar.h);
    const arrowY=bullish?Math.min(h-b-7,fy+12):Math.max(t+9,fy-12);
-   const clr=bullish?"#078b66":"#d75865",light=bullish?"#e6f7ed":"#fff0f1";
+   const correction=e.type==="correctionBuy";const clr=correction?"#8662b7":bullish?"#078b66":"#d75865",light=correction?"#f2edfb":bullish?"#e6f7ed":"#fff0f1";
    ctx.fillStyle=clr;ctx.beginPath();
    if(bullish){ctx.moveTo(x,arrowY-6);ctx.lineTo(x-5,arrowY+3);ctx.lineTo(x+5,arrowY+3)}
    else{ctx.moveTo(x,arrowY+6);ctx.lineTo(x-5,arrowY-3);ctx.lineTo(x+5,arrowY-3)}
    ctx.closePath();ctx.fill();
    if(step>=4.2||signalAnchors[selectedP+":"+i]===from+k){
-    const label=(bullish?"买":"卖")+(stage>1?stage:"1"),textWidth=label.length*10+9;
+    const label=correction?"纠错"+(stage>1?stage:""):(bullish?"买":"卖")+(stage>1?stage:"1"),textWidth=label.length*10+9;
     const ty=bullish?Math.min(h-b-8,arrowY+17):Math.max(t+9,arrowY-17);
     const bx=Math.max(l+1,Math.min(w-r-textWidth-1,x-textWidth/2));
     const by=Math.max(t,Math.min(h-b-18,ty-12));
@@ -701,6 +701,15 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   }
   else if(wb||ws){const bullish=!!wb,yy=bullish?Math.min(h-b-5,y(bar.l)+14):Math.max(t+7,y(bar.h)-14);plotText(ctx,bullish?"底":"顶",x,yy,bullish?"#2fa988":"#cc7c78",9,"center","650")}
   if(stop){plotText(ctx,"止损",x,Math.max(t+11,y(bar.h)-15),"#d45665",10,"center","750")}
+  const vanish=list.find(q=>q.type==="invalid"||q.type==="expired");
+  if(vanish){plotText(ctx,"消",x,Math.max(t+12,y(bar.h)-18),"#cc9465",10,"center","700")}
+  if(selectedEvent?.index===i&&selectedEvent.barI===from+k){
+   ctx.strokeStyle="#6189ab";ctx.lineWidth=1.3;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(x,t);ctx.lineTo(x,h-b);ctx.stroke();ctx.setLineDash([]);
+   const selectedLabel="定位 · "+quickName(selectedEvent.e||list[0]||{type:"watchBuy"});
+   const lx=Math.max(l,Math.min(w-r-132,x-48)),ly=t+13;
+   ctx.fillStyle="rgba(237,244,250,.96)";ctx.fillRect(lx,t,132,21);
+   plotText(ctx,selectedLabel,lx+5,ly,"#326686",11,"left","700");
+  }
   if(Math.abs(nine[k])===9&&(k===0||Math.abs(nine[k-1])<9)){const high=nine[k]>0,yy=high?Math.max(t+11,y(bar.h)-21):Math.min(h-b-7,y(bar.l)+22);plotText(ctx,"9",x,yy,high?"#d56c70":"#199e7b",10,"center","700")}
  });
  // Current price dotted guide
@@ -833,7 +842,7 @@ function quickCollect(kind=quickKind,scope=quickIndex){
 function locateQuick(n){
  const list=quickCollect();if(n<0||n>=list.length)return;
  const item=list[n],e=item.e,i=item.index;
- selectedEvent={key:item.key,index:i,barI:e.i,t:e.t};
+ selectedEvent={key:item.key,index:i,barI:e.i,t:e.t,e};
  for(let x=0;x<4;x++)delete signalAnchors[selectedP+":"+x];
  signalAnchors[selectedP+":"+i]=e.i;
  const master=getSignal(0,selectedP);
@@ -894,7 +903,7 @@ function jumpToBuy(i,index){
 }
 function buyNavigator(i,v){
  const buys=buySignalEvents(v),key=selectedP+":"+i,active=signalAnchors[key],idx=buys.findIndex(e=>e.i===active);
- const stageName=e=>e.stage===1?"首次":e.stage===2?"二次":e.stage===3?"三次":"第"+e.stage+"次";
+ const stageName=e=>e.type==="correctionBuy"?"纠错买回"+(e.stage>1?"第"+e.stage+"次":""):e.stage===1?"首次":e.stage===2?"二次":e.stage===3?"三次":"第"+e.stage+"次";
  const options=buys.map(e=>'<option value="'+e.i+'" '+(e.i===active?"selected":"")+'>'+stageName(e)+' · '+e.t.replace("T"," ")+' · '+valstr(v.bars[e.i].c)+'</option>').join("");
  return '<div class="buynav" data-chart="'+i+'"><span class="buynav-meta">历史买点 <b>'+buys.length+'</b> 个</span>'+
   '<button class="buyjump prev" data-i="'+i+'" data-step="-1" '+(!buys.length||idx===0?"disabled":"")+' title="上一个买点">‹</button>'+
