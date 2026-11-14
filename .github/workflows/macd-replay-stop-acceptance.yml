@@ -1,0 +1,118 @@
+name: MACD linked trade replay and correction stop acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-replay-stop-acceptance.yml"
+permissions: {contents: read}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Strict MACD structural and DIF correction stop unit tests
+        run: node macd-resonance/verify.js
+      - name: Install browser
+        run: |
+          npm install --prefix /tmp/macd-replay --no-save playwright
+          /tmp/macd-replay/node_modules/.bin/playwright install chromium
+      - name: Verify publicly deployed full-history campaign replay and UI
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-replay/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+            try{
+              const base='https://macd-resonance-monitor.vercel.app';
+              const page=await browser.newPage({viewport:{width:1440,height:1000}});
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              const response=await page.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
+              assert.equal(response.status(),200,'Production URL must load');
+              await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:60000});
+              await page.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:60000});
+              console.log('LIVE_MARKET',await page.locator('#status').innerText());
+              const before=await page.evaluate(()=>{const r=getHistoryStats();return {
+                corrections:r.rows.reduce((n,x)=>n+(x.v.stats.correctionBuy||0),0),
+                correctionStops:r.rows.reduce((n,x)=>n+(x.v.stats.correctionStop||0),0),
+                actualExitCount:r.rows.reduce((n,x)=>n+x.v.trades.length,0),
+                caseCount:replayBuildCases().length,
+                linked:replayBuildCases().filter(c=>c.hasCorrectionStop).length
+              }});
+              console.log('CORRECTION_COUNTS',JSON.stringify(before));
+              assert(before.corrections>0&&before.correctionStops>0,'Correction stops should exist in full history');
+              assert(before.linked>0,'No correction-linked campaigns');
+              assert.equal(await page.locator('.chart-card').count(),4);
+              assert.equal(await page.locator('#replay-panel').isVisible(),false);
+              await page.locator('#view-replay').click();
+              assert.equal(await page.locator('#replay-panel').isVisible(),true);
+              assert.equal(await page.locator('.chart-card:visible').count(),1,'Replay must focus one K-line only');
+              const defaultKind=await page.locator('#replay-kind').inputValue();
+              assert.equal(defaultKind,'correctionStop');
+              const num=await page.locator('#replay-number').innerText();
+              console.log('REPLAY_START',num);
+              assert(await page.locator('.replay-node').count()>=4,'Complete campaign timeline missing');
+              const nodes=await page.locator('.replay-node .node-label').allInnerTexts();
+              console.log('CAMPAIGN_CHAIN',JSON.stringify(nodes));
+              assert(nodes.some(x=>x.includes('首次买入')));
+              assert(nodes.some(x=>x.includes('顶部卖出')));
+              assert(nodes.some(x=>x.includes('纠错买回')));
+              assert(nodes.some(x=>x.includes('纠错止损')));
+              await page.locator('.replay-node').first().click();
+              const first=await page.evaluate(()=>({selectedP,replayNodeIndex,chart:focusIndex,caseId:replayCaseId}));
+              assert.equal(first.replayNodeIndex,0);
+              const selected=await page.evaluate(()=>{
+                const c=replayCurrent(),node=c.nodes[replayNodeIndex];
+                return {located:visible(c.index).bars.some(b=>b.t===node.t),type:node.title};
+              });
+              assert(selected.located,'Timeline click must locate chart around event date');
+              console.log('CLICK_NODE_LOCATED',JSON.stringify(selected));
+              const stopNode=page.locator('.replay-node').filter({hasText:'纠错止损'}).first();
+              await stopNode.click();
+              const stopSpot=await page.evaluate(()=>{
+                const c=replayCurrent(),n=c.nodes[replayNodeIndex];
+                return {date:n.t,barVisible:visible(c.index).bars.some(b=>b.t===n.t),ref:c.legs.find(t=>t.entryType==='correctionBuy')?.correctionRefDIF};
+              });
+              assert(stopSpot.barVisible,'Correction stop not plotted near selected bar');
+              console.log('CORRECTION_STOP_LOCATED',JSON.stringify(stopSpot));
+              await page.locator('#replay-tag').selectOption({label:'止损过早'});
+              await page.locator('#replay-memo').fill('验收复盘：严格DIF跌回后，比较顶部卖出和提前退出的差异');
+              await page.locator('#replay-save').click();
+              assert((await page.locator('#replay-save-status').innerText()).includes('已保存'));
+              await page.locator('#view-market').click();
+              assert.equal(await page.locator('.chart-card:visible').count(),4);
+              await page.locator('#view-replay').click();
+              assert.equal(await page.locator('#replay-tag').inputValue(),'止损过早');
+              assert((await page.locator('#replay-memo').inputValue()).includes('严格DIF'));
+              console.log('LOCAL_REVIEW_NOTES_OK');
+              await page.locator('#replay-next').click();
+              assert((await page.locator('#replay-number').innerText()).includes('/'));
+              console.log('NEXT_CASE_OK',await page.locator('#replay-number').innerText());
+              await page.locator('#replay-kind').selectOption('open');
+              const openCount=await page.locator('#replay-number').innerText();
+              console.log('OPEN_CASES',openCount);
+              await page.locator('#replay-kind').selectOption('unpairedSell');
+              console.log('UNPAIRED_SELL_CASES',await page.locator('#replay-number').innerText());
+              await page.locator('#replay-kind').selectOption('all');
+              assert(await page.locator('.replay-node').count()>0);
+              await page.locator('#replay-index').selectOption('2');
+              assert.equal(await page.evaluate(()=>replayCurrent().index),2,'Index filter ignored');
+              await page.locator('#replay-period').selectOption('D');
+              assert.equal(await page.evaluate(()=>replayCurrent().period),'D','Period filter ignored');
+              assert.deepEqual(errors,[]);console.log('JS_ERRORS_0');
+              await page.screenshot({path:'/tmp/replay-desktop.png',fullPage:true});
+              const mobile=await browser.newPage({viewport:{width:390,height:844}});
+              assert.equal((await mobile.goto(base,{waitUntil:'domcontentloaded',timeout:45000})).status(),200);
+              await mobile.waitForSelector('#view-replay');
+              await mobile.locator('#view-replay').click();
+              assert(await mobile.locator('#replay-panel').isVisible(),'Mobile replay unavailable');
+              assert.equal(await mobile.locator('.chart-card:visible').count(),1,'Mobile must show focused single chart');
+              console.log('MOBILE_REPLAY_OK');
+              console.log('ALL_PASS');
+            }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
