@@ -80,6 +80,51 @@ for(let i=0;i<4;i++){
   }
  }
 }
+
+// Sensitivity study only: users may intend strictly MORE than 3 opposite columns.
+// Reuse the source engine in a separate VM function with only the separator threshold
+// changed from >=3 to >=4; do NOT change the production source file.
+const scanBegin=script.indexOf("function scanStructure("),scanEnd=script.indexOf("\nfunction analyzeLifecycle(",scanBegin);
+assert(scanBegin>0&&scanEnd>scanBegin,"Unable to isolate historical structure scanner");
+const scanner3=script.slice(scanBegin,scanEnd);
+assert(scanner3.includes("const ref=prior&&gap>=3?extrema(prior):null;"),"Unexpected original separator policy");
+const scanner4=scanner3.replace("function scanStructure(","function scanStructureFour(")
+ .replace("const ref=prior&&gap>=3?extrema(prior):null;","const ref=prior&&gap>=4?extrema(prior):null;");
+vm.runInContext(scanner4+";this.scanStructureFour=scanStructureFour;",sandbox,{timeout:3500});
+const {scanStructureFour,analyzeLifecycle}=sandbox;
+const compared=[];
+for(let i=0;i<4;i++){
+ const m=merge(m15.data[i]["15"],latest.data[i]["15"]);
+ const d=merge(daily.data[i]["101"],latest.data[i]["101"]);
+ const w=merge(weekly.data[i]["102"],latest.data[i]["102"]);
+ const h=merge(latest.data[i]["60"]);
+ const byP={"15":m,"60":h.length>65?h:resample(m,4),"90":resample(m,6),"120":h.length>65?resampleHourly(h):resample(m,8),D:d,W:w};
+ for(const [p,pName] of periods){
+  const v=calculate(byP[p]);if(!v)continue;
+  const strict4=scanStructureFour(v.bars,v.dif,v.hist);
+  const lifecycle4=analyzeLifecycle(v.bars,v.dif,v.hist,strict4.events);
+  const first3=v.events.filter(e=>e.type==="buy"||e.type==="sell");
+  const first4=strict4.events.filter(e=>e.type==="buy"||e.type==="sell");
+  const key=e=>e.type+"|"+e.i;
+  const shadowSet=new Set(first4.map(key));
+  const gone=first3.filter(e=>!shadowSet.has(key)).map(e=>({date:e.t,type:e.type,ref:e.ref?.dif}));
+  const trades3=v.trades, trades4=lifecycle4.trades;
+  const win=trades=>trades.filter(t=>t.exitClose>t.entryClose).length;
+  compared.push({index:idxNames[i],period:pName,first3:first3.length,first4:first4.length,
+   lostFirst:gone.length,daysLost:gone,secondary3:v.events.filter(e=>/^(second|third|later)(Buy|Sell)$/.test(e.type)).length,
+   secondary4:lifecycle4.events.filter(e=>/^(second|third|later)(Buy|Sell)$/.test(e.type)).length,
+   trades3:trades3.length,trades4:trades4.length,wins3:win(trades3),wins4:win(trades4),
+   correction3:v.stats.correctionBuy,correction4:lifecycle4.counts.correctionBuy});
+ }
+}
+console.log("AUDIT_4_BARS",JSON.stringify({overall:{
+ first3:compared.reduce((a,c)=>a+c.first3,0),first4:compared.reduce((a,c)=>a+c.first4,0),
+ lostFirst:compared.reduce((a,c)=>a+c.lostFirst,0),
+ trades3:compared.reduce((a,c)=>a+c.trades3,0),trades4:compared.reduce((a,c)=>a+c.trades4,0),
+ wins3:compared.reduce((a,c)=>a+c.wins3,0),wins4:compared.reduce((a,c)=>a+c.wins4,0),
+ correction3:compared.reduce((a,c)=>a+c.correction3,0),correction4:compared.reduce((a,c)=>a+c.correction4,0)
+},groups:compared.filter(c=>c.lostFirst>0)}));
+
 const summary={source:latest.generated_at_utc,groups:cases.length,totalBaseBuy:allBuy.length,totalBaseSell:allSell.length,totalSecondary:cases.reduce((s,c)=>s+c.secondary,0),strictFailures:problems.length,threeGapEvents:gap3.length,threeGapBuy:gap3.filter(x=>x.type==="buy").length,threeGapSell:gap3.filter(x=>x.type==="sell").length};
 console.log("AUDIT_SUMMARY",JSON.stringify(summary));
 console.log("AUDIT_CASES",JSON.stringify(cases));
