@@ -525,6 +525,10 @@ function projectNext(v){
  const colorPrice=priceForDIF(dea); // next histogram sign = sign(next DIF - current DEA)
  const zone=v.active;
  const result={k,a,colorPrice,mode:"none",direction:null,lossPrice:null,turnPrice:null,formation:null};
+ if(v.position?.entryType==="correctionBuy"&&Number.isFinite(v.position.correctionRefDIF)){
+  result.mode="correctionHolding";result.stopPrice=priceForDIF(v.position.correctionRefDIF);
+  result.originalEntryT=v.position.originalEntryT;return result;
+ }
  if(v.correctionPending&&!v.position){
   result.mode="correction";result.direction="bottom";result.rebuyPrice=priceForDIF(v.correctionPending.refDIF);
   result.originalEntryT=v.correctionPending.originalEntryT;result.oppositeStreak=v.correctionPending.oppositeStreak;
@@ -603,7 +607,7 @@ function calculate(bars){
  }
  return output;
 }
-function processAll(){store={};for(let j=0;j<4;j++){const a=raw[j];if(!a)continue;const m=filterFinal(a["15"]||[],"15"),h=filterFinal(a["60"]||[],"60"),d=filterFinal(a["101"]||[],"D"),w=filterFinal(a["102"]||[],"W");store[j]={};store[j]["15"]=calculate(m);store[j]["60"]=calculate(h.length>65?h:resample(m,4));store[j]["90"]=calculate(resample(m,6));store[j]["120"]=calculate(h.length>65?resampleHourly(h):resample(m,8));store[j].D=calculate(d);store[j].W=calculate(w)}render()}
+function processAll(){store={};replayCache=null;for(let j=0;j<4;j++){const a=raw[j];if(!a)continue;const m=filterFinal(a["15"]||[],"15"),h=filterFinal(a["60"]||[],"60"),d=filterFinal(a["101"]||[],"D"),w=filterFinal(a["102"]||[],"W");store[j]={};store[j]["15"]=calculate(m);store[j]["60"]=calculate(h.length>65?h:resample(m,4));store[j]["90"]=calculate(resample(m,6));store[j]["120"]=calculate(h.length>65?resampleHourly(h):resample(m,8));store[j].D=calculate(d);store[j].W=calculate(w)}render()}
 function getSignal(i,p){return store[i]&&store[i][p]||null}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function nLabel(v){return v>0?"高"+v:v<0?"低"+(-v):"九转—"}
@@ -757,12 +761,13 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   ctx.fillRect(startX,t,Math.max(1,w-r-startX),hh);
  }
  const proj=(bars.at(-1)?.t===v.bars.at(-1)?.t)?v.projection:null;
- if(proj&&(proj.mode==="watch"||proj.mode==="candidate"||proj.mode==="campaign"||proj.mode==="correction")){
+ if(proj&&(proj.mode==="watch"||proj.mode==="candidate"||proj.mode==="campaign"||proj.mode==="correction"||proj.mode==="correctionHolding")){
   const guidelines=[];
   if(proj.mode==="watch"||proj.mode==="campaign"){
    if(Number.isFinite(proj.lossPrice))guidelines.push({price:proj.lossPrice,label:"失效临界",color:"#df8993"});
    if(Number.isFinite(proj.turnPrice))guidelines.push({price:proj.turnPrice,label:proj.direction==="bottom"?"DIF买点":"DIF下拐",color:"#2eaf82"});
   }else if(proj.mode==="correction"&&Number.isFinite(proj.rebuyPrice))guidelines.push({price:proj.rebuyPrice,label:"纠错买回",color:"#8662b7"});
+  else if(proj.mode==="correctionHolding"&&Number.isFinite(proj.stopPrice))guidelines.push({price:proj.stopPrice,label:"纠错止损",color:"#d26573"});
   else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
   for(const g of guidelines)if(g.price>=mn&&g.price<=mx){
    const gy=y(g.price);ctx.lineWidth=1;ctx.strokeStyle=g.color;ctx.setLineDash([2,5]);
@@ -771,11 +776,17 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   }
  }
  const step=ww/bars.length,cw=Math.max(2,Math.min(11,step*.7)),xc=k=>l+(k+.5)*step;
- const signalMap=new Map(),pairInfo=quickPairStatus(v);for(const e of v.events){if(e.i<from||e.i>=v.bars.length)continue;if(quickIndex!=="all"&&Number(quickIndex)!==i)continue;if(quickKind!=="all"&&!matchQuickEvent(e,quickKind,pairInfo))continue;const list=signalMap.get(e.i)||[];list.push(e);signalMap.set(e.i,list)}
+ const signalMap=new Map(),pairInfo=quickPairStatus(v),rc=replayMode?replayCurrent():null;
+ for(const e of v.events){
+  if(e.i<from||e.i>=v.bars.length)continue;
+  if(rc){if(rc.index!==i||!rc.nodes.some(n=>!n.reference&&n.i===e.i))continue}
+  else{if(quickIndex!=="all"&&Number(quickIndex)!==i)continue;if(quickKind!=="all"&&!matchQuickEvent(e,quickKind,pairInfo))continue}
+  const list=signalMap.get(e.i)||[];list.push(e);signalMap.set(e.i,list)
+ }
  bars.forEach((bar,k)=>{const up=bar.c>=bar.o,color=up?"#d95562":"#11a47a",x=xc(k);
   ctx.strokeStyle=color;ctx.lineWidth=1.15;ctx.beginPath();ctx.moveTo(x,y(bar.h));ctx.lineTo(x,y(bar.l));ctx.stroke();
   const hi=y(Math.max(bar.o,bar.c)),lo=y(Math.min(bar.o,bar.c));ctx.fillStyle=color;ctx.fillRect(x-cw/2,hi,cw,Math.max(1.35,lo-hi));
-  const list=signalMap.get(from+k)||[],buy=list.find(q=>["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"].includes(q.type)),sell=list.find(q=>["sell","secondSell","thirdSell","laterSell"].includes(q.type)),wb=list.find(q=>q.type==="watchBuy"),ws=list.find(q=>q.type==="watchSell"),stop=list.find(q=>q.type==="stopLoss");
+  const list=signalMap.get(from+k)||[],buy=list.find(q=>["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"].includes(q.type)),sell=list.find(q=>["sell","secondSell","thirdSell","laterSell"].includes(q.type)),wb=list.find(q=>q.type==="watchBuy"),ws=list.find(q=>q.type==="watchSell"),stop=list.find(q=>q.type==="stopLoss"||q.type==="correctionStop");
   if(buy||sell){
    const bullish=!!buy,e=buy||sell,stage=Number(e.stage)||1,fy=y(bullish?bar.l:bar.h);
    const arrowY=bullish?Math.min(h-b-7,fy+12):Math.max(t+9,fy-12);
@@ -811,6 +822,18 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   }
   if(Math.abs(nine[k])===9&&(k===0||Math.abs(nine[k-1])<9)){const high=nine[k]>0,yy=high?Math.max(t+11,y(bar.h)-21):Math.min(h-b-7,y(bar.l)+22);plotText(ctx,"9",x,yy,high?"#d56c70":"#199e7b",10,"center","700")}
  });
+ // In replay mode, show every timeline node present in this visible window.
+ if(replayMode){const rc=replayCurrent();if(rc?.index===i){
+  const selected=rc.nodes[replayNodeIndex];
+  for(const nd of rc.nodes){if(nd.i<from||nd.i>=from+bars.length)continue;
+   const xx=xc(nd.i-from),isSelected=selected?.i===nd.i;
+   ctx.lineWidth=isSelected?1.5:1;ctx.strokeStyle=isSelected?"#306f9b":nd.reference?"#baa0c7":"#8ca9c0";ctx.setLineDash(nd.reference?[2,4]:[5,4]);
+   ctx.beginPath();ctx.moveTo(xx,t);ctx.lineTo(xx,h-b);ctx.stroke();ctx.setLineDash([]);
+   if(isSelected||nd.reference){const txt=nd.reference?"后续顶部·对照":nd.title;
+    const tx=Math.max(l+4,Math.min(w-r-130,xx-55));ctx.fillStyle=nd.reference?"#f3eefb":"#edf5fc";ctx.fillRect(tx,t+6,130,20);
+    plotText(ctx,txt,tx+6,t+20,nd.reference?"#805ea5":"#2f698f",10,"left","700");}
+  }
+ }}
  // Current price dotted guide
  const last=bars.at(-1).c,yp=y(last);ctx.strokeStyle="#aebdca";ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(l,yp);ctx.lineTo(w-r,yp);ctx.stroke();ctx.setLineDash([]);
  ctx.fillStyle="#253d54";ctx.fillRect(w-r+7,yp-9,r-10,18);plotText(ctx,valstr(last,2),w-8,yp+4,"white",10,"right","600");
@@ -855,6 +878,9 @@ function projectionHTML(v,label){
   if(Number.isFinite(p.turnPrice))items+='<span class="estimate-chip buy">'+(p.mode==="campaign"?"第"+p.nextStage+"次":"")+(p.direction==="bottom"?"买点 DIF↑":"DIF↓")+' '+turn+' 约'+valstr(p.turnPrice)+'</span>';
   else items+='<span class="estimate-chip note">DIF尚未回落/反转，暂无新的首次拐头临界价</span>';
   if(p.mode==="campaign"&&p.oppositeStreak>=2)items+='<span class="estimate-chip note">若下一根仍为反色柱，则本轮结构结束</span>';
+ }else if(p.mode==="correctionHolding"){
+  items+='<span class="estimate-chip watch">纠错买回持有中</span>';
+  if(Number.isFinite(p.stopPrice))items+='<span class="estimate-chip loss">DIF跌回参考高点：下根收盘 ≤ 约'+valstr(p.stopPrice)+' 即纠错止损</span>';
  }else if(p.mode==="correction"){
   items+='<span class="estimate-chip watch">顶部已卖 · 纠错观察中</span>';
   if(Number.isFinite(p.rebuyPrice))items+='<span class="estimate-chip buy">DIF突破原高点：收盘 &gt; 约'+valstr(p.rebuyPrice)+'</span>';
@@ -992,10 +1018,11 @@ function renderQuick(){
  byId("quick-detail").textContent=entry>=0?("当前 "+(entry+1)+"/"+list.length+" · "+quickName(list[entry].e)+" · "+(list[entry].badge||"")+ " · "+list[entry].e.t.replace("T"," ")):"点位直接跳到K线，已配对/未配对在选择项中标明";
 }
 
-let replayMode=false,replayKind="correctionStop",replayIndex="all",replayPeriod="all",replayCaseId=null,replayNodeIndex=0;
+let replayMode=false,replayKind="correctionStop",replayIndex="all",replayPeriod="all",replayCaseId=null,replayNodeIndex=0,replayCache=null;
 const REPLAY_BUYS=new Set(["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"]);
 const REPLAY_SELLS=new Set(["sell","secondSell","thirdSell","laterSell"]);
 function replayBuildCases(){
+ if(replayCache)return replayCache;
  const cases=[];
  for(let i=0;i<4;i++)for(const [period,label] of PERIODS){
   const v=getSignal(i,period);if(!v)continue;
@@ -1056,7 +1083,8 @@ function replayBuildCases(){
     unpairedSell:true,hasCorrection:false,hasCorrectionStop:false,hasStop:false,hasTopSell:false,hasOpen:false,returns:[]});
   }
  }
- return cases.sort((a,b)=>b.lastT.localeCompare(a.lastT)||a.index-b.index||a.id.localeCompare(b.id));
+ replayCache=cases.sort((a,b)=>b.lastT.localeCompare(a.lastT)||a.index-b.index||a.id.localeCompare(b.id));
+ return replayCache;
 }
 function replayFiltered(){
  return replayBuildCases().filter(c=>
