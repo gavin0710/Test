@@ -96,7 +96,14 @@ ok(uiSegment.includes("laterBuy"),"Fourth and later buys are retained");
 ok(script.includes("function buySignalEvents("),"Historical signal navigator implemented");
 ok(script.includes("function navigateBuy("),"Previous and next buy navigation implemented");
 ok(script.includes("function jumpToBuy("),"Exact candle index navigation implemented");
-ok(uiSegment.includes("visibleBars===0?v.bars.length"),"All-history plot range uses all available candles");
+ok(uiSegment.includes("visibleBars===0?100:visibleBars"),"Full-history mode stays legible at 100 bars and pans through entire range");
+ok(uiSegment.includes("function setPanOffset("),"Horizontal chart panning implemented");
+ok(uiSegment.includes("function pointerStart(")&&uiSegment.includes("function pointerMove("),"Pointer-drag supports history navigation");
+ok(uiSegment.includes("panOffsetByPeriod"),"Panning retains independent scroll positions by period");
+ok(script.includes("function mergeHistoricalBars(")&&script.includes("function ensureHistoricalData("),"Long-history archive is merged into live source without truncation");
+ok(html.includes('id="history-slider"'),"Full-history scrubber is present");
+ok(html.includes('id="history-range"'),"Actual historical coverage date range is displayed");
+
 const graphSection=script.slice(script.indexOf("function drawPrice("),script.indexOf("function drawMacd("));
 ok(graphSection.includes('const label=(bullish?"买":"卖")'),"Explicit buy/sell label in price chart");
 ok(graphSection.includes('signalAnchors[selectedP+":"+i]'),"Focused history marker highlighted");
