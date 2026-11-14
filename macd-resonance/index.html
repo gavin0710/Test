@@ -58,6 +58,17 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .periodbar{width:100%;justify-content:space-between}.periodbtn{min-width:0;flex:1;padding:9px 4px;font-size:11px}
 .chartgrid{gap:10px}.kplot{height:250px}.mplot{height:94px}.head{margin-bottom:17px}
 .controls{gap:10px}.badges{gap:4px}.signpill{font-size:10px;padding:5px 6px}.code{font-size:10px}.ohlc{font-size:9px}}
+
+.difline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:7px;color:#788a99;font-size:11px;font-variant-numeric:tabular-nums}
+.difline b{color:#377eae;font-weight:750;font-size:12px}
+.difline .dea{color:#ca9852}.difline .hist{color:#78919c}
+.estimate{padding:10px 17px 12px;border-top:1px solid #eef1f3;background:#fbfcfd;display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-height:44px}
+.estimate-label{color:#98a6b2;font-size:10px;font-weight:580;margin-right:3px}
+.estimate-chip{font-size:11px;color:#587086;background:#edf2f6;border-radius:6px;padding:6px 9px;white-space:nowrap}
+.estimate-chip.loss{color:#cf6170;background:#fff0f1}.estimate-chip.buy{color:#168c69;background:#eaf7f1}
+.estimate-chip.watch{color:#507696;background:#edf4fa}.estimate-chip.note{color:#8e9dab;background:#f2f4f6}
+.estimate-text{font-size:10px;color:#9aa7b2}
+@media(max-width:560px){.estimate{padding:9px 11px}.difline{gap:7px;font-size:10px}.difline b{font-size:11px}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -77,7 +88,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
   <details class="fold"><summary>历史触发记录 <span class="faint">当前选中周期</span></summary><div class="foldbody" id="history"></div></details>
   <details class="fold"><summary>计算规则与行情口径 <span class="faint">仅收盘K线触发</span></summary>
    <div class="foldbody" style="font-size:12px;line-height:1.9;color:#718393">
-    <p>EMA(12,26)、DEA(9)；MACD柱=2×(DIF−DEA)。当前同向MACD柱波段出现价格新高/低，但DIF极值未跟随创新极值，标为顶/底钝化；之后DIF首次转向触发方向提示。信号仅在已完成K线上确认。</p>
+    <p>EMA(12,26)、DEA(9)；MACD柱=2×(DIF−DEA)。严格结构钝化：必须为两个最近相邻的同色MACD柱区域，中间至少3根连续非同色柱；第二同色区最低/最高<strong>收盘价</strong>突破前区最低/最高收盘价，但本区域最低/最高<strong>DIF极值</strong>没有突破前区DIF极值，才形成底/顶钝化。影线与最高最低价不参与突破判断，DIF相等不算背离，不能跳过较近区域。</p><p>底钝化后DIF首次由下降转上升（在第二绿区内或紧随其后的第一根翻色柱）是买点；若DIF跌至前区参考低点则失效，若颜色已变化仍未上拐则结束观察。推演价基于下一根完整收盘价反算EMA和DIF，并非行情预测；图上的虚线只表示条件临界价。</p>
     <p>九转比较每根收盘价与前第4根收盘价，连续同向计数至9；图上标注九转9，当前计数始终展示在卡片右上角。九转不改变MACD操作信号。共振只统计同一周期、最近2根已完成K线内的同向DIF信号。</p>
     <p>90分钟K线按每天90/90/60交易分钟计算。120分钟按上午与下午各120分钟合成。4个指数以同周期时间轴比较；由于行情源不同，部分历史数据可能略有偏差。</p>
    </div>
@@ -231,7 +242,7 @@ function stateDesc(s){return ({buy:"↑ DIF拐头",sell:"↓ DIF拐头",watchBuy
 function stateClass(s){return s==="buy"?"buy":s==="sell"?"sell":s==="watchBuy"?"watchbuy":s==="watchSell"?"watchsell":s==="neutral"?"":"missing"}
 
 
-let visibleBars=100,focusIndex=-1,hoverTime=null,renderBusy=false;
+let visibleBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
 const IDXCODE=["000001","399001","399006","000688"];
 function paintState(s){return ({buy:"↑ DIF上拐",sell:"↓ DIF下拐",watchBuy:"底钝化",watchSell:"顶钝化",neutral:"暂无信号"})[s]||"数据缺失"}
 function valstr(n,d=2){return Number.isFinite(n)?n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}):"—"}
@@ -251,12 +262,44 @@ function canvasSize(el){const b=el.getBoundingClientRect(),w=Math.max(160,Math.f
 function plotText(ctx,str,x,y,color="#9ba7b3",size=10,align="left",weight="400"){ctx.font=weight+" "+size+"px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif";ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(str,x,y)}
 function dims(w,h){return {l:15,r:64,t:16,b:27,ww:w-79,hh:h-43}}
 function visible(i){const v=getSignal(i,selectedP);if(!v)return null;const length=Math.min(visibleBars,v.bars.length),from=v.bars.length-length;return {v,from,bars:v.bars.slice(from),dif:v.dif.slice(from),dea:v.dea.slice(from),hist:v.hist.slice(from),nine:v.nine.slice(from)}}
-function ptr(i,ev){const data=visible(i),el=ev.currentTarget;if(!data)return;const {l,ww}=dims(el.getBoundingClientRect().width,el.getBoundingClientRect().height);const x=ev.clientX-el.getBoundingClientRect().left;const k=Math.max(0,Math.min(data.bars.length-1,Math.floor((x-l)/ww*data.bars.length)));hoverTime=data.bars[k].t;queueDraw()}
+function ptr(i,ev){
+ const data=visible(i),el=ev.currentTarget;if(!data)return;
+ const rect=el.getBoundingClientRect(),dim=dims(rect.width,rect.height);
+ const x=ev.clientX-rect.left,k=Math.max(0,Math.min(data.bars.length-1,Math.floor((x-dim.l)/dim.ww*data.bars.length)));
+ hoverTime=data.bars[k].t;hoverIndex=i;
+ if(el.classList.contains("kplot")){
+  const yy=ev.clientY-rect.top;
+  const mn=Math.min(...data.bars.map(b=>b.l)),mx=Math.max(...data.bars.map(b=>b.h));
+  const ext=Math.max((mx-mn)*.12,mx*.0015),lower=mn-ext,upper=mx+ext;
+  const bounded=Math.max(dim.t,Math.min(dim.t+dim.hh,yy));
+  hoverPixelPrice=lower+(dim.t+dim.hh-bounded)/dim.hh*(upper-lower);
+ }else hoverPixelPrice=null;
+ queueDraw();
+}
 function queueDraw(){if(renderBusy)return;renderBusy=true;requestAnimationFrame(()=>{renderBusy=false;drawAll()})}
 function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect().width<30)return;const {ctx,w,h}=canvasSize(el);if(!data){plotText(ctx,"暂无可用K线",w/2,h/2,"#a4afba",12,"center");return}
  const {bars,dif,nine,from,v}=data,dim=dims(w,h),{l,r,t,b,ww,hh}=dim;
  let mn=Math.min(...bars.map(b=>b.l)),mx=Math.max(...bars.map(b=>b.h));const ext=Math.max((mx-mn)*.12,mx*.0015);mn-=ext;mx+=ext;const y=n=>t+(mx-n)/(mx-mn)*hh;
  for(let j=0;j<=4;j++){const yy=t+hh*j/4;ctx.strokeStyle="#eef1f5";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(l,yy);ctx.lineTo(w-r,yy);ctx.stroke();plotText(ctx,valstr(mx-(mx-mn)*j/4,Math.abs(mx-mn)<1?3:2),w-7,yy+3,"#9da9b5",10,"right")}
+ // Highlight the active same-color comparison region, and project next-bar closing thresholds.
+ if(v.active?.mode==="watch"&&v.active.regionStart>=from){
+  const startX=l+(v.active.regionStart-from)*ww/bars.length;
+  ctx.fillStyle=v.active.sign<0?"rgba(21,160,118,.045)":"rgba(216,90,102,.045)";
+  ctx.fillRect(startX,t,Math.max(1,w-r-startX),hh);
+ }
+ const proj=v.projection;
+ if(proj&&(proj.mode==="watch"||proj.mode==="candidate")){
+  const guidelines=[];
+  if(proj.mode==="watch"){
+   if(Number.isFinite(proj.lossPrice))guidelines.push({price:proj.lossPrice,label:"失效临界",color:"#df8993"});
+   if(Number.isFinite(proj.turnPrice))guidelines.push({price:proj.turnPrice,label:proj.direction==="bottom"?"DIF买点":"DIF下拐",color:"#2eaf82"});
+  }else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
+  for(const g of guidelines)if(g.price>=mn&&g.price<=mx){
+   const gy=y(g.price);ctx.lineWidth=1;ctx.strokeStyle=g.color;ctx.setLineDash([2,5]);
+   ctx.beginPath();ctx.moveTo(l,gy);ctx.lineTo(w-r,gy);ctx.stroke();ctx.setLineDash([]);
+   plotText(ctx,g.label,l+5,Math.max(t+11,gy-5),g.color,9);
+  }
+ }
  const step=ww/bars.length,cw=Math.max(2,Math.min(11,step*.7)),xc=k=>l+(k+.5)*step;
  const signalMap=new Map();for(const e of v.events){if(e.i<from||e.i>=v.bars.length)continue;const list=signalMap.get(e.i)||[];list.push(e);signalMap.set(e.i,list)}
  bars.forEach((bar,k)=>{const up=bar.c>=bar.o,color=up?"#d95562":"#11a47a",x=xc(k);
@@ -284,20 +327,45 @@ function drawMacd(i,data){const el=byId("m"+i);if(!el||el.getBoundingClientRect(
  for(const [values,color] of [[dif,"#377eae"],[dea,"#d5a14f"]]){ctx.strokeStyle=color;ctx.lineWidth=1.7;ctx.lineJoin="round";ctx.beginPath();values.forEach((v,k)=>k?ctx.lineTo(xc(k),y(v)):ctx.moveTo(xc(k),y(v)));ctx.stroke()}
  plotText(ctx,"DIF",dim.l+7,12,"#377eae",10,"left","650");plotText(ctx,"DEA",dim.l+40,12,"#d5a14f",10,"left","650");
  plotText(ctx,valstr(mx,2),w-7,dim.t+4,"#a4afba",9,"right");plotText(ctx,"0",w-7,y(0)+3,"#9aa8b5",9,"right");plotText(ctx,valstr(mn,2),w-7,h-dim.b+5,"#a4afba",9,"right");
- if(hoverTime){const k=bars.findIndex(b=>b.t===hoverTime);if(k>=0){ctx.strokeStyle="#9aa9b8";ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(xc(k),0);ctx.lineTo(xc(k),h);ctx.stroke();ctx.setLineDash([])}}
+ const hoverK=hoverTime?bars.findIndex(b=>b.t===hoverTime):-1;
+ if(hoverK>=0){ctx.strokeStyle="#9aa9b8";ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(xc(hoverK),0);ctx.lineTo(xc(hoverK),h);ctx.stroke();ctx.setLineDash([])}
+ const k=hoverK>=0?hoverK:bars.length-1;
+ const difValue=dif[k],deaValue=dea[k],histValue=hist[k];
+ const diflabel=byId("difline"+i);
+ if(diflabel)diflabel.innerHTML='DIF <b>'+difValue.toFixed(4)+'</b>　 DEA <span class="dea">'+deaValue.toFixed(4)+'</span>　 MACD柱 <span class="hist">'+histValue.toFixed(4)+'</span>';
+ 
 }
 function drawAll(){for(let i=0;i<4;i++){if(focusIndex>=0&&focusIndex!==i)continue;const data=visible(i);drawPrice(i,data);drawMacd(i,data)}}
+function projectionHTML(v,label){
+ if(!v||!v.projection)return '<div class="estimate"><span class="estimate-text">当前没有足够数据用于临界收盘价计算</span></div>';
+ const p=v.projection;let items='';
+ if(p.mode==="watch"){
+  const side=p.direction==="bottom"?"底":"顶";
+  const loss=p.direction==="bottom"?"≤":"≥",turn=p.direction==="bottom"?">":"<";
+  items+='<span class="estimate-chip watch">'+side+'钝化观察中</span>';
+  if(Number.isFinite(p.lossPrice))items+='<span class="estimate-chip loss">失效 '+loss+' 约'+valstr(p.lossPrice)+'</span>';
+  if(Number.isFinite(p.turnPrice))items+='<span class="estimate-chip buy">'+(p.direction==="bottom"?"买点 DIF↑":"DIF↓")+' '+turn+' 约'+valstr(p.turnPrice)+'</span>';
+  else items+='<span class="estimate-chip note">暂不能推断首次DIF拐头价</span>';
+ }else if(p.mode==="candidate"&&p.formation){
+  const f=p.formation;
+  items+='<span class="estimate-chip watch">'+(f.side==="bottom"?"新底钝化":"新顶钝化")+'条件区间</span>';
+  items+='<span class="estimate-chip">约 '+valstr(f.lo)+' < 收盘 < '+valstr(f.hi)+'</span>';
+ }else{
+  items+='<span class="estimate-text">目前无有效钝化条件区间；不推算虚假买点</span>';
+ }
+ return '<div class="estimate"><span class="estimate-label">'+label+'推演</span>'+items+'</div>';
+}
 function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v&&v.bars.at(-2),pct=last&&prev?(last.c-prev.c)/prev.c*100:0,delta=last&&prev?last.c-prev.c:0,n=v?v.nine.at(-1):0,s=v?v.state:"missing";
  const c=delta>=0?"up":"down";
- const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";
- return '<article class="chart-card '+(focusIndex===i?"focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+paintState(s)+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div><div class="chartfoot"><span>▲ / ▼ DIF拐头 · 顶 / 底 结构钝化 · 9 九转</span><span class="latest">'+timed+'</span></div></article>'
+ const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const projection=projectionHTML(v,nextLabel);
+ return '<article class="chart-card '+(focusIndex===i?"focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+paintState(s)+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+projection+'<div class="chartfoot"><span>收盘价突破 · DIF波段极值 · 反色柱≥3</span><span class="latest">'+timed+'</span></div></article>'
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 function renderHistory(){const events=[];for(let i=0;i<4;i++){const v=getSignal(i,selectedP);if(!v)continue;for(const e of v.events.filter(e=>e.type==="buy"||e.type==="sell").slice(-12))events.push({...e,i,nine:v.nine[e.i]})}
  events.sort((a,b)=>b.t.localeCompare(a.t));byId("history").innerHTML=events.length?'<div class="eventlist">'+events.slice(0,18).map(e=>'<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.i].name+'</b><span class="mstatus '+e.type+'">'+(e.type==="buy"?"↑ DIF向上拐头":"↓ DIF向下拐头")+'</span><span>'+nLabel(e.nine)+'</span></div>').join("")+'</div>':'<div class="faint" style="padding:12px">本周期尚无历史拐头记录</div>'}
 function render(){renderPeriods();renderResonance();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
- grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;render()});
- grid.querySelectorAll("canvas").forEach(c=>{c.addEventListener("pointermove",e=>ptr(Number(c.dataset.i),e));c.addEventListener("pointerleave",()=>{hoverTime=null;queueDraw()})});
+ grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
+ grid.querySelectorAll("canvas").forEach(c=>{c.addEventListener("pointermove",e=>ptr(Number(c.dataset.i),e));c.addEventListener("pointerleave",()=>{hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;queueDraw()})});
  renderMatrix();renderHistory();requestAnimationFrame(drawAll)}
 
 function paintDataSource(directHits){
