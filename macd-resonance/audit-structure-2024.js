@@ -155,4 +155,29 @@ console.log("FEB_2024_BARS",JSON.stringify(rowsFeb));
 console.log("FEB_2024_EVENTS",JSON.stringify(earlyEvents));
 console.log("FEB_2024_TRADES",JSON.stringify(earlyTrades));
 
+
+for(let idx=0;idx<4;idx++){
+ const wbars=merge(weekly.data[idx]["102"],latest.data[idx]["102"]),val=calculate(wbars);
+ const events=val.events.filter(e=>e.t>="2023-08-01"&&e.t<="2024-04-30").map(e=>({
+  date:e.t,type:e.type,i:e.i,stage:e.stage,regionStart:e.regionStart,firstI:e.firstI,
+  refDIF:f(e.refDIF??e.ref?.dif),refClose:f(e.ref?.close),
+  sourceBuy:e.originalT,reason:e.reason,
+  associatedTrade:(val.trades.find(t=>t.entryI===e.i||t.exitI===e.i)||null)?.entryT
+ }));
+ const bars=wbars.map((b,i)=>({b,i})).filter(x=>x.b.t>="2023-12-01"&&x.b.t<="2024-03-15").map(({b,i})=>({
+  date:b.t,close:f(b.c),dif:f(val.dif[i]),dea:f(val.dea[i]),hist:f(val.hist[i]),
+  priorDif:f(val.dif[i-1]), events:val.events.filter(e=>e.i===i).map(e=>({type:e.type,stage:e.stage,refDIF:f(e.refDIF??e.ref?.dif),firstI:e.firstI}))
+ }));
+ const deals=val.trades.filter(t=>t.entryT<="2024-04-30"&&t.exitT>="2023-08-01").map(t=>({
+  entryT:t.entryT,entryType:t.entryType,entryClose:f(t.entryClose),
+  bottomFirstI:t.bottomFirstI,exitT:t.exitT,exitType:t.exitType,exitClose:f(t.exitClose),
+  buySignals:(t.buySignals||[]).map(e=>({...e,t:wbars[e.i]?.t})),root:t.originalEntryT,
+ }));
+ const gap=val.cycles.filter(c=>c.side==="bottom"&&wbars[c.firstI]?.t>="2023-06-01"&&wbars[c.firstI]?.t<="2024-04-30").map(c=>({
+  first:wbars[c.firstI]?.t,last:wbars[c.lastSignalI]?.t,refDIF:f(c.refDIF),stage:c.stage,closed:c.closed,
+  end:wbars[c.endedAt]?.t,reason:c.endReason,oppositeStreak:c.oppositeStreak
+ }));
+ console.log("WEEK_CASE_"+idx,JSON.stringify({index:idxNames[idx],first:wbars[0]?.t,events,bars,trades:deals,bottomCycles:gap}));
+}
+
 console.log("AUDIT_DONE");
