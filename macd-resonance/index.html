@@ -806,34 +806,78 @@ function paintDataSource(directHits){
  byId("status").textContent=valid===24?"24/24周期有数据":valid?valid+"/24周期有数据":"行情暂不可用";
  byId("updated").textContent="最新15分K线 "+recent15.slice(0,16).replace("T"," ")+"（北京时间）";
  const detail=directHits===16?"行情直连":directHits?"直连+归档补充":usedSnapshot?"归档快照":"行情源无响应";
- byId("sourceline").textContent="数据：东方财富公开指数K线 / 腾讯归档备用源 · "+detail;
+ byId("sourceline").textContent="数据：东方财富公开指数K线 / 腾讯归档备用源 · "+detail+
+ (Object.keys(historyCache).length?" · 历史库"+Object.keys(historyCache).join("/"):" · 历史扩展尚未载入");
  byId("chartfail").hidden=valid>0;
  byId("chartfail").textContent="行情接口和归档均暂不可用；不会使用模拟数据填充。";
 }
+
+let historyCache={},historyFetchTime=0,historyRequest=null,historyErrors=[];
+function mergeHistoricalBars(...sets){
+ const m=new Map();
+ for(const rows of sets)for(const b of rows||[]){
+  if(!b||typeof b.t!=="string"||!["o","c","h","l"].every(k=>Number.isFinite(b[k])))continue;
+  m.set(b.t,b);
+ }
+ return [...m.values()].sort((a,b)=>a.t.localeCompare(b.t));
+}
+function mergeCachedHistory(){
+ for(const period of ["15","101","102"]){
+  const set=historyCache[period];if(!set)continue;
+  for(let i=0;i<4;i++){
+   if(!raw[i])raw[i]={};
+   raw[i][period]=mergeHistoricalBars(set[i]?.[period],raw[i][period]);
+  }
+ }
+}
+function ensureHistoricalData(force=false){
+ const now=Date.now();
+ if(!force&&historyRequest)return historyRequest;
+ if(!force&&historyFetchTime&&now-historyFetchTime<30*60*1000)return Promise.resolve();
+ const requests=["101","102","15"].map(async period=>{
+  try{
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),22000);
+   let res;try{res=await fetch("/api/history?period="+period,{cache:"no-store",signal:controller.signal})}finally{clearTimeout(timer)}
+   if(!res.ok)throw Error("HTTP "+res.status);
+   const json=await res.json();
+   if(json.period!==period||!Array.isArray(json.data)||json.data.length!==4)throw Error("归档结构不完整");
+   const total=json.data.reduce((n,x)=>n+(x?.[period]?.length||0),0);
+   if(total<100)throw Error("历史数据不足");
+   historyCache[period]=json.data;
+  }catch(e){historyErrors.push(period+"历史："+String(e.message||e))}
+ });
+ historyRequest=Promise.all(requests).then(()=>{
+  historyFetchTime=Date.now();
+  historyRequest=null;
+ }).catch(()=>{historyRequest=null});
+ return historyRequest;
+}
+
 async function load(){
  if(load.busy)return;
  load.busy=true;byId("refresh").disabled=true;byId("status").textContent="正在更新…";byId("statusdot").className="dot";
- dataErrors=[];usedSnapshot=false;raw={};
+ dataErrors=[];usedSnapshot=false;raw={};historyErrors=[];
  try{
   try{
    const res=await Promise.race([fetch("/api/latest?ts="+Date.now(),{cache:"no-store"}),new Promise((_,reject)=>setTimeout(()=>reject(Error("快照超时")),3000))]);
    if(res.ok){const snapshot=await res.json();if(snapshot&&snapshot.data&&snapshot.data.length===4){
     for(let i=0;i<4;i++){raw[i]={};for(const klt of ["15","60","101","102"]){if(Array.isArray(snapshot.data[i][klt]))raw[i][klt]=snapshot.data[i][klt]}}
-    usedSnapshot=true;processAll();paintDataSource(0);
+    usedSnapshot=true;mergeCachedHistory();processAll();paintDataSource(0);
    }}
   }catch(err){}
   let directHits=0;
+  const historyJob=ensureHistoricalData().then(()=>{mergeCachedHistory();processAll();paintDataSource(directHits)});
   const jobs=IDX.map(async(index,i)=>{
    for(const klt of ["15","60","101","102"]){
     try{
      const response=await jsonp(endpoint(index.secid,klt,klt==="15"||klt==="60"?1800:480));
-     const rows=parseBars(response);if(!raw[i])raw[i]={};raw[i][klt]=rows;directHits++;
+     const rows=parseBars(response);if(!raw[i])raw[i]={};raw[i][klt]=mergeHistoricalBars(raw[i][klt],rows);directHits++;
     }catch(err){dataErrors.push(index.short+" "+klt+": "+err.message)}
    }
    processAll();paintDataSource(directHits);
   });
-  await Promise.all(jobs);
-  lastFetch=Date.now();processAll();paintDataSource(directHits);
+  await Promise.all([...jobs,historyJob]);
+  mergeCachedHistory();lastFetch=Date.now();processAll();paintDataSource(directHits);
  }finally{
   lastFetch=Date.now();load.busy=false;byId("refresh").disabled=false;
  }
