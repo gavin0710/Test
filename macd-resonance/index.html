@@ -108,6 +108,13 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .kplot,.mplot{cursor:crosshair;touch-action:pan-y}
 .kplot.dragging,.mplot.dragging,.chartgrid.dragging .kplot,.chartgrid.dragging .mplot{cursor:grabbing;user-select:none}
 @media(max-width:570px){.history-strip{gap:7px;padding:7px 9px}.history-scrubber{order:3;flex-basis:100%}.history-range{font-size:9px;flex:1;white-space:normal}.history-reset{padding:5px 7px}}
+
+.density{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 9px;border:1px solid #dbe4eb;background:#fff;border-radius:9px;white-space:nowrap}
+.density-btn{height:30px;width:30px;border:none;border-radius:6px;background:#eaf1f7;color:#486986;font-weight:700;font-size:19px;line-height:1}
+.density-btn:hover{background:#dce9f4;color:#274b6a}
+#density-count{width:55px;max-width:65px;padding:4px 1px;border:0;background:transparent;font-size:12px;font-weight:750;color:#34536f;text-align:center;appearance:textfield}
+#density-count::-webkit-inner-spin-button,#density-count::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+@media(max-width:600px){.density{gap:3px}.density-btn{width:27px;height:27px}.density .faint{font-size:10px}.controls{flex-wrap:wrap}}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -116,7 +123,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
  </header>
  <nav class="toolbar" aria-label="行情操作">
   <div class="periodbar" id="periodbar"></div>
-  <div class="controls"><div class="resblock" id="resonance"></div><span class="faint">最近</span><button class="winbtn" data-n="60">60根</button><button class="winbtn active" data-n="100">100根</button><button class="winbtn" data-n="0" title="加载整个历史区间，但保持100根K线可读窗口；拖动或滚动时间轴浏览历史">全部历史</button></div>
+  <div class="controls"><div class="resblock" id="resonance"></div><div class="density" title="调节每屏可见K线根数：减少根数放大K线，增加根数缩小K线"><span class="faint">每屏</span><button id="density-minus" class="density-btn" type="button" aria-label="减少每屏K线根数，放大K线">−</button><input type="number" id="density-count" min="15" max="500" step="1" value="100" aria-label="每屏K线数量"><span class="faint">根</span><button id="density-plus" class="density-btn" type="button" aria-label="增加每屏K线根数，缩小K线">+</button></div><button class="winbtn" data-n="0" title="将时间轴跳到当前指数最早的真实K线，并可横向回看全部归档">全历史</button></div>
  </nav>
  <div class="history-strip" aria-label="历史K线横向浏览">
   <span class="history-hint">← 拖动K线回看历史</span>
@@ -447,7 +454,7 @@ function stateDesc(s){return ({buy:"↑ DIF拐头",sell:"↓ DIF拐头",watchBuy
 function stateClass(s){return s==="buy"?"buy":s==="sell"?"sell":s==="watchBuy"?"watchbuy":s==="watchSell"?"watchsell":s==="neutral"?"":"missing"}
 
 
-let visibleBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
+let visibleBars=100,densityBars=100,focusIndex=-1,hoverTime=null,hoverIndex=-1,hoverPixelPrice=null,renderBusy=false;
 let panOffsetByPeriod={},dragSession=null;
 const buyTypes=new Set(["buy","secondBuy","thirdBuy","laterBuy"]);
 const sellTypes=new Set(["sell","secondSell","thirdSell","laterSell"]);
@@ -457,10 +464,29 @@ function paintState(s){return ({buy:"↑ DIF上拐",sell:"↓ DIF下拐",watchBu
 function valstr(n,d=2){return Number.isFinite(n)?n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}):"—"}
 function signclass(s){return s==="neutral"||!s?"":s==="buy"?"buy":s==="sell"||s==="stop"?"sell":s==="watchBuy"?"watchbuy":"watchsell"}
 function stateHTML(i,p){const v=getSignal(i,p);return v?'<span class="mstatus '+signclass(v.state)+'">'+paintState(v.state)+'</span><span class="faint"> · '+nLabel(v.nine.at(-1))+'</span>':"—"}
-function renderPeriods(){byId("periodbar").innerHTML=PERIODS.map(([p,n])=>'<button class="periodbtn '+(selectedP===p?"active":"")+'" data-p="'+p+'" aria-pressed="'+(selectedP===p)+'">'+n+'</button>').join("");
- byId("periodbar").querySelectorAll("button").forEach(b=>b.onclick=()=>{selectedP=b.dataset.p;hoverTime=null;render()});
- document.querySelectorAll(".winbtn").forEach(b=>{b.classList.toggle("active",Number(b.dataset.n)===visibleBars);b.onclick=()=>{visibleBars=Number(b.dataset.n);signalAnchors={};hoverTime=null;render()}});
+function changeDensity(next){
+ const number=Math.round(Number(next));
+ if(!Number.isFinite(number))return;
+ densityBars=Math.max(15,Math.min(500,number));
+ visibleBars=densityBars;
+ hoverTime=null;hoverPixelPrice=null;
+ // Retain historical date while changing zoom, but leave manual event navigation.
+ render();
 }
+function renderPeriods(){
+ byId("periodbar").innerHTML=PERIODS.map(([p,n])=>'<button class="periodbtn '+(selectedP===p?"active":"")+'" data-p="'+p+'" aria-pressed="'+(selectedP===p)+'">'+n+'</button>').join("");
+ byId("periodbar").querySelectorAll("button").forEach(b=>b.onclick=()=>{selectedP=b.dataset.p;hoverTime=null;selectedEvent=null;render()});
+ const input=byId("density-count");
+ input.value=String(visibleBars===0?densityBars:visibleBars);
+ byId("density-minus").onclick=()=>{const c=visibleBars===0?densityBars:visibleBars;changeDensity(c-(c<=60?5:c<=180?10:20))};
+ byId("density-plus").onclick=()=>{const c=visibleBars===0?densityBars:visibleBars;changeDensity(c+(c<60?5:c<180?10:20))};
+ input.onchange=()=>changeDensity(input.value);
+ input.onkeydown=e=>{if(e.key==="Enter"){changeDensity(input.value);input.blur()}};
+ document.querySelectorAll(".winbtn").forEach(b=>{b.classList.toggle("active",visibleBars===0);b.onclick=()=>{
+  visibleBars=0;signalAnchors={};selectedEvent=null;panOffsetByPeriod[selectedP]=maxPanOffset();hoverTime=null;render();
+ }});
+}
+
 function renderResonance(){let b=0,s=0;for(let i=0;i<4;i++){const v=getSignal(i,selectedP);if(v&&v.state==="buy")b++;if(v&&v.state==="sell")s++}
  byId("resonance").innerHTML=(b||s?'<span class="faint">共振</span><span class="resnum '+(b?"":"empty")+'">↑ '+b+'/4</span><span class="resnum '+(s?"down":"empty")+'">↓ '+s+'/4</span>':'<span class="faint">当前无同向拐头共振</span>');
 }
@@ -470,7 +496,7 @@ function canvasSize(el){const b=el.getBoundingClientRect(),w=Math.max(160,Math.f
 }
 function plotText(ctx,str,x,y,color="#9ba7b3",size=10,align="left",weight="400"){ctx.font=weight+" "+size+"px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif";ctx.fillStyle=color;ctx.textAlign=align;ctx.fillText(str,x,y)}
 function dims(w,h){return {l:15,r:64,t:16,b:27,ww:w-79,hh:h-43}}
-function viewportLength(v){return Math.min(visibleBars===0?100:visibleBars,v?.bars?.length||0)}
+function viewportLength(v){return Math.min(visibleBars===0?densityBars:visibleBars,v?.bars?.length||0)}
 function maxPanOffset(period=selectedP){
  const master=getSignal(0,period);
  if(!master)return 0;
@@ -682,7 +708,7 @@ function navigateBuy(i,step){
  let idx=buys.findIndex(e=>e.i===at);
  if(idx<0)idx=step<0?buys.length: -1;
  idx=Math.max(0,Math.min(buys.length-1,idx+step));
- visibleBars=visibleBars===0?100:visibleBars;
+ visibleBars=visibleBars===0?densityBars:visibleBars;
  signalAnchors[key]=buys[idx].i;hoverTime=buys[idx].t;hoverIndex=i;hoverPixelPrice=null;
  render();
 }
