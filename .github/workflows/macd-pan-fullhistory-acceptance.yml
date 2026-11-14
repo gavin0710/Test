@@ -1,0 +1,79 @@
+name: Verify full-history draggable K-line production
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: [".github/workflows/macd-pan-fullhistory-acceptance.yml"]
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Rules and parsing checks
+        run: node macd-resonance/verify.js
+      - name: Headless chromium
+        run: |
+          npm install --prefix /tmp/macd-pan --no-save playwright
+          /tmp/macd-pan/node_modules/.bin/playwright install chromium
+      - name: Test data and chart horizontal drag
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-pan/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({args:['--no-sandbox']});
+            try{
+              const base='https://macd-resonance-monitor.vercel.app';
+              const page=await browser.newPage({viewport:{width:1520,height:1000}});
+              const errs=[];page.on('pageerror',e=>errs.push(e.message));
+              const res=await page.goto(base,{waitUntil:'domcontentloaded',timeout:40000});
+              assert.equal(res.status(),200);
+              await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:50000});
+              const before=await page.evaluate(()=>({from:visible(0).from,last:visible(0).bars.at(-1).t,max:maxPanOffset(),all:visible(0).v.bars.length}));
+              console.log('BEFORE',JSON.stringify(before));
+              assert(before.from>0&&before.max>0,'Cannot pan from end');
+              const canvas=page.locator('#k0'),bb=await canvas.boundingBox();
+              await page.mouse.move(bb.x+bb.width*.36,bb.y+100);
+              await page.mouse.down();
+              await page.mouse.move(bb.x+bb.width*.82,bb.y+100,{steps:12});
+              await page.mouse.up();
+              const after=await page.evaluate(()=>({from:visible(0).from,last:visible(0).bars.at(-1).t,offset:currentPanOffset(),all4:[0,1,2,3].map(i=>visible(i).from)}));
+              console.log('AFTER_DRAG',JSON.stringify(after));
+              assert(after.from<before.from&&after.last<before.last,'Dragging right should reveal older candles');
+              assert(after.all4.every(x=>x<before.from),'Four index plots should pan together');
+              assert((await page.locator('#history-range').innerText()).includes('当前窗口'),'Coverage dates absent');
+              await page.locator('#history-reset').click();
+              assert.equal(await page.evaluate(()=>currentPanOffset()),0);
+              await page.locator('.winbtn[data-n="0"]').click();
+              const full=await page.evaluate(()=>({bars:visible(0).bars.length,all:visible(0).v.bars.length,max:maxPanOffset()}));
+              console.log('ALL_HISTORY_MODE',JSON.stringify(full));
+              assert.equal(full.bars,Math.min(100,full.all),'All-history remains a legible 100-bar viewport');
+              const slider=page.locator('#history-slider');
+              await slider.evaluate(el=>{el.value='0';el.dispatchEvent(new Event('input',{bubbles:true}));});
+              const earliest=await page.evaluate(()=>({from:visible(0).from,first:visible(0).bars[0].t,fullFirst:visible(0).v.bars[0].t}));
+              assert.equal(earliest.from,0,'History slider should reach first available candle');
+              assert.equal(earliest.first,earliest.fullFirst);
+              console.log('EARLIEST_CANDLE',JSON.stringify(earliest));
+              const intraday=await page.request.get(base+'/api/history?period=15');
+              assert.equal(intraday.status(),200,'Archived 15m OHLC must load');
+              const archive=await intraday.json();
+              assert(archive.data.every(x=>x['15'].length>=496));
+              console.log('INTRADAY_ARCHIVE',archive.data.map(x=>x['15'].length).join(','));
+              await page.locator('.periodbtn[data-p="D"]').click();
+              assert.equal(await page.locator('.periodbtn.active').innerText(),'日线');
+              console.log('DAILY_COVERAGE',await page.locator('#history-range').innerText());
+              assert.deepEqual(errs,[]);
+              const mob=await browser.newPage({viewport:{width:390,height:850}});
+              const mobile=await mob.goto(base,{waitUntil:'domcontentloaded',timeout:40000});
+              assert.equal(mobile.status(),200);
+              await mob.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:50000});
+              assert(await mob.locator('#history-slider').isVisible());
+              console.log('MOBILE_OK');
+              console.log('ALL_PASS');
+            }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)})
+          NODE
