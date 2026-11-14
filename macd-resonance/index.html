@@ -277,7 +277,7 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
  for(const event of baseEvents){let list=baseByBar.get(event.i)||[];list.push(event);baseByBar.set(event.i,list)}
  const events=[],cycles={bottom:null,top:null},allCycles=[],trades=[],losses=[];
  let position=null,correctionPending=null,everOpened=0,unpairedSells=0;
- const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,
+ const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,correctionStop:0,
   technicalFailures:0,buy:0,sell:0,correctionBuy:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,open:0,
   openCorrections:0,pairedBuy:0,openBuy:0};
  const push=e=>{events.push(e);return e};
@@ -285,7 +285,7 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
   if(!position)return false;
   const out={...position,exitI:e.i,exitT:e.t,exitClose:bars[e.i].c,exitType:kind,holdBars:e.i-position.entryI};
   trades.push(out);position=null;counts.completed++;
-  if(kind==="stop"){counts.stopExits++;correctionPending=null}
+  if(kind==="stop"||kind==="correctionStop"){counts.stopExits++;correctionPending=null}
   else if(kind==="topSell"){
    counts.sellExits++;
    // A top-side sell is reversible only while its top structure remains structurally
@@ -318,6 +318,15 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
   }
  };
  for(let i=0;i<n;i++){
+  // A completed bar is used for confirmation; a correction never stops on its entry bar.
+  // This independent exit has priority over later top-side signals on the same bar.
+  if(position?.entryType==="correctionBuy"&&i>position.entryI&&Number.isFinite(position.correctionRefDIF)&&dif[i]<=position.correctionRefDIF+EPS){
+   const stop=push({type:"correctionStop",i,t:bars[i].t,side:"bottom",refDIF:position.correctionRefDIF,
+    originalI:position.campaignI,originalT:position.originalEntryT,entryI:position.entryI,
+    entryT:position.entryT,entryClose:position.entryClose,close:bars[i].c,
+    holdBars:i-position.entryI});
+   counts.correctionStop++;losses.push(stop);exit(stop,"correctionStop");
+  }
   // Rebuy after an actually paired top exit, not after an unpaired sell.
   // All comparisons use completed-bar DIF; price-only spikes and repeated DIF
   // turns do not qualify. Expire when >=3 consecutive non-red columns occur.
@@ -336,7 +345,8 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
      position={entryI:i,entryT:bars[i].t,entryClose:bars[i].c,entryType:"correctionBuy",
       campaignI:pending.campaignI,originalEntryT:pending.originalEntryT,
       originalEntryClose:pending.originalEntryClose,correctionCount:number,
-      bottomFirstI:null,buySignals:[{type:"correctionBuy",i}]};
+      bottomFirstI:null,correctionRefDIF:pending.refDIF,correctionFromExitI:pending.parentExitI,
+      buySignals:[{type:"correctionBuy",i}]};
      counts.correctionBuy++;correctionPending=null;
     }
    }
@@ -706,7 +716,7 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
    }
   }
   else if(wb||ws){const bullish=!!wb,yy=bullish?Math.min(h-b-5,y(bar.l)+14):Math.max(t+7,y(bar.h)-14);plotText(ctx,bullish?"底":"顶",x,yy,bullish?"#2fa988":"#cc7c78",9,"center","650")}
-  if(stop){plotText(ctx,"止损",x,Math.max(t+11,y(bar.h)-15),"#d45665",10,"center","750")}
+  if(stop){plotText(ctx,stop.type==="correctionStop"?"纠止":"止损",x,Math.max(t+11,y(bar.h)-15),"#d45665",10,"center","750")}
   const vanish=list.find(q=>q.type==="invalid"||q.type==="expired");
   if(vanish){plotText(ctx,"消",x,Math.max(t+12,y(bar.h)-18),"#cc9465",10,"center","700")}
   if(selectedEvent?.index===i&&selectedEvent.barI===from+k){
@@ -792,11 +802,11 @@ const QUICK_TYPES=[
 const QUICK_NORMAL_BUYS=new Set(["buy","secondBuy","thirdBuy","laterBuy"]);
 const QUICK_BUYS=new Set([...QUICK_NORMAL_BUYS,"correctionBuy"]);
 const QUICK_SELLS=new Set(["sell","secondSell","thirdSell","laterSell"]);
-const QUICK_EVENTS=new Set([...QUICK_BUYS,...QUICK_SELLS,"watchBuy","watchSell","expired","invalid","stopLoss"]);
+const QUICK_EVENTS=new Set([...QUICK_BUYS,...QUICK_SELLS,"watchBuy","watchSell","expired","invalid","stopLoss","correctionStop"]);
 function quickPairStatus(v){
  const buys=new Map(),sells=new Set();
  for(const t of v?.trades||[]){
-  const status=t.exitType==="topSell"?"已配对":"止损";
+  const status=t.exitType==="topSell"?"已配对":t.exitType==="correctionStop"?"纠错止损":"止损";
   for(const b of t.buySignals||[])buys.set(b.i,{status,exitT:t.exitT,exitI:t.exitI,rootT:t.originalEntryT||t.entryT,rootI:t.campaignI??t.entryI,correction:t.entryType==="correctionBuy"});
   if(t.exitType==="topSell")sells.add(t.exitI);
  }
@@ -815,12 +825,12 @@ function matchQuickEvent(e,kind,pair){
  if(kind==="thirdBuy")return type==="thirdBuy"||type==="laterBuy";
  if(kind==="pairedBuy")return QUICK_BUYS.has(type)&&pair.buys.get(e.i)?.status==="已配对";
  if(kind==="openBuy")return QUICK_BUYS.has(type)&&pair.buys.get(e.i)?.status==="未配对";
- if(kind==="stoppedBuy")return QUICK_BUYS.has(type)&&pair.buys.get(e.i)?.status==="止损";
+ if(kind==="stoppedBuy")return QUICK_BUYS.has(type)&&["止损","纠错止损"].includes(pair.buys.get(e.i)?.status);
  if(kind==="correction")return type==="correctionBuy";
  if(kind==="sell")return QUICK_SELLS.has(type);
  if(kind==="pairedSell")return QUICK_SELLS.has(type)&&pair.sells.has(e.i);
  if(kind==="unpairedSell")return QUICK_SELLS.has(type)&&!pair.sells.has(e.i);
- if(kind==="stop")return type==="stopLoss";
+ if(kind==="stop")return type==="stopLoss"||type==="correctionStop";
  return false;
 }
 function quickName(e){
@@ -829,6 +839,7 @@ function quickName(e){
  if(t==="watchSell")return "顶钝化";
  if(t==="expired"||t==="invalid")return "钝化消失";
  if(t==="stopLoss")return "结构止损";
+ if(t==="correctionStop")return "纠错止损";
  if(t==="correctionBuy")return "纠错买回"+(e.stage>1?e.stage:"");
  if(t==="buy"||t==="sell")return t==="buy"?"买1":"卖1";
  if(t==="secondBuy"||t==="secondSell")return t==="secondBuy"?"买2":"卖2";
@@ -955,7 +966,7 @@ function renderWinRates(){
  const fmt=(v,signed=false)=>v===null||!Number.isFinite(v)?"—":(signed&&v>0?"+":"")+v.toFixed(2)+"%";
  const sum=(items)=>{
   const trades=items.flatMap(r=>r.v.trades||[]),q=tradeSummary(trades);
-  const keys=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","buy","sell","failStop","unpairedSells","open"];
+  const keys=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","buy","sell","failStop","correctionStop","unpairedSells","open"];
   const counts=Object.fromEntries(keys.map(k=>[k,items.reduce((n,r)=>n+(r.stats[k]||0),0)]));
   counts.points=items.reduce((n,r)=>n+r.v.events.filter(e=>QUICK_EVENTS.has(e.type)).length,0);
   counts.span=items.length?items.map(r=>r.v.bars[0].t.slice(0,10)).sort()[0]+"～"+
@@ -973,7 +984,7 @@ function renderWinRates(){
  byId("win-period-body").innerHTML=PERIODS.map(([p,label])=>{
   const q=sum(rows.filter(r=>r.period===p));
   const cells=[q.points,q.watch,q.disappeared,q.formed,q.second,q.third+q.fourthPlus,
-   q.correctionBuy,q.buy,q.sell,q.failStop,q.completed,q.wins,fmt(q.winRate),
+   q.correctionBuy,q.buy,q.sell,q.failStop+q.correctionStop,q.completed,q.wins,fmt(q.winRate),
    fmt(q.avgProfit,true),fmt(q.avgReturn,true),q.open,q.unpairedSells];
   return '<tr><td><strong>'+label+'</strong></td><td class="event-t">'+q.span+'</td>'+
    cells.map((v,k)=>'<td class="'+(k===12?"important":k===9?"fail":"")+'">'+v+'</td>').join("")+'</tr>';
@@ -996,7 +1007,7 @@ function renderWinRates(){
  }).join("");
 }
 
-const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","failStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
+const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","failStop","correctionStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
 function getHistoryStats(){
  const rows=[],total=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));
  for(let j=0;j<4;j++)for(const [period,label] of PERIODS){
