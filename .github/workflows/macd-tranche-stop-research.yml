@@ -1,0 +1,17 @@
+name: Compare separate buy-structure risk tranches (read only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: [macd-resonance/research-structure-tranches.js,.github/workflows/macd-tranche-stop-research.yml]
+permissions: {contents: read}
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validate independent first-buy units and post-expiry risk handoff
+        run: node macd-resonance/research-structure-tranches.js
