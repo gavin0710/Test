@@ -129,6 +129,10 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .quickdetail{font-size:10px;color:#7c8e9e}
 .quick-selected{border-color:#8baeca!important;box-shadow:0 0 0 1px #bfd5e7,0 3px 14px #446e9812!important}
 @media(max-width:650px){.quickfilter{padding:10px}.quickdetail{flex-basis:100%}.quickjump select{max-width:unset}}
+
+.wave-pending{padding:9px 11px;margin:10px 0 7px;border-left:2px solid #bdcbd8;background:#f6f8fa;color:#5c7186;font-size:11px;font-weight:680}
+.wave-pending span{display:inline;color:#9aa7b4;font-weight:400;margin-left:10px}
+.wave-pending icon{font-size:12px}
 </style></head><body>
 <main class="shell">
  <header class="head">
@@ -153,20 +157,20 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
  <div id="chartfail" class="error" hidden></div>
  <section class="chartgrid" id="chartgrid" aria-label="四大指数K线图"></section>
  <section class="secondary" aria-label="辅助信息">
-  <details class="fold" id="winfold" open><summary>分波段交易成功率 <span class="faint">一买一卖或止损 · 退出收盘价高于首次买入收盘价</span></summary>
-   <div class="foldbody">
-    <p class="stats-explain">以同一指数、同一周期的一次首次底部买入作为开仓，到首次顶部卖出或结构失败止损作为平仓。退出收盘价高于首次买入收盘价算成功，持平记为未成功；二/三次信号不新增独立交易。只统计已平仓，未配对的买卖点和未平仓持仓不进入分母。未计交易费用、滑点或盘中可成交性。</p>
-    <div class="stat-overall" id="win-overall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>周期级别</th><th>四指数当前波段（临时）</th><th>有效历史</th><th>完成交易</th><th>盈利笔数</th><th>亏损笔数</th><th>持平笔数</th><th>成功率</th><th>顶部卖出完成</th><th>结构止损完成</th><th>待卖出</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
-    <h3 class="stat-section-head">买入时波段背景与MACD成功率（临时口径）</h3><p class="wave-note">研究提醒：后续需与上一个波段看板的大波／主波／子波结构严格对齐，再按浪级、推动／调整、顺势／逆势分别验证成功率。当前仅使用本周期收盘价经左右各3根K线确认的端点判断上行／下行观察段，不是原波段算法；无未来数据穿越，未确认则显示“未确认”。样本少于10笔不做优劣结论。</p><div class="stats-scroll"><table class="stats-table"><thead><tr><th>周期</th><th>买入时波段</th><th>完成交易</th><th>盈利</th><th>非盈利</th><th>成功率</th><th>样本</th></tr></thead><tbody id="wave-entry-body"></tbody></table></div><h3 class="stat-section-head">分指数 × 周期</h3>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>当前波段（临时）</th><th>历史根数</th><th>完整交易</th><th>盈利</th><th>亏损</th><th>持平</th><th>成功率</th><th>顶部卖出</th><th>止损退出</th><th>未退出</th></tr></thead><tbody id="win-index-body"></tbody></table></div>
-    <details class="fold" style="margin-top:12px"><summary>完整交易逐笔记录 <span class="faint">买入、退出收盘价及收益</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:960px"><thead><tr><th>指数</th><th>周期</th><th>买入K线</th><th>退出K线</th><th>买入收盘</th><th>退出收盘</th><th>买入时波段</th><th>收益率</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
-    <p class="stat-disclaimer">警示：这里是有限历史样本的信号配对统计，不构成已验证的历史回测。分钟线可用数据较短，各周期样本起止时间不同；样本过少时成功率只能作为事实记录，不支持推断未来胜率。</p>
-   </div>
+  <details class="fold" id="winfold" open><summary>六周期 · 关键点位与交易结果 <span class="faint">数量 / 成功率 / 平均盈利幅度 / 未配对</span></summary>
+    <div class="foldbody">
+     <div class="stat-overall" id="win-overall"></div>
+     <p class="stats-explain">统计范围为当前真实归档全历史；同一指数、同一周期独立统计。成功率=退出收盘价高于买入收盘价的已完成交易÷已完成交易；止损退出纳入失败或成功实测，未配对不参与成功率。平均盈利幅度只统计盈利交易的单次涨幅；平均每笔收益包含亏损，均未扣手续费或滑点。一次钝化可转化为买点，买1/买2等也是买点子集，所以各列不应全部相加。</p>
+     <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
+     <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>本阶段先优化MACD买卖点、纠错与配对规则，不显示波浪背景细分胜率</span></div>
+     <details class="fold" id="win-index-fold" style="margin-top:9px"><summary>四指数 × 六周期的交易明细 <span class="faint">24组，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1050px"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完成交易</th><th>盈利</th><th>亏损</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>纠错买回</th><th>未配对买入</th><th>未配对卖点</th></tr></thead><tbody id="win-index-body"></tbody></table></div></details>
+     <details class="fold" style="margin-top:9px"><summary>逐笔买卖及纠错关联 <span class="faint">原始买入 / 纠错买回 / 退出收益，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1080px"><thead><tr><th>指数</th><th>周期</th><th>原始买入K线</th><th>本次开仓K线</th><th>本次退出K线</th><th>开仓收盘</th><th>退出收盘</th><th>交易类型</th><th>本次收益</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
+     <p class="stat-disclaimer">数据是历史信号的收盘价配对演示，并非真实可成交的回测；分钟线仍然存在历史覆盖不足的问题。纠错买回与最初买入共用交易轮次标识，但每次再次开仓的收益单独记录，避免将两次资金进出虚构成一笔成交。</p>
+    </div>
   </details>
-  <details class="fold" id="statfold" open><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
+  <details class="fold" id="statfold"><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
     <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
@@ -907,45 +911,71 @@ function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{l
 
 
 function tradeSummary(trades){
- const result={completed:0,wins:0,losses:0,flats:0,sellExits:0,stopExits:0,winRate:null};
+ const result={completed:0,wins:0,losses:0,flats:0,sellExits:0,stopExits:0,winRate:null,avgProfit:null,avgReturn:null,correctionTrades:0};
+ let sum=0,winSum=0;
  for(const t of trades||[]){
   if(!Number.isFinite(t.entryClose)||!Number.isFinite(t.exitClose)||t.entryClose<=0)continue;
-  result.completed++;
-  if(t.exitClose>t.entryClose)result.wins++;
-  else if(t.exitClose<t.entryClose)result.losses++;
+  const ret=(t.exitClose/t.entryClose-1)*100;
+  result.completed++;sum+=ret;
+  if(ret>EPS){result.wins++;winSum+=ret}
+  else if(ret<-EPS)result.losses++;
   else result.flats++;
   if(t.exitType==="topSell")result.sellExits++;
   if(t.exitType==="stop")result.stopExits++;
+  if(t.entryType==="correctionBuy")result.correctionTrades++;
  }
  result.winRate=result.completed?result.wins/result.completed*100:null;
+ result.avgProfit=result.wins?winSum/result.wins:null;
+ result.avgReturn=result.completed?sum/result.completed:null;
  return result;
 }
 function renderWinRates(){
- const {rows}=getHistoryStats();
- const periods=PERIODS.map(([p,label])=>({p,label,items:rows.filter(r=>r.period===p)}));
- const summaryLines=r=>{const trades=r.flatMap(x=>x.v.trades||[]),t=tradeSummary(trades);
-  return {...t,open:r.reduce((n,x)=>n+(x.v.position?1:0),0),roots:r.reduce((n,x)=>n+x.v.bars.length,0)}};
- const all=summaryLines(rows);
- const pct=x=>x.winRate===null?"—":x.winRate.toFixed(1)+"%";
- const grade=p=>p==="15"?"15分钟 · 短波段":p==="60"?"60分钟 · 短波段":p==="90"?"90分钟 · 短波段":p==="120"?"120分钟 · 短波段":p==="D"?"日线 · 中波段":"周线 · 长波段";
- byId("win-overall").innerHTML=[["完整交易",all.completed],["盈利交易",all.wins],["亏损交易",all.losses],["持平交易",all.flats],["样本成功率",pct(all)],["待卖出",all.open]]
-  .map(([label,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+label+'</span></div>').join("");
- byId("win-period-body").innerHTML=periods.map(({p,items})=>{
-  const q=summaryLines(items),span=items.length?items.map(r=>r.v.bars[0].t.slice(0,10)).sort().at(0)+"～"+items.map(r=>r.v.bars.at(-1).t.slice(0,10)).sort().at(-1):"—";
-  return '<tr><td>'+grade(p)+'</td><td>'+items.map(r=>IDX[r.i].short+' '+waveCell(r.v)).join('　')+'</td><td class="event-t">'+span+'</td><td>'+q.completed+'</td><td class="important">'+q.wins+'</td><td>'+q.losses+'</td><td>'+q.flats+'</td><td class="'+(q.completed?"important":"")+'">'+pct(q)+'</td><td>'+q.sellExits+'</td><td>'+q.stopExits+'</td><td>'+q.open+'</td></tr>';
+ const {rows,total}=getHistoryStats();
+ const fmt=(v,signed=false)=>v===null||!Number.isFinite(v)?"—":(signed&&v>0?"+":"")+v.toFixed(2)+"%";
+ const sum=(items)=>{
+  const trades=items.flatMap(r=>r.v.trades||[]),q=tradeSummary(trades);
+  const keys=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","buy","sell","failStop","unpairedSells","open"];
+  const counts=Object.fromEntries(keys.map(k=>[k,items.reduce((n,r)=>n+(r.stats[k]||0),0)]));
+  counts.points=items.reduce((n,r)=>n+r.v.events.filter(e=>QUICK_EVENTS.has(e.type)).length,0);
+  counts.span=items.length?items.map(r=>r.v.bars[0].t.slice(0,10)).sort()[0]+"～"+
+   items.map(r=>r.v.bars.at(-1).t.slice(0,10)).sort().at(-1):"—";
+  return {...q,...counts};
+ };
+ const totalStats=sum(rows);
+ byId("win-overall").innerHTML=[
+  ["关键点位",totalStats.points],["全部钝化",totalStats.watch],["买入点",totalStats.buy],
+  ["纠错买回",totalStats.correctionBuy],["顶部卖点",totalStats.sell],
+  ["完成交易",totalStats.completed],["成功率",fmt(totalStats.winRate)],
+  ["盈利平均幅度",fmt(totalStats.avgProfit,true)],["未配对买入",totalStats.open],
+  ["未配对卖点",totalStats.unpairedSells]
+ ].map(([label,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+label+'</span></div>').join("");
+ byId("win-period-body").innerHTML=PERIODS.map(([p,label])=>{
+  const q=sum(rows.filter(r=>r.period===p));
+  const cells=[q.points,q.watch,q.disappeared,q.formed,q.second,q.third+q.fourthPlus,
+   q.correctionBuy,q.buy,q.sell,q.failStop,q.completed,q.wins,fmt(q.winRate),
+   fmt(q.avgProfit,true),fmt(q.avgReturn,true),q.open,q.unpairedSells];
+  return '<tr><td><strong>'+label+'</strong></td><td class="event-t">'+q.span+'</td>'+
+   cells.map((v,k)=>'<td class="'+(k===12?"important":k===9?"fail":"")+'">'+v+'</td>').join("")+'</tr>';
  }).join("");
  byId("win-index-body").innerHTML=rows.map(r=>{
-  const q=tradeSummary(r.v.trades);
-  return '<tr><td>'+IDX[r.i].name+'</td><td>'+r.label+'</td><td>'+waveCell(r.v)+'</td><td>'+r.v.bars.length+'</td><td>'+q.completed+'</td><td class="important">'+q.wins+'</td><td>'+q.losses+'</td><td>'+q.flats+'</td><td class="'+(q.completed?"important":"")+'">'+pct(q)+'</td><td>'+q.sellExits+'</td><td>'+q.stopExits+'</td><td>'+(r.v.position?1:0)+'</td></tr>';
+  const v=r.v,q=tradeSummary(v.trades||[]);
+  const cells=[v.bars.length,q.completed,q.wins,q.losses,fmt(q.winRate),
+   fmt(q.avgProfit,true),fmt(q.avgReturn,true),v.stats.correctionBuy||0,v.position?1:0,v.stats.unpairedSells||0];
+  return '<tr><td>'+IDX[r.i].name+'</td><td>'+r.label+'</td>'+
+   cells.map((x,k)=>'<td class="'+(k===4?"important":"")+'">'+x+'</td>').join("")+'</tr>';
  }).join("");
  const ordered=rows.flatMap(r=>(r.v.trades||[]).map(t=>({...t,index:r.i,period:r.label,ret:(t.exitClose/t.entryClose-1)*100}))).sort((a,b)=>b.exitT.localeCompare(a.exitT));
- renderWaveGroups(rows);
  byId("win-trades-body").innerHTML=ordered.map(t=>{
   const result=t.ret>0?"盈利":t.ret<0?"亏损":"持平";
-  return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+t.entryT.replace("T"," ")+'</td><td>'+t.exitT.replace("T"," ")+'</td><td>'+valstr(t.entryClose)+'</td><td>'+valstr(t.exitClose)+'</td><td>'+waveName(t.entryWave)+'</td><td class="'+(t.ret>0?"important":t.ret<0?"fail":"")+'">'+(t.ret>0?"+":"")+t.ret.toFixed(2)+'%</td><td>'+(t.exitType==="topSell"?"顶部结构卖出":"结构失败止损")+'</td><td>'+result+'</td></tr>';
+  const name=t.entryType==="correctionBuy"?"纠错买回第"+t.correctionCount+"次":"首次买入";
+  return '<tr><td>'+IDX[t.index].name+'</td><td>'+t.period+'</td><td>'+(t.originalEntryT||t.entryT).replace("T"," ")+'</td><td>'+t.entryT.replace("T"," ")+'</td>'+
+   '<td>'+t.exitT.replace("T"," ")+'</td><td>'+valstr(t.entryClose)+'</td><td>'+valstr(t.exitClose)+'</td><td>'+name+'</td>'+
+   '<td class="'+(t.ret>0?"important":t.ret<0?"fail":"")+'">'+fmt(t.ret,true)+'</td>'+
+   '<td>'+(t.exitType==="topSell"?"顶部结构卖出":"结构失败止损")+'</td><td>'+result+'</td></tr>';
  }).join("");
 }
-const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","failStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
+
+const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","failStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
 function getHistoryStats(){
  const rows=[],total=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));
  for(let j=0;j<4;j++)for(const [period,label] of PERIODS){
@@ -957,13 +987,13 @@ function getHistoryStats(){
 }
 function renderStats(){
  const {rows,total}=getHistoryStats();
- const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["待卖出",total.open]];
+ const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["待卖出",total.open]];
  byId("statsoverall").innerHTML=items.map(([name,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+name+'</span></div>').join("");
  byId("statsbody").innerHTML=rows.map(({i,period,label,v,stats:q})=>{
   const hist=v.bars,range=hist[0].t.slice(0,10)+'～'+hist.at(-1).t.slice(0,10);
-  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
+  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.correctionBuy,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
   return '<tr><td>'+IDX[i].name+'</td><td>'+label+'</td><td class="event-t">'+range+'（'+hist.length+'根）</td>'+
-    cells.map((n,k)=>'<td class="'+(k===6?"fail":k===7||k===8?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
+    cells.map((n,k)=>'<td class="'+(k===7?"fail":k===8||k===9?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
  }).join("");
  const stops=[],open=[];
  for(const {i,label,v} of rows){
