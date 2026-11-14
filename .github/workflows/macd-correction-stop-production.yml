@@ -1,0 +1,89 @@
+name: Official correction stop and February 2024 MACD audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: [".github/workflows/macd-correction-stop-production.yml"]
+permissions: {contents: read}
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Confirm math and trade lifecycle regression rules
+        run: node macd-resonance/verify.js
+      - name: Chromium
+        run: |
+          npm install --prefix /tmp/macd-accept --no-save playwright
+          /tmp/macd-accept/node_modules/.bin/playwright install chromium
+      - name: Production browser audit of actual correction exit plus historical case
+        run: |
+          node <<'NODE'
+          const assert=require('node:assert/strict'),{chromium}=require('/tmp/macd-accept/node_modules/playwright');
+          (async()=>{
+           const browser=await chromium.launch({args:['--no-sandbox']});
+           try{
+            const page=await browser.newPage({viewport:{width:1460,height:1000}}),errors=[];
+            page.on('pageerror',e=>errors.push(e.message));
+            const response=await page.goto('https://macd-resonance-monitor.vercel.app/',{waitUntil:'domcontentloaded',timeout:45000});
+            assert.equal(response.status(),200);
+            await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:65000});
+            await page.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:65000});
+            const result=await page.evaluate(()=>{
+             const rows=getHistoryStats().rows,sh=getSignal(0,'D');
+             const k=sh.bars.findIndex(b=>b.t==='2024-02-02'),k0=sh.bars.findIndex(b=>b.t==='2024-01-22');
+             const on=sh.events.filter(e=>e.i===k).map(e=>e.type),
+                   prior=sh.events.filter(e=>e.i===k0).map(e=>e.type);
+             const all=rows.flatMap(r=>r.v.trades||[]);
+             const corrections=rows.reduce((n,r)=>n+r.v.stats.correctionBuy,0),
+                   stops=rows.reduce((n,r)=>n+r.v.stats.correctionStop,0);
+             const cases=replayBuildCases();
+             return {formalRule:calculate.toString().includes('enableCorrectionStop:true'),
+               fourCharts:document.querySelectorAll('.chart-card').length,
+               correctionBuys:corrections,correctionStops:stops,trades:all.length,
+               stopTrades:all.filter(t=>t.exitType==='correctionStop').length,
+               stopCases:cases.filter(c=>c.hasCorrectionStop).length,
+               feb02:{close:sh.bars[k].c,dif:sh.dif[k],events:on},
+               jan22:{close:sh.bars[k0].c,events:prior},
+               feb05:{events:sh.events.filter(e=>e.t==='2024-02-05').map(e=>e.type)},
+               topLabels:document.querySelector('#win-period-body')?.children?.length||0,
+               pageContainsCandidate:document.body.innerText.includes('拟止损'),
+               resolvedPeriods:rows.length
+             };
+            });
+            console.log('OFFICIAL_AUDIT',JSON.stringify(result));
+            assert(result.formalRule);
+            assert.equal(result.fourCharts,4);
+            assert.equal(result.resolvedPeriods,24);
+            assert.equal(result.topLabels,6);
+            assert(result.correctionStops>0);
+            assert.equal(result.stopTrades,result.correctionStops);
+            assert.equal(result.stopCases,result.correctionStops);
+            assert(result.feb02.events.includes('watchBuy'));
+            assert(!result.feb02.events.includes('stopLoss'));
+            assert(result.jan22.events.includes('structureFailure'));
+            assert(result.feb05.events.includes('invalid'));
+            assert.equal(result.pageContainsCandidate,false);
+            await page.locator('#view-replay').click();
+            assert.equal(await page.locator('.chart-card:visible').count(),4);
+            await page.locator('#replay-kind').selectOption('correctionStop');
+            assert(await page.locator('.replay-node').filter({hasText:'纠错止损'}).count()>0);
+            assert.equal(await page.locator('.replay-node').filter({hasText:'拟纠错止损'}).count(),0);
+            console.log('REPLAY_CHAIN',JSON.stringify(await page.locator('.replay-node .node-label').allInnerTexts()));
+            assert.equal(await page.locator('.confluence-item').count(),4);
+            assert.deepEqual(errors,[]);
+            console.log('DESKTOP_ALL_PASS');
+            const mobile=await browser.newPage({viewport:{width:390,height:844}});
+            assert.equal((await mobile.goto('https://macd-resonance-monitor.vercel.app/',{waitUntil:'domcontentloaded',timeout:45000})).status(),200);
+            await mobile.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:65000});
+            await mobile.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:65000});
+            await mobile.locator('#view-replay').click();
+            assert.equal(await mobile.locator('.chart-card:visible').count(),4);
+            console.log('MOBILE_ALL_PASS');
+            console.log('ALL_PASS');
+           }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)})
+          NODE
