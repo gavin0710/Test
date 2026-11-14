@@ -994,7 +994,7 @@ function quickName(e){
  if(t==="watchSell")return "顶钝化";
  if(t==="expired"||t==="invalid")return "钝化消失";
  if(t==="stopLoss")return "结构止损";
- if(t==="correctionStop")return "纠错止损";
+ if(t==="correctionStop")return "纠错止损"+(e.stopUnitCount>1?"（"+e.stopUnitCount+"单元）":"");
  if(t==="correctionBuy")return "纠错买回"+(e.stage>1?e.stage:"");
  if(t==="buy"||t==="sell")return t==="buy"?"买1":"卖1";
  if(t==="secondBuy"||t==="secondSell")return t==="secondBuy"?"买2":"卖2";
@@ -1008,7 +1008,16 @@ function quickCollect(kind=quickKind,scope=quickIndex){
   if(scope!=="all"&&Number(scope)!==i)continue;
   const v=getSignal(i,selectedP);if(!v)continue;
   const pair=quickPairStatus(v);
-  for(const e of v.events){
+  // The ledger retains one raw correctionStop per unit; the signal navigator shows each bar once.
+  const seenCorrectionStops=new Set(),stopUnitCounts=new Map();
+  for(const loss of v.losses||[])if(loss.type==="correctionStop")
+   stopUnitCounts.set(loss.i,(stopUnitCounts.get(loss.i)||0)+1);
+  for(const sourceEvent of v.events){
+   if(sourceEvent.type==="correctionStop"){
+    if(seenCorrectionStops.has(sourceEvent.i))continue;
+    seenCorrectionStops.add(sourceEvent.i);
+   }
+   const e=sourceEvent.type==="correctionStop"?{...sourceEvent,stopUnitCount:stopUnitCounts.get(sourceEvent.i)||1}:sourceEvent;
    if(!matchQuickEvent(e,kind,pair))continue;
    const trade=QUICK_BUYS.has(e.type)?pair.buys.get(e.i):null;
    const badge=trade?.status||(e.unexecuted?"仅技术信号":QUICK_SELLS.has(e.type)?pair.sells.has(e.i)?"已配对":"未配对":"");
@@ -1443,13 +1452,20 @@ function renderHistory(){
  stopLoss:"结构失败止损",correctionBuy:"纠错买回",correctionStop:"纠错止损",structureFailure:"参考DIF破位",watchBuy:"底钝化",watchSell:"顶钝化",expired:"钝化消失",invalid:"钝化失效"};
  for(let i=0;i<4;i++){
   const v=getSignal(i,selectedP);if(!v)continue;
-  for(const e of v.events.filter(e=>["buy","secondBuy","thirdBuy","laterBuy","sell","secondSell","thirdSell","laterSell","stopLoss","correctionBuy","correctionStop","watchBuy","watchSell","expired","invalid"].includes(e.type)).slice(-24))
+  const grouped=[],seenStops=new Map();
+  for(const e of v.events.filter(e=>["buy","secondBuy","thirdBuy","laterBuy","sell","secondSell","thirdSell","laterSell","stopLoss","correctionBuy","correctionStop","watchBuy","watchSell","expired","invalid"].includes(e.type))){
+   if(e.type==="correctionStop"){
+    if(seenStops.has(e.i)){seenStops.get(e.i).stopUnitCount++;continue}
+    const evt={...e,stopUnitCount:1};seenStops.set(e.i,evt);grouped.push(evt);
+   }else grouped.push(e);
+  }
+  for(const e of grouped.slice(-24))
    events.push({...e,index:i,nine:v.nine[e.i]||0});
  }
  events.sort((a,b)=>b.t.localeCompare(a.t));
  byId("history").innerHTML=events.length?'<div class="eventlist">'+events.slice(0,24).map(e=>{
   const bullish=e.type.includes("Buy")||e.type==="buy",bear=e.type.includes("Sell")||e.type==="sell"||e.type==="stopLoss"||e.type==="correctionStop";
-  return '<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.index].name+'</b><span class="mstatus '+(bullish?"buy":bear?"sell":"")+'">'+(names[e.type]||e.type)+'</span><span>'+valstr(e.price||e.close||0)+' · '+nLabel(e.nine)+'</span></div>';
+  return '<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.index].name+'</b><span class="mstatus '+(bullish?"buy":bear?"sell":"")+'">'+(names[e.type]||e.type)+(e.type==="correctionStop"&&e.stopUnitCount>1?" · "+e.stopUnitCount+"单元":"")+'</span><span>'+valstr(e.price||e.close||0)+' · '+nLabel(e.nine)+'</span></div>';
  }).join("")+'</div>':'<div class="faint" style="padding:12px">当前周期尚无历史事件记录</div>';
 }
 function render(){renderPeriods();renderResonance();renderQuick();renderReplay();const grid=byId("chartgrid");grid.className="chartgrid"+(!replayMode&&focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
