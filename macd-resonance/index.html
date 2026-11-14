@@ -432,6 +432,11 @@ function projectNext(v){
  const colorPrice=priceForDIF(dea); // next histogram sign = sign(next DIF - current DEA)
  const zone=v.active;
  const result={k,a,colorPrice,mode:"none",direction:null,lossPrice:null,turnPrice:null,formation:null};
+ if(v.correctionPending&&!v.position){
+  result.mode="correction";result.direction="bottom";result.rebuyPrice=priceForDIF(v.correctionPending.refDIF);
+  result.originalEntryT=v.correctionPending.originalEntryT;result.oppositeStreak=v.correctionPending.oppositeStreak;
+  return result;
+ }
  const campaign=(v.cycles||[]).filter(x=>!x.closed&&Number.isFinite(x.refDIF)).at(-1);
  if(campaign&&campaign.firstI<v.bars.length-1){
   result.mode="campaign";result.direction=campaign.sign<0?"bottom":"top";
@@ -659,12 +664,13 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
   ctx.fillRect(startX,t,Math.max(1,w-r-startX),hh);
  }
  const proj=(bars.at(-1)?.t===v.bars.at(-1)?.t)?v.projection:null;
- if(proj&&(proj.mode==="watch"||proj.mode==="candidate"||proj.mode==="campaign")){
+ if(proj&&(proj.mode==="watch"||proj.mode==="candidate"||proj.mode==="campaign"||proj.mode==="correction")){
   const guidelines=[];
   if(proj.mode==="watch"||proj.mode==="campaign"){
    if(Number.isFinite(proj.lossPrice))guidelines.push({price:proj.lossPrice,label:"失效临界",color:"#df8993"});
    if(Number.isFinite(proj.turnPrice))guidelines.push({price:proj.turnPrice,label:proj.direction==="bottom"?"DIF买点":"DIF下拐",color:"#2eaf82"});
-  }else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
+  }else if(proj.mode==="correction"&&Number.isFinite(proj.rebuyPrice))guidelines.push({price:proj.rebuyPrice,label:"纠错买回",color:"#8662b7"});
+  else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
   for(const g of guidelines)if(g.price>=mn&&g.price<=mx){
    const gy=y(g.price);ctx.lineWidth=1;ctx.strokeStyle=g.color;ctx.setLineDash([2,5]);
    ctx.beginPath();ctx.moveTo(l,gy);ctx.lineTo(w-r,gy);ctx.stroke();ctx.setLineDash([]);
@@ -756,6 +762,11 @@ function projectionHTML(v,label){
   if(Number.isFinite(p.turnPrice))items+='<span class="estimate-chip buy">'+(p.mode==="campaign"?"第"+p.nextStage+"次":"")+(p.direction==="bottom"?"买点 DIF↑":"DIF↓")+' '+turn+' 约'+valstr(p.turnPrice)+'</span>';
   else items+='<span class="estimate-chip note">DIF尚未回落/反转，暂无新的首次拐头临界价</span>';
   if(p.mode==="campaign"&&p.oppositeStreak>=2)items+='<span class="estimate-chip note">若下一根仍为反色柱，则本轮结构结束</span>';
+ }else if(p.mode==="correction"){
+  items+='<span class="estimate-chip watch">顶部已卖 · 纠错观察中</span>';
+  if(Number.isFinite(p.rebuyPrice))items+='<span class="estimate-chip buy">DIF突破原高点：收盘 &gt; 约'+valstr(p.rebuyPrice)+'</span>';
+  if(p.originalEntryT)items+='<span class="estimate-text">关联原买入 '+p.originalEntryT.slice(0,10)+'</span>';
+  if(p.oppositeStreak>=2)items+='<span class="estimate-chip note">再出现1根非红柱将取消纠错资格</span>';
  }else if(p.mode==="candidate"&&p.formation){
   const f=p.formation;
   items+='<span class="estimate-chip watch">'+(f.side==="bottom"?"新底钝化":"新顶钝化")+'条件区间</span>';
