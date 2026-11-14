@@ -251,8 +251,8 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   <details class="fold" id="winfold" open><summary>六周期 · 关键点位与交易结果 <span class="faint">数量 / 成功率 / 平均盈利幅度 / 未配对</span></summary>
     <div class="foldbody">
      <div class="stat-overall" id="win-overall"></div>
-     <p class="stats-explain">按独立底部结构风险单元统计：新结构买1新建单元，同结构买2/3只追加信号；结构失效仅退出本单元，旧结构保护期结束后止损不再重启。顶部卖点可以结束多个单元。成功率=盈利的已完成单元交易÷已完成单元交易；收益按信号收盘价估算，未含交易费用、滑点及成交可行性。不能将各单元收益率相加视为组合实盘收益。</p>
-     <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th>纠错买回</th><th>纠错止损</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
+     <p class="stats-explain">纠错买回和纠错止损均为“信号次数 / 结构单元数”，不把一根K线的多个结构退出重复计算为多次市场信号。按独立底部结构风险单元统计：新结构买1新建单元，同结构买2/3只追加信号；结构失效仅退出本单元，旧结构保护期结束后止损不再重启。顶部卖点可以结束多个单元。成功率=盈利的已完成单元交易÷已完成单元交易；收益按信号收盘价估算，未含交易费用、滑点及成交可行性。不能将各单元收益率相加视为组合实盘收益。</p>
+     <div class="stats-scroll"><table class="stats-table" style="min-width:1600px"><thead><tr><th>周期</th><th>历史范围</th><th>关键点总数</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次+</th><th title="纠错信号次数 / 涉及结构单元数">纠错买回（信号/单元）</th><th title="纠错止损触发次数 / 退出结构单元数">纠错止损（信号/单元）</th><th>买点</th><th>卖点</th><th>失败止损</th><th>完成交易</th><th>盈利笔数</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>买后未配对</th><th>卖点未配对</th></tr></thead><tbody id="win-period-body"></tbody></table></div>
      <div class="wave-pending"><icon>◈</icon> 波浪周期成功了待验证 <span>优先验证历史共振与买卖点有效性，暂不应用波浪分类结果</span></div>
      <details class="fold" id="win-index-fold" style="margin-top:9px"><summary>四指数 × 六周期的交易明细 <span class="faint">24组，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1050px"><thead><tr><th>指数</th><th>周期</th><th>历史根数</th><th>完成交易</th><th>盈利</th><th>亏损</th><th>成功率</th><th>平均盈利幅度</th><th>平均每笔收益</th><th>纠错买回</th><th>未配对买入</th><th>未配对卖点</th></tr></thead><tbody id="win-index-body"></tbody></table></div></details>
      <details class="fold" style="margin-top:9px"><summary>逐笔买卖及纠错关联 <span class="faint">原始买入 / 纠错买回 / 退出收益，按需要展开</span></summary><div class="foldbody stats-scroll"><table class="stats-table" style="min-width:1080px"><thead><tr><th>指数</th><th>周期</th><th>结构ID</th><th>原始买入K线</th><th>本次开仓K线</th><th>本次退出K线</th><th>开仓收盘</th><th>退出收盘</th><th>交易类型</th><th>本次收益</th><th>退出方式</th><th>结果</th></tr></thead><tbody id="win-trades-body"></tbody></table></div></details>
@@ -261,8 +261,8 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   </details>
   <details class="fold" id="statfold"><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，多个结构风险单元按同一指数同一周期分别归属。</p><div class="stat-overall" id="statsoverall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>纠错买回</th><th>纠错止损</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
-    <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同结构买2/3不新建独立单元；新结构买1会建立新的独立单元。若同时存在多个单元，顶部卖点会结束所有仍持有单元，卖点数与退出交易数不必相等。配对是信号层模拟，不代表实际下单、组合回测或可成交性。存在买入后未出现顶部卖点或其他正式退出条件的情况，会标为“未配对”，不自动补卖点。</div></div>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th title="纠错信号次数 / 涉及结构单元数">纠错买回（信号/单元）</th><th title="纠错止损触发次数 / 退出结构单元数">纠错止损（信号/单元）</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>买后未配对</th></tr></thead><tbody id="statsbody"></tbody></table></div>
+    <div class="stat-disclaimer">纠错买回、止损均展示信号次数与所关联的结构单元数。统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同结构买2/3不新建独立单元；新结构买1会建立新的独立单元。若同时存在多个单元，顶部卖点会结束所有仍持有单元，卖点数与退出交易数不必相等。配对是信号层模拟，不代表实际下单、组合回测或可成交性。存在买入后未出现顶部卖点或其他正式退出条件的情况，会标为“未配对”，不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>独立结构止损与未配对风险单元 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
    <div class="foldbody"><div id="stoprecords"></div><div id="openrecords"></div></div>
@@ -370,7 +370,7 @@ function analyzeLifecycle(bars,dif,hist,baseEvents,options={}){
  // Each confirmed bottom structure gets its own risk unit, even when older units remain held.
  let positions=[],correctionPendings=[],everOpened=0,unpairedSells=0;
  const counts={watch:0,disappeared:0,formed:0,second:0,third:0,fourthPlus:0,failStop:0,correctionStop:0,
- technicalFailures:0,buy:0,sell:0,correctionBuy:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,
+ technicalFailures:0,buy:0,sell:0,correctionBuy:0,correctionBuyUnits:0,correctionStopUnits:0,unpairedSells:0,completed:0,sellExits:0,stopExits:0,
  open:0,openCorrections:0,pairedBuy:0,openBuy:0};
  const push=e=>(events.push(e),e);
  const exitUnit=(p,e,kind)=>{
@@ -497,6 +497,10 @@ function analyzeLifecycle(bars,dif,hist,baseEvents,options={}){
    const e=push({...raw,stage:1,side:key,firstI:i,structureId:cyc.structureId});signal(e);
   }
  }
+ // Event-level counts use unique completed bars; unit-level counts reflect separately held bottom structures.
+ counts.correctionBuyUnits=[...trades,...positions].filter(p=>p.entryType==="correctionBuy").length;
+ counts.correctionStopUnits=losses.filter(e=>e.type==="correctionStop").length;
+ counts.correctionStop=new Set(losses.filter(e=>e.type==="correctionStop").map(e=>e.i)).size;
  counts.open=positions.length;
  counts.openCorrections=positions.filter(p=>p.entryType==="correctionBuy").length;
  counts.pairedBuy=trades.filter(t=>t.exitType==="topSell").length;
@@ -1357,7 +1361,7 @@ function renderWinRates(){
  const fmt=(v,signed=false)=>v===null||!Number.isFinite(v)?"—":(signed&&v>0?"+":"")+v.toFixed(2)+"%";
  const sum=(items)=>{
   const trades=items.flatMap(r=>r.v.trades||[]),q=tradeSummary(trades);
-  const keys=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","buy","sell","failStop","correctionStop","unpairedSells","open"];
+  const keys=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","correctionBuyUnits","buy","sell","failStop","correctionStop","correctionStopUnits","unpairedSells","open"];
   const counts=Object.fromEntries(keys.map(k=>[k,items.reduce((n,r)=>n+(r.stats[k]||0),0)]));
   counts.points=items.reduce((n,r)=>n+r.v.events.filter(e=>QUICK_EVENTS.has(e.type)).length,0);
   counts.span=items.length?items.map(r=>r.v.bars[0].t.slice(0,10)).sort()[0]+"～"+
@@ -1367,7 +1371,7 @@ function renderWinRates(){
  const totalStats=sum(rows);
  byId("win-overall").innerHTML=[
   ["关键点位",totalStats.points],["全部钝化",totalStats.watch],["买入点",totalStats.buy],
-  ["纠错买回",totalStats.correctionBuy],["纠错止损",totalStats.correctionStop],["顶部卖点",totalStats.sell],
+  ["纠错买回",totalStats.correctionBuy+"次 · "+totalStats.correctionBuyUnits+"单元"],["纠错止损",totalStats.correctionStop+"次 · "+totalStats.correctionStopUnits+"单元"],["顶部卖点",totalStats.sell],
   ["完成交易",totalStats.completed],["成功率",fmt(totalStats.winRate)],
   ["盈利平均幅度",fmt(totalStats.avgProfit,true)],["未配对买入",totalStats.open],
   ["未配对卖点",totalStats.unpairedSells]
@@ -1375,7 +1379,7 @@ function renderWinRates(){
  byId("win-period-body").innerHTML=PERIODS.map(([p,label])=>{
   const q=sum(rows.filter(r=>r.period===p));
   const cells=[q.points,q.watch,q.disappeared,q.formed,q.second,q.third+q.fourthPlus,
-   q.correctionBuy,q.correctionStop,q.buy,q.sell,q.failStop,q.completed,q.wins,fmt(q.winRate),
+   q.correctionBuy+" / "+q.correctionBuyUnits,q.correctionStop+" / "+q.correctionStopUnits,q.buy,q.sell,q.failStop,q.completed,q.wins,fmt(q.winRate),
    fmt(q.avgProfit,true),fmt(q.avgReturn,true),q.open,q.unpairedSells];
   return '<tr><td><strong>'+label+'</strong></td><td class="event-t">'+q.span+'</td>'+
    cells.map((v,k)=>'<td class="'+(k===13?"important":[7,10].includes(k)?"fail":"")+'">'+v+'</td>').join("")+'</tr>';
@@ -1398,7 +1402,7 @@ function renderWinRates(){
  }).join("");
 }
 
-const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","failStop","correctionStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
+const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","correctionBuy","correctionBuyUnits","failStop","correctionStop","correctionStopUnits","buy","sell","sellExits","unpairedSells","stopExits","open"];
 function getHistoryStats(){
  const rows=[],total=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));
  for(let j=0;j<4;j++)for(const [period,label] of PERIODS){
@@ -1410,11 +1414,11 @@ function getHistoryStats(){
 }
 function renderStats(){
  const {rows,total}=getHistoryStats();
- const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy],["纠错止损",total.correctionStop],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["买后未配对",total.open]];
+ const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["纠错买回",total.correctionBuy+"次 · "+total.correctionBuyUnits+"单元"],["纠错止损",total.correctionStop+"次 · "+total.correctionStopUnits+"单元"],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["买后未配对",total.open]];
  byId("statsoverall").innerHTML=items.map(([name,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+name+'</span></div>').join("");
  byId("statsbody").innerHTML=rows.map(({i,period,label,v,stats:q})=>{
   const hist=v.bars,range=hist[0].t.slice(0,10)+'～'+hist.at(-1).t.slice(0,10);
-  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.correctionBuy,q.correctionStop,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
+  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.correctionBuy+" / "+q.correctionBuyUnits,q.correctionStop+" / "+q.correctionStopUnits,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
   return '<tr><td>'+IDX[i].name+'</td><td>'+label+'</td><td class="event-t">'+range+'（'+hist.length+'根）</td>'+
     cells.map((n,k)=>'<td class="'+([7,8].includes(k)?"fail":[9,10].includes(k)?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
  }).join("");
