@@ -1,5 +1,4 @@
-name: Browser smoke test for MACD hosted dashboard
-
+name: Browser smoke test for MACD four-chart dashboard
 on:
   workflow_dispatch:
   push:
@@ -7,60 +6,25 @@ on:
     paths:
       - ".github/workflows/macd-resonance-ui-check.yml"
       - "macd-resonance/index.html"
-
+      - "macd-resonance/verify-ledger-ui.js"
 permissions:
   contents: read
-
 jobs:
   browser-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install headless browser
+      - name: Regression-test MACD and independent structure ledger
         run: |
-          mkdir -p /tmp/macd-ui-smoke
-          npm install --prefix /tmp/macd-ui-smoke --no-save playwright
-          /tmp/macd-ui-smoke/node_modules/.bin/playwright install --with-deps chromium
-      - name: Validate actual rendered matrix and interactions
+          node macd-resonance/verify.js
+          node macd-resonance/verify-ledger-history.js
+      - name: Install headless Chromium
         run: |
-          node <<'NODE'
-          const assert = require('node:assert/strict');
-          const { chromium } = require('/tmp/macd-ui-smoke/node_modules/playwright');
-          (async () => {
-            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
-            try {
-              const context=await browser.newContext({viewport:{width:1400,height:950}});
-              await context.addCookies([{name:'__Http-phish',value:'1',domain:'raw.githack.com',path:'/',secure:true,httpOnly:true}]);
-              const page=await context.newPage();
-              const jsErrors=[];
-              page.on('pageerror',error=>jsErrors.push(error.message));
-              const resp=await page.goto('https://raw.githack.com/gavin0710/Test/master/macd-resonance/index.html',{waitUntil:'domcontentloaded',timeout:45000});
-              console.log('Preview HTTP:',resp.status(),'URL:',page.url());
-              await page.waitForSelector('#matrixbody button.cell',{timeout:25000});
-              let count=await page.locator('#matrixbody button.cell').count();
-              console.log('Matrix cells:',count);
-              assert.equal(count,24);
-              await page.waitForFunction(()=>document.getElementById('status') && /周期有数据/.test(document.getElementById('status').textContent),{timeout:35000});
-              const status=await page.locator('#status').innerText();
-              console.log('Data status:',status);
-              assert(/24\/24/.test(status),'Not all 24 indicator units calculated');
-              await page.locator('button.cell[data-i="2"][data-p="D"]').click();
-              const title=await page.locator('#detailtitle').innerText();
-              console.log('Selected:',title);
-              assert(title.includes('创业板指') && title.includes('日线'),'Matrix drilldown not reactive');
-              await page.locator('#tabs button[data-p="W"]').click();
-              const t2=await page.locator('#detailtitle').innerText();
-              console.log('Weekly switch:',t2);
-              assert(t2.includes('周线'),'Period tab did not update');
-              assert.equal(jsErrors.length,0,'JavaScript runtime error: '+jsErrors.join('; '));
-              await page.screenshot({path:'/tmp/macd-dashboard.png',fullPage:true});
-              console.log('Screenshot captured, JS errors: 0');
-            } finally {
-              await browser.close();
-            }
-          })().catch(error => {console.error(error);process.exit(1)});
-          NODE
+          npm install --prefix /tmp/macd-ledger-v2 --no-save playwright
+          /tmp/macd-ledger-v2/node_modules/.bin/playwright install chromium
+      - name: Validate actual desktop and mobile four-chart interfaces using archived OHLC
+        run: node macd-resonance/verify-ledger-ui.js
