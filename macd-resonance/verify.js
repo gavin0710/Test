@@ -7,7 +7,7 @@ assert(script,"Dashboard script missing");new vm.Script(script,{filename:"dashbo
 const cut=script.indexOf('byId("refresh").onclick=load;');assert(cut>0,"Engine isolation failed");
 const sandbox={window:{},document:{},console};
 vm.createContext(sandbox);
-vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema};",sandbox,{timeout:3000});
+vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema,localWave};",sandbox,{timeout:3000});
 const {calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema}=sandbox.testApi;
 let assertions=0;
 function ok(value,label){assert(value,label);assertions++}
