@@ -1,50 +1,100 @@
 #!/usr/bin/env node
 "use strict";
-const fs=require("fs");
-const vm=require("vm");
-const assert=require("node:assert/strict");
-const path=require("path");
-const root=__dirname;
-const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
-const m=html.match(/<script>([\s\S]*?)<\/script>/);
-assert(m&&m[1],"Dashboard inline script missing");
-const script=m[1];
-new vm.Script(script,{filename:"dashboard.js"});
-const cut=script.indexOf('byId("refresh").onclick=load;');
-assert(cut>0,"Could not isolate calculation engine");
+const fs=require("fs"),vm=require("vm"),assert=require("node:assert/strict"),path=require("path");
+const root=__dirname,html=fs.readFileSync(path.join(root,"index.html"),"utf8");
+const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+assert(script,"Dashboard script missing");new vm.Script(script,{filename:"dashboard.js"});
+const cut=script.indexOf('byId("refresh").onclick=load;');assert(cut>0,"Engine isolation failed");
 const sandbox={window:{},document:{},console};
 vm.createContext(sandbox);
-vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,resample,resampleHourly,parseBars,ema};",sandbox,{timeout:1000});
-const {calculate,resample,resampleHourly,ema}=sandbox.testApi;
-function segment(from,to,count,out){for(let i=0;i<count;i++)out.push(from+(to-from)*(i+1)/count)}
-function wave(type){
- const up=type==="sell",s=up?1:-1;
- const cls=[];segment(100,100,80,cls);segment(100,100+s*12,35,cls);segment(100+s*12,100+s*4,38,cls);segment(100+s*4,100+s*15,110,cls);segment(100+s*15,100+s*10,25,cls);
- return cls.map((c,i)=>({t:"t"+i,o:c,c,h:c+.05,l:c-.05}));
+vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,projectNext,resample,resampleHourly,ema};",sandbox,{timeout:3000});
+const {calculate,scanStructure,projectNext,resample,resampleHourly,ema}=sandbox.testApi;
+let assertions=0;
+function ok(value,label){assert(value,label);assertions++}
+function equal(actual,expected,label){assert.equal(actual,expected,label);assertions++}
+function fake({gap=3,side="bottom",prices2,difs2,wickOnly=false}={}){
+ const bottom=side==="bottom",c1=bottom?[100,99,98,97]:[100,101,102,103],
+ c2=prices2||(bottom?[96,95.5,95]:[104,104.5,105]),
+ d1=bottom?[-1,-2,-2.5,-2.2]:[1,2,2.5,2.2],
+ d2=difs2||(bottom?[-1.8,-1.7,-1.6]:[1.8,1.7,1.6]);
+ const prices=[...c1,...Array(gap).fill(100),...c2];
+ const dif=[...d1,...Array.from({length:gap},(_,i)=>bottom?.2+i*.1:-.2-i*.1),...d2];
+ const hist=[...Array(4).fill(bottom?-1:1),...Array(gap).fill(bottom?1:-1),...Array(c2.length).fill(bottom?-1:1)];
+ const bars=prices.map((c,i)=>({t:"t"+String(i).padStart(3,"0"),o:c,c,h:c+(wickOnly&&i>=4+gap?10:.2),l:c-(wickOnly&&i>=4+gap?10:.2)}));
+ return {bars,dif,hist,result:scanStructure(bars,dif,hist)}
 }
-for(const sign of ["buy","sell"]){
- const v=calculate(wave(sign));
- assert(v&&v.events.some(x=>x.type===sign),sign+" structural divergence missed");
- assert.equal(v.nine.at(-1)*(sign==="buy"?1:-1)>0,true,"Nine-turn direction inconsistent");
- assert(v.dif.every(Number.isFinite)&&v.dea.every(Number.isFinite),"MACD numerical failure");
+const event=(f,type)=>f.result.events.find(e=>e.type===type);
+for(const gap of [0,1,2]){
+ const f=fake({gap});ok(!event(f,"watchBuy"),"Must reject "+gap+" non-green separators");
 }
+for(const gap of [3,4,6]){
+ const f=fake({gap});ok(!!event(f,"watchBuy"),"Accept "+gap+" consecutive opposite columns");
+ ok(!!event(f,"buy"),"DIF first upturn should buy with "+gap+" separators");
+}
+const top=fake({side:"top"});ok(!!event(top,"watchSell"),"Top divergence");ok(!!event(top,"sell"),"Top DIF downturn");
+ok(!event(fake({prices2:[98,99,100]}),"watchBuy"),"No closing-price breakdown");
+ok(!event(fake({prices2:[97,98,99]}),"watchBuy"),"Equal low close is not a breakdown");
+ok(!event(fake({prices2:[99,99,99],wickOnly:true}),"watchBuy"),"Intrabar wick lows never count");
+ok(!event(fake({difs2:[-2.8,-2.9,-3]}),"watchBuy"),"DIF new minimum invalid");
+ok(!event(fake({difs2:[-2.5,-2.4,-2.3]}),"watchBuy"),"Equal DIF low invalid");
+ok(!event(fake({side:"top",difs2:[2.5,2.4,2.3]}),"watchSell"),"Equal top DIF invalid");
+const later=fake({prices2:[98,97,96],difs2:[-1.8,-1.9,-1.7]});
+equal(event(later,"watchBuy").i,9,"Divergence only at actual closing breakdown");
+equal(event(later,"buy").i,9,"DIF turn on arming bar is buy");
+const watch=fake({difs2:[-1.5,-1.6,-1.7]});
+equal(watch.result.state,"watchBuy","Pending bottom not a buy signal");
+ok(!event(watch,"buy"),"No premature buy");
+const invalid=fake({difs2:[-1.8,-2.3,-2.6]});
+ok(!!event(invalid,"watchBuy"),"Early divergence appeared");
+ok(!!event(invalid,"invalid"),"Later DIF breaks reference and invalidates watch");
+equal(invalid.result.state,"neutral","Invalid watch not active");
+const futureCross=fake({difs2:[-1.5,-1.6,-1.7]});
+futureCross.bars.push({t:"t999",o:96,c:96,h:97,l:95});
+futureCross.dif.push(-1.6);futureCross.hist.push(.2);
+const crosses=scanStructure(futureCross.bars,futureCross.dif,futureCross.hist);
+ok(crosses.events.some(e=>e.type==="buy"&&e.atCross),"First opposite-color bar may complete DIF first turn");
+const noCross=fake({difs2:[-1.5,-1.6,-1.7]});
+noCross.bars.push({t:"t999",o:96,c:96,h:97,l:95});
+noCross.dif.push(-1.8);noCross.hist.push(.2);
+const expired=scanStructure(noCross.bars,noCross.dif,noCross.hist);
+ok(!expired.events.some(e=>e.type==="buy"),"Opposite bar without DIF turn must not buy");
+ok(expired.events.some(e=>e.type==="expired"),"Expired region is auditable");
+// Do not skip a nearer same-color region whose separator is too short:
+const earlier=fake({gap:3,difs2:[-1.8,-1.9,-2]}),b3=earlier.bars.slice();
+const dif3=earlier.dif.slice(),hist3=earlier.hist.slice();
+for(let i=0;i<2;i++){b3.push({t:"m"+i,o:100,c:100,h:100,l:100});dif3.push(.2+i*.1);hist3.push(1)}
+for(let i=0;i<3;i++){b3.push({t:"n"+i,o:90,c:90-i,h:100,l:80});dif3.push(-1.2-i*.1);hist3.push(-1)}
+const nearest=scanStructure(b3,dif3,hist3);
+ok(!nearest.events.some(e=>e.type==="watchBuy"&&e.regionStart===earlier.bars.length+2),"Never skip closest same-color region");
+// Projection math precise: next DIF = (11/13) EMA12 - (25/27) EMA26 + (28/351) P
+const e12=100,e26=102,current=-2,previous=-1.9,reference=-2.5;
+const projection=projectNext({bars:[{c:99}],dif:[previous,current],dea:[-1.3,-1.3],ema12:[e12],ema26:[e26],
+active:{mode:"watch",sign:-1,ref:{dif:reference}}});
+ok(projection.turnPrice>projection.lossPrice,"Buying threshold above invalidation for bottom");
+const testDIF=p=>projection.a+projection.k*p;
+ok(Math.abs(testDIF(projection.turnPrice)-current)<1e-8,"Turn price inversion exact");
+ok(Math.abs(testDIF(projection.lossPrice)-reference)<1e-8,"Invalidation inversion exact");
+ok(Number.isFinite(projection.colorPrice),"Histogram color boundary computed");
+const oldDIF=projectNext({bars:[{c:99}],dif:[-2.2,-2],dea:[-1.3],ema12:[100],ema26:[102],active:{mode:"watch",sign:-1,ref:{dif:-2.5}}});
+equal(oldDIF.turnPrice,null,"Continued DIF ascent is not a new first turn");
 const times=["09:45","10:00","10:15","10:30","10:45","11:00","11:15","11:30","13:15","13:30","13:45","14:00","14:15","14:30","14:45","15:00"];
 const minute=times.map((t,i)=>({t:"2026-11-12T"+t,o:100+i,c:100+i+.4,h:101+i,l:99+i}));
-assert.equal(resample(minute,6).length,3,"90m non-overlapping buckets");
-assert.equal(resample(minute,6)[1].t,"2026-11-12T14:00","90m middle bar ends at 14:00");
+equal(resample(minute,6).length,3,"90m non-overlapping buckets");
+equal(resample(minute,6)[1].t,"2026-11-12T14:00","90m middle bar ends at 14:00");
 const hourly=[minute[3],minute[7],minute[11],minute[15]];
-assert.equal(resampleHourly(hourly).length,2,"120m morning/afternoon buckets");
-assert.equal(resampleHourly(hourly)[0].t,"2026-11-12T11:30","120m morning close");
-assert.equal(ema(Array(70).fill(100),12).at(-1),100,"EMA constant input");
-assert.equal(calculate(wave("sell").slice(0,40)),null,"Insufficient bars must not make signals");
+equal(resampleHourly(hourly).length,2,"120m morning/afternoon buckets");
+equal(resampleHourly(hourly)[0].t,"2026-11-12T11:30","120m morning close");
+equal(ema(Array(70).fill(100),12).at(-1),100,"EMA constant input");
+equal(calculate(Array.from({length:40},(_,i)=>({t:"t"+i,o:100,c:100,h:100,l:100}))),null,"Insufficient bars");
+const simple=calculate(Array.from({length:110},(_,i)=>({t:"t"+i,o:100+i*.05,c:100+i*.05,h:101+i*.05,l:99+i*.05})));
+ok(simple&&Number.isFinite(simple.dif.at(-1)),"MACD price calculation");
+ok(simple.projection!==null,"Projection attached to each complete signal unit");
 if(fs.existsSync(path.join(root,"data","latest.json"))){
  const snap=JSON.parse(fs.readFileSync(path.join(root,"data","latest.json"),"utf8"));
- assert(Array.isArray(snap.data)&&snap.data.length===4,"Snapshot needs four indexes");
+ ok(Array.isArray(snap.data)&&snap.data.length===4,"Four market indexes");
  for(const item of snap.data)for(const bars of Object.values(item)){
-  assert(Array.isArray(bars)&&bars.length>=60,"Snapshot must retain verified OHLC source series");
-  for(const b of bars){
-   assert(Number.isFinite(b.c)&&Number.isFinite(b.o)&&b.h>=b.l,"Invalid price bar");
-  }
+  ok(Array.isArray(bars)&&bars.length>=60,"Verified OHLC series");
+  for(const b of bars)ok(Number.isFinite(b.c)&&Number.isFinite(b.o)&&b.h>=b.l,"OHLC integrity");
  }
 }
-console.log("PASS: JS parse, synthetic MACD bidirectional turns, nine-turn, 90/120-minute buckets, snapshot schema");
+console.log("PASS:",assertions,"assertions: close prices, >=3 separators, region-DIF, exact equalities, DIF first turns, expiry, next-close thresholds, 90/120m, data schema");
