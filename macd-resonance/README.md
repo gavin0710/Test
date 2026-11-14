@@ -1,6 +1,6 @@
 # 四指共振 · K线主看板
 
-> 新任务接手请先读 [HANDOFF.md](./HANDOFF.md)：背景、已定规则、数据验证、问题清单和发布步骤集中维护在其中。
+> **新建任务 / Work 接手先读 [START_HERE.md](./START_HERE.md)**：2分钟了解现状、优先待办、双任务协作及验收发布流程；再读 [HANDOFF.md](./HANDOFF.md) 了解完整交易规则、数据验证、ETF试验与未决问题。**普通任务与 Work 均可研发、验收和发布，须先确认最新 master 与生产部署，避免覆盖。**
 
 
 正式站点：https://macd-resonance-monitor.vercel.app/
