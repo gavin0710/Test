@@ -352,7 +352,7 @@ function scanStructure(bars,dif,hist){
  return {events,regions,active,ref:active?.ref||null,lastSignalIndex:last?.i??-1000,age:last?bars.length-1-last.i:Infinity,recent,state};
 }
 
-function analyzeLifecycle(bars,dif,hist,baseEvents){
+function analyzeLifecycle(bars,dif,hist,baseEvents,options={}){
  const n=bars.length,sideOf=e=>e.type==="buy"?-1:e.type==="sell"?1:0;
  const signAt=i=>hist[i]<-EPS?-1:hist[i]>EPS?1:0;
  const turns=(i,sign)=>i>=2&&(sign<0?dif[i]>dif[i-1]+EPS&&dif[i-1]<=dif[i-2]+EPS:dif[i]<dif[i-1]-EPS&&dif[i-1]>=dif[i-2]-EPS);
@@ -403,7 +403,7 @@ function analyzeLifecycle(bars,dif,hist,baseEvents){
  for(let i=0;i<n;i++){
   // A completed bar is used for confirmation; a correction never stops on its entry bar.
   // This independent exit has priority over later top-side signals on the same bar.
-  if(position?.entryType==="correctionBuy"&&i>position.entryI&&Number.isFinite(position.correctionRefDIF)&&dif[i]<=position.correctionRefDIF+EPS){
+  if(options.enableCorrectionStop===true&&position?.entryType==="correctionBuy"&&i>position.entryI&&Number.isFinite(position.correctionRefDIF)&&dif[i]<=position.correctionRefDIF+EPS){
    const stop=push({type:"correctionStop",i,t:bars[i].t,side:"bottom",refDIF:position.correctionRefDIF,
     originalI:position.campaignI,originalT:position.originalEntryT,entryI:position.entryI,
     entryT:position.entryT,entryClose:position.entryClose,close:bars[i].c,
@@ -767,7 +767,7 @@ function drawPrice(i,data){const el=byId("k"+i);if(!el||el.getBoundingClientRect
    if(Number.isFinite(proj.lossPrice))guidelines.push({price:proj.lossPrice,label:"失效临界",color:"#df8993"});
    if(Number.isFinite(proj.turnPrice))guidelines.push({price:proj.turnPrice,label:proj.direction==="bottom"?"DIF买点":"DIF下拐",color:"#2eaf82"});
   }else if(proj.mode==="correction"&&Number.isFinite(proj.rebuyPrice))guidelines.push({price:proj.rebuyPrice,label:"纠错买回",color:"#8662b7"});
-  else if(proj.mode==="correctionHolding"&&Number.isFinite(proj.stopPrice))guidelines.push({price:proj.stopPrice,label:"纠错止损",color:"#d26573"});
+  else if(proj.mode==="correctionHolding"&&Number.isFinite(proj.stopPrice))guidelines.push({price:proj.stopPrice,label:"拟止损·未启用",color:"#9b8295"});
   else if(proj.formation)guidelines.push({price:proj.formation.priceReference,label:"收盘突破参考",color:"#9d99c8"});
   for(const g of guidelines)if(g.price>=mn&&g.price<=mx){
    const gy=y(g.price);ctx.lineWidth=1;ctx.strokeStyle=g.color;ctx.setLineDash([2,5]);
@@ -880,7 +880,7 @@ function projectionHTML(v,label){
   if(p.mode==="campaign"&&p.oppositeStreak>=2)items+='<span class="estimate-chip note">若下一根仍为反色柱，则本轮结构结束</span>';
  }else if(p.mode==="correctionHolding"){
   items+='<span class="estimate-chip watch">纠错买回持有中</span>';
-  if(Number.isFinite(p.stopPrice))items+='<span class="estimate-chip loss">DIF跌回参考高点：下根收盘 ≤ 约'+valstr(p.stopPrice)+' 即纠错止损</span>';
+  if(Number.isFinite(p.stopPrice))items+='<span class="estimate-chip note">研究候选：下根收盘 ≤ 约'+valstr(p.stopPrice)+'，DIF跌回参考高点（不作为正式止损）</span>';
  }else if(p.mode==="correction"){
   items+='<span class="estimate-chip watch">顶部已卖 · 纠错观察中</span>';
   if(Number.isFinite(p.rebuyPrice))items+='<span class="estimate-chip buy">DIF突破原高点：收盘 &gt; 约'+valstr(p.rebuyPrice)+'</span>';
