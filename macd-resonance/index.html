@@ -926,8 +926,8 @@ function tradeSummary(trades){
   if(!Number.isFinite(t.entryClose)||!Number.isFinite(t.exitClose)||t.entryClose<=0)continue;
   const ret=(t.exitClose/t.entryClose-1)*100;
   result.completed++;sum+=ret;
-  if(ret>EPS){result.wins++;winSum+=ret}
-  else if(ret<-EPS)result.losses++;
+  if(ret>1e-9){result.wins++;winSum+=ret}
+  else if(ret< -1e-9)result.losses++;
   else result.flats++;
   if(t.exitType==="topSell")result.sellExits++;
   if(t.exitType==="stop")result.stopExits++;
