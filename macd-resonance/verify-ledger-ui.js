@@ -34,17 +34,31 @@ const server=http.createServer((req,res)=>{
     const v=getSignal(0,"D"),buy=v.events.find(e=>e.type==="buy"&&e.t.startsWith("2024-01-16"));
     const stop=buy&&v.events.find(e=>e.type==="stopLoss"&&e.structureId===buy.structureId);
     const rows=getHistoryStats().rows, trades=rows.reduce((a,r)=>a+r.v.trades.length,0);
+    const day=rows.filter(r=>r.period==="D");
+    const total=(field)=>day.reduce((a,r)=>a+(r.stats[field]||0),0);
+    const oldPeriod=selectedP;selectedP="D";
+    const quickStopCount=quickCollect("correctionStop").length;
+    selectedP=oldPeriod;
+    const dailyDisplay=[...document.querySelectorAll("#win-period-body tr")].find(e=>e.textContent?.includes("日线"))?.textContent||"";
     return {buy:buy?.t,stop:stop?.t,structures:v.structureLedger.length,
      trades,renderedRows:document.querySelectorAll("#win-trades-body tr").length,
      open:rows.reduce((a,r)=>a+r.v.positions.length,0),
      shownOpen:document.querySelectorAll("#openrecords tbody tr").length,
      hasStructureColumn:!!document.querySelector("#win-trades-body td:nth-child(3)"),
-     validPaths:rows.every(r=>r.v.positions.every(p=>p.structureId)&&r.v.trades.every(t=>t.structureId))};
+     validPaths:rows.every(r=>r.v.positions.every(p=>p.structureId)&&r.v.trades.every(t=>t.structureId)),
+     daySignalBuys:total("correctionBuy"),dayUnitBuys:total("correctionBuyUnits"),
+     daySignalStops:total("correctionStop"),dayUnitStops:total("correctionStopUnits"),
+     dailyDisplay,quickStopCount};
    });
    assert.equal(report.stop,"2024-01-22");
    assert.equal(report.trades,report.renderedRows);
    assert.equal(report.open,report.shownOpen);
    assert(report.hasStructureColumn&&report.validPaths);
+   assert(report.daySignalBuys>0&&report.dayUnitBuys>=report.daySignalBuys,"Every buy signal maps to one or more independently owned units");
+   assert(report.daySignalStops>0&&report.dayUnitStops>=report.daySignalStops,"Every correction stop signal maps to one or more unit exits");
+   assert.equal(report.quickStopCount,report.daySignalStops,"Correction-stop point selector shows one event per trigger");
+   assert(report.dailyDisplay.includes(report.daySignalBuys+" / "+report.dayUnitBuys),"Daily buy signal/unit accounting is visible");
+   assert(report.dailyDisplay.includes(report.daySignalStops+" / "+report.dayUnitStops),"Daily stop signal/unit accounting is visible");
    await page.locator("#view-replay").click();
    assert.equal(await page.locator(".chart-card:visible").count(),4);
    assert.equal(await page.locator(".confluence-item").count(),4);

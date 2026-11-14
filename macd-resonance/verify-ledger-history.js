@@ -50,9 +50,26 @@ for(let j=0;j<4;j++){
    const origin=ledger.find(l=>l.structureId===t.structureId);
    assert(t.exitI===origin.endI,"Stop on exact structure invalidation bar");
   }
+  const correctionBuys=v.events.filter(e=>e.type==="correctionBuy");
+  const correctionStops=v.events.filter(e=>e.type==="correctionStop");
+  const correctionUnits=[...v.trades,...v.positions].filter(t=>t.entryType==="correctionBuy");
+  assert.equal(v.stats.correctionBuy,correctionBuys.length,"Correction buy signal count");
+  assert.equal(v.stats.correctionBuyUnits,correctionUnits.length,"Correction buy risk units");
+  assert.equal(v.stats.correctionStop,new Set(correctionStops.map(e=>e.i)).size,"Distinct correction stop triggers, not risk units");
+  assert.equal(v.stats.correctionStopUnits,correctionStops.length,"Unit-level correction stop exits");
+  assert.equal(v.stats.correctionStopUnits,v.trades.filter(t=>t.exitType==="correctionStop").length,"No duplicate stop executions");
+  if(j===0&&p==="D"){
+   const example=correctionBuys.find(e=>e.t==="2014-09-12");
+   const sameStop=correctionStops.filter(e=>e.t==="2014-09-16");
+   assert.equal(example?.linkedStructureIds?.length,7,"One correction signal reopens seven structure units");
+   assert.equal(sameStop.length,7,"One 2014-09-16 DIF trigger closes seven units");
+   console.log("LEDGER_SSE_CORRECTION_SIGNAL",JSON.stringify({
+    correctionBuy:example.t,signalCount:1,buyUnits:example.linkedStructureIds.length,
+    correctionStop:"2014-09-16",stopSignals:1,stopUnits:sameStop.length}));
+  }
   outputs.push({index:names[j],period:p,bars:v.bars.length,buys:buys.length,
    closed:v.trades.length,open:v.positions.length,stops:v.stats.failStop,
-   topExits:v.stats.sellExits,correctionStops:v.stats.correctionStop});
+   topExits:v.stats.sellExits,correctionStops:v.stats.correctionStop,correctionStopUnits:v.stats.correctionStopUnits});
  }
 }
 const sse=calculate(merge(daily.data[0]["101"],latest.data[0]["101"]));
