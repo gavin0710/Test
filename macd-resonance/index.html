@@ -168,6 +168,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .replay-note button{justify-self:start;background:#2e6688;color:white;border:0;border-radius:7px;padding:8px 13px;font-size:11px;grid-column:2}
 .replay-note #replay-save-status{grid-column:2;font-size:10px}
 body.reviewing .quickfilter{display:none}
+body.reviewing .periodbar{display:none}
 body.reviewing .chartgrid{grid-template-columns:1fr}
 body.reviewing .chartgrid .chart-card{display:none}
 body.reviewing .chartgrid .chart-card.review-focused{display:block}
@@ -1137,7 +1138,7 @@ function renderReplay(){
   byId("replay-overview").textContent="暂无历史案例";
   byId("replay-nodes").innerHTML="";
   byId("replay-compare").innerHTML="";
-  byId("replay-note").hidden=true;
+  document.querySelector(".replay-note").hidden=true;
   return;
  }
  replayCaseId=c.id;
@@ -1156,7 +1157,7 @@ function renderReplay(){
   ["实际进出段数",c.legs.filter(t=>Number.isInteger(t.exitI)).length],
   ["纠错买回",c.legs.filter(t=>t.entryType==="correctionBuy").length+"次"],
   ["纠错止损",c.legs.filter(t=>t.exitType==="correctionStop").length+"次"],
-  ["已完成各段收益之和",c.returns.length?replayPct(sum):"未配对"]
+  ["各段收益率简单相加",c.returns.length?replayPct(sum):"未配对"]
  ];
  byId("replay-overview").innerHTML=metrics.map(([k,v])=>'<div class="replay-metric"><span>'+esc(k)+'</span><b class="'+(typeof v==="string"&&v[0]==="+"?"positive":typeof v==="string"&&v[0]==="−"?"negative":"")+'">'+esc(v)+'</b></div>').join("");
  byId("replay-nodes").innerHTML=c.nodes.map((n,i)=>{
@@ -1175,6 +1176,7 @@ function renderReplay(){
  }
  byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>退出对照：</b>'+esc(x)+'</div>').join(""):"<span>选择时间线任一节点即可在K线图中定位；未配对不虚构卖点。</span>")+
   '<div class="faint">比较仅使用信号K线收盘价、未计手续费或滑点；后续顶部点是反事实观察，不是实际退出。</div>';
+ document.querySelector(".replay-note").hidden=false;
  const note=replayNoteRead(c);
  byId("replay-tag").value=note.tag||"";
  byId("replay-memo").value=note.memo||"";
