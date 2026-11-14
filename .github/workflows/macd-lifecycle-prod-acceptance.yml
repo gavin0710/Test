@@ -56,6 +56,28 @@ jobs:
             assert.equal(totals.open,14);
             assert.equal(totals.sellExits+totals.stopExits,totals.completed||totals.sellExits+totals.stopExits);
             console.log('SUMMARY_COUNTS',JSON.stringify(totals));
+            assert.equal(await page.locator('#win-period-body tr').count(),6,'Six timeframe success-rate rows missing');
+            assert.equal(await page.locator('#win-index-body tr').count(),24,'24 index/timeframe success-rate rows missing');
+            const success=await page.evaluate(()=>{
+              const {rows}=getHistoryStats();
+              const getFor=p=>tradeSummary(rows.filter(r=>r.period===p).flatMap(r=>r.v.trades));
+              const overall=tradeSummary(rows.flatMap(r=>r.v.trades));
+              return {overall,periods:Object.fromEntries(['15','60','90','120','D','W'].map(p=>[p,getFor(p)]))};
+            });
+            assert.equal(success.overall.completed,14);
+            assert.equal(success.overall.wins,6);
+            assert.equal(success.overall.losses,8);
+            assert(Math.abs(success.overall.winRate-42.857142857)<1e-5);
+            assert.equal(success.periods['15'].completed,3);
+            assert.equal(success.periods['15'].wins,0);
+            assert.equal(success.periods.D.completed,2);
+            assert.equal(success.periods.D.wins,1);
+            assert.equal(success.periods.W.completed,8);
+            assert.equal(success.periods.W.wins,5);
+            assert.equal(success.periods['90'].winRate,null);
+            assert.equal(success.periods['120'].winRate,null);
+            assert.equal(await page.locator('#win-trades-body tr').count(),success.overall.completed);
+            console.log('WIN_RATES',JSON.stringify(success));
             await page.locator('#stopfold summary').click();
             const stopRows=await page.locator('#stoprecords tbody tr').count();
             const openRows=await page.locator('#openrecords tbody tr').count();
