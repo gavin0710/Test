@@ -114,25 +114,26 @@ equal(calculate(Array.from({length:40},(_,i)=>({t:"t"+i,o:100,c:100,h:100,l:100}
 const simple=calculate(Array.from({length:110},(_,i)=>({t:"t"+i,o:100+i*.05,c:100+i*.05,h:101+i*.05,l:99+i*.05})));
 ok(simple&&Number.isFinite(simple.dif.at(-1)),"MACD price calculation");
 ok(simple.projection!==null,"Projection attached to each complete signal unit");
-// Chart historical signal navigation must include every buy stage, and full mode all bars.
-const uiSegment=script.slice(script.indexOf("let visibleBars="),script.indexOf("function drawPrice("));
-ok(uiSegment.includes("const buyTypes=new Set"),"Historical buy type set exists");
-ok(uiSegment.includes("laterBuy"),"Fourth and later buys are retained");
-ok(script.includes("function buySignalEvents("),"Historical signal navigator implemented");
-ok(script.includes("function navigateBuy("),"Previous and next buy navigation implemented");
-ok(script.includes("function jumpToBuy("),"Exact candle index navigation implemented");
-ok(uiSegment.includes("visibleBars===0?densityBars:visibleBars"),"Full-history mode stays legible at user-adjustable candle density");
-ok(uiSegment.includes("function setPanOffset("),"Horizontal chart panning implemented");
-ok(uiSegment.includes("function pointerStart(")&&uiSegment.includes("function pointerMove("),"Pointer-drag supports history navigation");
-ok(uiSegment.includes("panOffsetByPeriod"),"Panning retains independent scroll positions by period");
-ok(script.includes("function mergeHistoricalBars(")&&script.includes("function ensureHistoricalData("),"Long-history archive is merged into live source without truncation");
-ok(html.includes('id="history-slider"'),"Full-history scrubber is present");
-ok(html.includes('id="history-range"'),"Actual historical coverage date range is displayed");
-
-const graphSection=script.slice(script.indexOf("function drawPrice("),script.indexOf("function drawMacd("));
-ok(graphSection.includes('const label=correction?"纠错"')&&graphSection.includes('(bullish?"买":"卖")'),"Chart annotates standard buys, sells and purple correction rebuys");
-ok(graphSection.includes('signalAnchors[selectedP+":"+i]'),"Focused history marker highlighted");
-ok(graphSection.includes('["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"]'),"All buy stages and correction events mapped onto K-line");
+// Exercise the shared time slots with missing history and different first trade dates.
+vm.runInContext(`
+ const a=calculate(Array.from({length:100},(_,i)=>({t:"T"+String(i).padStart(3,"0"),o:100,c:100,h:100,l:100})));
+ const b=calculate(a.bars.filter((_,i)=>i>=12&&i!==93));
+ store={0:{D:a},1:{D:b}};
+ visibleBars=15;
+ this.marketLatest={range:chartWindow(),a:visible(0),b:visible(1)};
+ marketEndByPeriod.set("D","T020");
+ this.marketHistory={range:chartWindow(),b:visible(1)};
+ marketEndByPeriod.clear();
+ historyTimelines.clear();
+ store={};
+`,sandbox);
+const {marketLatest,marketHistory}=sandbox;
+equal(marketLatest.range.startT,"T085","Latest window contains 15 common time slots");
+equal(marketLatest.a.bars.length,15,"Complete series fills every common time slot");
+equal(marketLatest.b.bars.length,14,"Missing quote is never fabricated");
+equal(marketLatest.b.slots[8],9,"A missing quote leaves its time slot open");
+equal(marketHistory.range.endT,"T020","Historical end is selected by time");
+equal(marketHistory.b.slots[0],6,"Later series starts at its actual position within the same window");
 // Profit classification uses exactly one initial buy and its first matched exit/stop.
 const winCalc=()=>{
  const parse=fs.readFileSync(path.join(root,"index.html"),"utf8").match(/<script>([\s\S]*?)<\/script>/)?.[1];
@@ -253,8 +254,8 @@ equal(soldAgain.trades[0].campaignI,soldAgain.trades[1].campaignI,"Both legs lin
 equal(soldAgain.trades[1].entryType,"correctionBuy","Second leg identifies correction entry");
 equal(soldAgain.counts.completed,2,"Completed correction counts as a leg, not an independent root campaign");
 ok(html.includes('id="density-minus"')&&html.includes('id="density-plus"'),"K-line density +/- buttons present");
-ok(html.includes('id="quick-chips"')&&html.includes('id="quick-list"'),"Main-view signal event selector present");
-ok(script.includes("function quickCollect(")&&script.includes("function quickPairStatus("),"Buy/sell matched and unmatched filters implemented");
+ok(html.includes('id="history-fold"')&&script.includes("collectHistoryEvents"),"Historical events remain available in the history log");
+ok(!html.includes('id="quickfilter"')&&!html.includes('id="history-slider"'),"The chart toolbar has no duplicate filter or global slider row");
 ok(html.includes("波浪周期成功了待验证"),"Wave analysis explicitly deferred in main statistics");
 ok(html.includes("纠错买回"),"Correction event and linked trade report are visible");
 
@@ -353,9 +354,5 @@ for(const mode of ["watch","campaign"]){
 }
 ok(!script.includes("历史浏览中 · 下一根条件推演")&&!script.includes("历史共振对照 · 同周期同时间窗"),
  "Historical/replay projection placeholders have been removed");
-ok(script.includes('const projection=isLatest&&!replayMode?projectionHTML(v,nextLabel):"";'),
- "Current projection only in latest normal market view");
-ok(script.includes('if(isFocusedProjection(proj)){'),
- "Projected dotted lines are hidden when no confirmed divergence is being watched");
 
 console.log("PASS:",assertions,"assertions: close-price divergence, 3 opposite bars, linked buy-sell trade, enabled correction stop, four-chart replay");

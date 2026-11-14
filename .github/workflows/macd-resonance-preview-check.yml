@@ -19,7 +19,7 @@ jobs:
           curl --location --retry 3 --retry-delay 2 --max-time 45 --fail --silent --show-error "$base/" -o /tmp/dashboard.html
           grep -q '四指共振' /tmp/dashboard.html
           grep -q 'structureLedger' /tmp/dashboard.html
-          grep -q '新结构买1独立' /tmp/dashboard.html
+          grep -q '新结构买1新建单元' /tmp/dashboard.html
           echo "LIVE_HTML_OK $(wc -c < /tmp/dashboard.html)"
       - name: Verify live archived API structure and all four indices
         run: |

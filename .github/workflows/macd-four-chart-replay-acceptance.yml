@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - ".github/workflows/macd-four-chart-replay-acceptance.yml"
+      - "macd-resonance/index.html"
 permissions: {contents: read}
 jobs:
   verify:
@@ -32,5 +33,5 @@ jobs:
           done
           echo "The production alias does not serve this revision."
           exit 1
-      - name: Verify production desktop and mobile replay
+      - name: Verify production navigation, ledger and replay on desktop and mobile
         run: node macd-resonance/verify-ledger-ui.js
