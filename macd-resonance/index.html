@@ -990,6 +990,198 @@ function renderQuick(){
  byId("quick-count").textContent=PERIODS.find(x=>x[0]===selectedP)?.[1]+" · "+list.length+"个匹配点位"+(shown.length<list.length?" · 下拉显示最近300个":"");
  byId("quick-detail").textContent=entry>=0?("当前 "+(entry+1)+"/"+list.length+" · "+quickName(list[entry].e)+" · "+(list[entry].badge||"")+ " · "+list[entry].e.t.replace("T"," ")):"点位直接跳到K线，已配对/未配对在选择项中标明";
 }
+
+let replayMode=false,replayKind="correctionStop",replayIndex="all",replayPeriod="all",replayCaseId=null,replayNodeIndex=0;
+const REPLAY_BUYS=new Set(["buy","secondBuy","thirdBuy","laterBuy","correctionBuy"]);
+const REPLAY_SELLS=new Set(["sell","secondSell","thirdSell","laterSell"]);
+function replayBuildCases(){
+ const cases=[];
+ for(let i=0;i<4;i++)for(const [period,label] of PERIODS){
+  const v=getSignal(i,period);if(!v)continue;
+  const campaigns=new Map();
+  const complete=[...(v.trades||[])];
+  if(v.position)complete.push({...v.position,exitI:null,exitT:null,exitClose:null,exitType:"open"});
+  for(const t of complete){
+   const root=t.campaignI??t.entryI,id=i+":"+period+":"+root;
+   if(!campaigns.has(id))campaigns.set(id,{id,index:i,period,label,root,legs:[],v});
+   campaigns.get(id).legs.push(t);
+  }
+  for(const c of campaigns.values()){
+   c.legs.sort((a,b)=>a.entryI-b.entryI);
+   c.nodes=[];c.lastI=c.legs.at(-1)?.exitI??c.legs.at(-1)?.entryI??0;
+   const pushNode=(barI,title,kind,{reference=false,trade=null,ev=null}={})=>{
+    if(!Number.isInteger(barI)||barI<0||barI>=v.bars.length)return;
+    if(c.nodes.some(n=>n.i===barI&&n.title===title))return;
+    c.nodes.push({i:barI,title,kind,reference,trade,ev,t:v.bars[barI].t,close:v.bars[barI].c})
+   };
+   for(const leg of c.legs){
+    if(leg.entryType==="correctionBuy"){
+     const previous=c.legs.find(t=>t.exitI===leg.correctionFromExitI);
+     if(previous&&!c.nodes.some(n=>n.i===previous.exitI))pushNode(previous.exitI,"顶部卖出","sell",{trade:previous});
+     pushNode(leg.entryI,"纠错买回"+(leg.correctionCount>1?leg.correctionCount:""),"correction",{trade:leg});
+    }else pushNode(leg.entryI,"首次买入","buy",{trade:leg});
+    for(const entry of leg.buySignals||[]){
+     if(entry.i===leg.entryI)continue;
+     const name=entry.type==="secondBuy"?"二次买点":entry.type==="thirdBuy"?"三次买点":"追加买点";
+     pushNode(entry.i,name,"buy",{trade:leg});
+    }
+    if(Number.isInteger(leg.exitI)){
+     const kind=leg.exitType==="topSell"?"sell":"stop",name=leg.exitType==="topSell"?"顶部卖出":leg.exitType==="correctionStop"?"纠错止损":"结构止损";
+     pushNode(leg.exitI,name,kind,{trade:leg});
+     if(leg.exitType==="correctionStop"){
+      // For comparison only: the next later top signal exists in the source
+      // even though the strict correction stop already exited this position.
+      const future=v.events.find(e=>REPLAY_SELLS.has(e.type)&&e.i>leg.exitI&&e.i>=leg.entryI);
+      if(future)pushNode(future.i,"后续顶部信号 · 对照","sell",{reference:true,trade:leg,ev:future});
+     }
+    }else pushNode(v.bars.length-1,"未配对 · 最新K线","open",{reference:true,trade:leg});
+   }
+   c.nodes.sort((a,b)=>a.i-b.i||Number(a.reference)-Number(b.reference));
+   c.lastT=v.bars[c.lastI]?.t||v.bars.at(-1).t;
+   c.hasCorrection=c.legs.some(t=>t.entryType==="correctionBuy");
+   c.hasCorrectionStop=c.legs.some(t=>t.exitType==="correctionStop");
+   c.hasStop=c.legs.some(t=>t.exitType==="stop"||t.exitType==="correctionStop");
+   c.hasTopSell=c.legs.some(t=>t.exitType==="topSell");
+   c.hasOpen=c.legs.some(t=>t.exitType==="open");
+   c.returns=c.legs.filter(t=>Number.isInteger(t.exitI)&&t.entryClose>0).map(t=>(t.exitClose/t.entryClose-1)*100);
+   cases.push(c);
+  }
+  const linked=new Set(complete.filter(t=>t.exitType==="topSell").map(t=>t.exitI));
+  for(const e of v.events){
+   if(!REPLAY_SELLS.has(e.type)||linked.has(e.i))continue;
+   const id=i+":"+period+":unpaired:"+e.i;
+   cases.push({id,index:i,period,label,root:null,legs:[],v,lastI:e.i,lastT:e.t,
+    nodes:[{i:e.i,title:"顶部卖点 · 未配对",kind:"sell",reference:false,ev:e,t:e.t,close:v.bars[e.i].c}],
+    unpairedSell:true,hasCorrection:false,hasCorrectionStop:false,hasStop:false,hasTopSell:false,hasOpen:false,returns:[]});
+  }
+ }
+ return cases.sort((a,b)=>b.lastT.localeCompare(a.lastT)||a.index-b.index||a.id.localeCompare(b.id));
+}
+function replayFiltered(){
+ return replayBuildCases().filter(c=>
+  (replayIndex==="all"||Number(replayIndex)===c.index)&&
+  (replayPeriod==="all"||replayPeriod===c.period)&&
+  (replayKind==="all"||
+   replayKind==="correction"&&c.hasCorrection||
+   replayKind==="correctionStop"&&c.hasCorrectionStop||
+   replayKind==="stop"&&c.hasStop||
+   replayKind==="topSell"&&c.hasTopSell||
+   replayKind==="open"&&c.hasOpen||
+   replayKind==="unpairedSell"&&c.unpairedSell));
+}
+function replayCurrent(){
+ if(!replayMode)return null;
+ const list=replayFiltered();
+ return list.find(c=>c.id===replayCaseId)||list[0]||null;
+}
+function replaySetCase(id){
+ const c=replayFiltered().find(x=>x.id===id);if(!c)return;
+ replayCaseId=c.id;replayNodeIndex=Math.max(0,c.nodes.findIndex(n=>n.kind==="correction"));
+ if(!c.nodes.length)replayNodeIndex=0;
+ replayGoNode(replayNodeIndex);
+}
+function replayGoNode(index){
+ const c=replayCurrent();if(!c||!c.nodes[index])return;
+ replayCaseId=c.id;replayNodeIndex=index;
+ const node=c.nodes[index];
+ selectedP=c.period;focusIndex=c.index;quickIndex="all";quickKind="all";
+ signalAnchors={};signalAnchors[selectedP+":"+c.index]=node.i;
+ const desired=60;
+ if(visibleBars===0||visibleBars>90){visibleBars=desired;densityBars=desired}
+ hoverTime=node.t;hoverIndex=c.index;hoverPixelPrice=null;
+ render();
+}
+function replaySetMode(active){
+ replayMode=!!active;selectedEvent=null;
+ if(replayMode){
+  const cases=replayFiltered(),first=cases.find(c=>c.id===replayCaseId)||cases[0];
+  if(first)replaySetCase(first.id);else render();
+ }else{focusIndex=-1;signalAnchors={};render()}
+}
+function replayNoteKey(c){return "macd-review-note-v1:"+c.id}
+function replayNoteRead(c){
+ try{return JSON.parse(localStorage.getItem(replayNoteKey(c))||"{}")}catch(e){return {}}
+}
+function replayNoteSave(c){
+ try{
+  const obj={tag:byId("replay-tag").value,memo:byId("replay-memo").value,updated:new Date().toISOString()};
+  localStorage.setItem(replayNoteKey(c),JSON.stringify(obj));
+  byId("replay-save-status").textContent="已保存在当前浏览器 · "+obj.updated.slice(0,16).replace("T"," ");
+ }catch(e){byId("replay-save-status").textContent="保存失败：本浏览器可能禁止本地存储"}
+}
+function replayPct(n){return Number.isFinite(n)?(n>0?"+":"")+n.toFixed(2)+"%":"未配对"}
+function renderReplay(){
+ document.body.classList.toggle("reviewing",replayMode);
+ byId("view-market").classList.toggle("active",!replayMode);
+ byId("view-replay").classList.toggle("active",replayMode);
+ byId("replay-panel").hidden=!replayMode;
+ byId("view-market").onclick=()=>replaySetMode(false);
+ byId("view-replay").onclick=()=>replaySetMode(true);
+ if(!replayMode)return;
+ const all=replayFiltered(),c=all.find(x=>x.id===replayCaseId)||all[0];
+ byId("replay-kind").value=replayKind;
+ byId("replay-index").value=replayIndex;
+ byId("replay-period").value=replayPeriod;
+ for(const [id,state] of [["replay-kind","replayKind"],["replay-index","replayIndex"],["replay-period","replayPeriod"]]){
+  byId(id).onchange=()=>{
+   if(state==="replayKind")replayKind=byId(id).value;
+   else if(state==="replayIndex")replayIndex=byId(id).value;
+   else replayPeriod=byId(id).value;
+   replayCaseId=null;
+   const cases=replayFiltered();if(cases.length)replaySetCase(cases[0].id);else render();
+  };
+ }
+ if(!c){
+  byId("replay-case").innerHTML='<option>筛选条件下没有可复盘案例</option>';
+  byId("replay-number").textContent="0笔";
+  byId("replay-overview").textContent="暂无历史案例";
+  byId("replay-nodes").innerHTML="";
+  byId("replay-compare").innerHTML="";
+  byId("replay-note").hidden=true;
+  return;
+ }
+ replayCaseId=c.id;
+ const idx=all.findIndex(x=>x.id===c.id);
+ byId("replay-number").textContent=(idx+1)+" / "+all.length+"笔";
+ byId("replay-case").innerHTML=all.map((x,i)=>'<option value="'+esc(x.id)+'" '+(x.id===c.id?"selected":"")+'>'+
+  esc(IDX[x.index].short+" · "+x.label+" · "+x.lastT.slice(0,10)+" · "+(x.unpairedSell?"卖点未配对":x.hasCorrectionStop?"纠错止损":x.hasCorrection?"有纠错":x.hasStop?"结构止损":x.hasOpen?"未配对":"顶部退出"))+'</option>').join("");
+ byId("replay-case").onchange=e=>replaySetCase(e.target.value);
+ byId("replay-prev").disabled=idx<=0;byId("replay-next").disabled=idx>=all.length-1;
+ byId("replay-prev").onclick=()=>replaySetCase(all[Math.max(0,idx-1)].id);
+ byId("replay-next").onclick=()=>replaySetCase(all[Math.min(all.length-1,idx+1)].id);
+ const sum=c.returns.reduce((a,x)=>a+x,0);
+ const metrics=[
+  ["指数 / 周期",IDX[c.index].short+" · "+c.label],
+  ["所属交易轮次",c.unpairedSell?"孤立顶部卖点":(c.v.bars[c.root]?.t||"—").slice(0,10)],
+  ["实际进出段数",c.legs.filter(t=>Number.isInteger(t.exitI)).length],
+  ["纠错买回",c.legs.filter(t=>t.entryType==="correctionBuy").length+"次"],
+  ["纠错止损",c.legs.filter(t=>t.exitType==="correctionStop").length+"次"],
+  ["已完成各段收益之和",c.returns.length?replayPct(sum):"未配对"]
+ ];
+ byId("replay-overview").innerHTML=metrics.map(([k,v])=>'<div class="replay-metric"><span>'+esc(k)+'</span><b class="'+(typeof v==="string"&&v[0]==="+"?"positive":typeof v==="string"&&v[0]==="−"?"negative":"")+'">'+esc(v)+'</b></div>').join("");
+ byId("replay-nodes").innerHTML=c.nodes.map((n,i)=>{
+  const pc=n.trade&&Number.isInteger(n.trade.exitI)&&n.i===n.trade.exitI&&n.trade.entryClose>0?replayPct((n.trade.exitClose/n.trade.entryClose-1)*100):"";
+  return '<button type="button" class="replay-node '+n.kind+(i===replayNodeIndex?" active":"")+(n.reference?" reference":"")+'" data-node="'+i+'" aria-pressed="'+(i===replayNodeIndex)+'"><span class="node-label">'+esc(n.title)+'</span><span class="node-time">'+esc(n.t.replace("T"," "))+'</span><span class="node-price">收盘 '+valstr(n.close)+(pc?" · "+pc:"")+'</span></button>';
+ }).join("");
+ byId("replay-nodes").querySelectorAll("button").forEach(b=>b.onclick=()=>replayGoNode(Number(b.dataset.node)));
+ const corrections=c.legs.filter(t=>t.entryType==="correctionBuy"),comparisons=[];
+ for(const leg of corrections){
+  if(!Number.isInteger(leg.exitI))continue;
+  const next=c.nodes.find(n=>n.reference&&n.i>leg.exitI&&REPLAY_SELLS.has(n.ev?.type));
+  if(next){
+   const hypothetical=(next.close/leg.entryClose-1)*100,actual=(leg.exitClose/leg.entryClose-1)*100;
+   comparisons.push("纠错 "+leg.entryT.slice(0,10)+"：实际"+(leg.exitType==="correctionStop"?"止损":"卖出")+" "+replayPct(actual)+"；后续顶部信号对照 "+replayPct(hypothetical)+"；差 "+(actual-hypothetical).toFixed(2)+"个百分点");
+  }
+ }
+ byId("replay-compare").innerHTML=(comparisons.length?comparisons.map(x=>'<div><b>退出对照：</b>'+esc(x)+'</div>').join(""):"<span>选择时间线任一节点即可在K线图中定位；未配对不虚构卖点。</span>")+
+  '<div class="faint">比较仅使用信号K线收盘价、未计手续费或滑点；后续顶部点是反事实观察，不是实际退出。</div>';
+ const note=replayNoteRead(c);
+ byId("replay-tag").value=note.tag||"";
+ byId("replay-memo").value=note.memo||"";
+ byId("replay-save-status").textContent=note.updated?"已存于当前浏览器 · "+note.updated.slice(0,16).replace("T"," "):"仅存于当前浏览器，不上传服务器";
+ byId("replay-save").onclick=()=>replayNoteSave(c);
+}
+
 function buySignalEvents(v){return v?v.events.filter(e=>buyTypes.has(e.type)&&Number.isInteger(e.i)):[]}
 function navigateBuy(i,step){
  const v=getSignal(i,selectedP),buys=buySignalEvents(v);if(!buys.length)return;
@@ -1020,7 +1212,7 @@ function buyNavigator(i,v){
 function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v&&v.bars.at(-2),pct=last&&prev?(last.c-prev.c)/prev.c*100:0,delta=last&&prev?last.c-prev.c:0,n=v?v.nine.at(-1):0,s=v?v.state:"missing";
  const c=delta>=0?"up":"down";
  const timed=last?last.t.replace("T"," ").slice(0,16):"K线数据缺失";const latestLabel=v?.signalDetail?.stage>1?(v.signalDetail.stage+"次"+(s==="buy"?"买点":s==="sell"?"卖点":"信号")):paintState(s);const nextLabel=selectedP==="D"?"下一交易日":selectedP==="W"?"下一周线":"下一根"+PERIODS.find(x=>x[0]===selectedP)?.[1]+"K线"; const view=visible(i),isLatest=view?.bars.at(-1)?.t===v?.bars.at(-1)?.t;const projection=isLatest?projectionHTML(v,nextLabel):'<div class="estimate"><span class="estimate-text">历史浏览中 · 下一根条件推演仅对应最新K线；点击“回最新”查看</span></div>';const navigator=buyNavigator(i,v);
- return '<article class="chart-card '+(focusIndex===i?"focused":"")+(selectedEvent?.index===i?" quick-selected":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>买1/2/3：DIF逐次上拐 · 卖：顶部结构 · 止损：结构失败</span><span class="latest">'+timed+'</span></div></article>'
+ return '<article class="chart-card '+(focusIndex===i?"focused":"")+(selectedEvent?.index===i?" quick-selected":"")+(replayMode&&replayCurrent()?.index===i?" review-focused":"")+'" id="card'+i+'"><div class="charthead"><div><div class="name">'+IDX[i].name+'<span class="code">'+IDXCODE[i]+'</span></div><div class="price-row"><span class="closeprice '+c+'">'+(last?valstr(last.c):"—")+'</span><span class="chg '+c+'">'+(last?(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%":"—")+'</span></div><div class="ohlc" id="ohlc'+i+'">—</div><div class="difline" id="difline'+i+'">DIF <b>'+(v?v.dif.at(-1).toFixed(4):"—")+'</b></div></div><div class="badges"><span class="signpill '+signclass(s)+'">'+latestLabel+'</span><span class="signpill nine '+(n>0?"pos":n<0?"neg":"")+'">'+nLabel(n)+'</span><button class="expand" title="'+(focusIndex>=0?"退出聚焦":"放大K线")+'" data-i="'+i+'">'+(focusIndex===i?"⤢":"⤢")+'</button></div></div><div class="chartarea"><canvas class="kplot" id="k'+i+'" data-i="'+i+'"></canvas><div class="macd-label">MACD (12, 26, 9)</div><canvas class="mplot" id="m'+i+'" data-i="'+i+'"></canvas></div>'+navigator+projection+'<div class="chartfoot"><span>买1/2/3：DIF逐次上拐 · 卖：顶部结构 · 止损：结构失败</span><span class="latest">'+timed+'</span></div></article>'
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 
@@ -1140,7 +1332,7 @@ function renderHistory(){
   return '<div class="eventrow"><span>'+e.t.replace("T"," ")+'</span><b>'+IDX[e.index].name+'</b><span class="mstatus '+(bullish?"buy":bear?"sell":"")+'">'+(names[e.type]||e.type)+'</span><span>'+valstr(e.price||e.close||0)+' · '+nLabel(e.nine)+'</span></div>';
  }).join("")+'</div>':'<div class="faint" style="padding:12px">当前周期尚无历史事件记录</div>';
 }
-function render(){renderPeriods();renderResonance();renderQuick();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
+function render(){renderPeriods();renderResonance();renderQuick();renderReplay();const grid=byId("chartgrid");grid.className="chartgrid"+(focusIndex>=0?" focus":"");grid.innerHTML=IDX.map((x,i)=>cardHTML(i)).join("");
  grid.querySelectorAll(".expand").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.i);focusIndex=focusIndex===i?-1:i;hoverTime=null;hoverIndex=-1;hoverPixelPrice=null;render()});
  grid.querySelectorAll(".buyjump").forEach(b=>b.onclick=()=>navigateBuy(Number(b.dataset.i),Number(b.dataset.step)));
  grid.querySelectorAll(".buyselect").forEach(sel=>sel.onchange=()=>{if(sel.value!=="")jumpToBuy(Number(sel.dataset.i),Number(sel.value))});
