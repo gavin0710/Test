@@ -1,0 +1,54 @@
+name: Probe available market history endpoints
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: [".github/workflows/macd-history-probe.yml"]
+permissions: {contents: read}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect full-history availability and provider lookback
+        run: |
+          python - <<'PY'
+          import urllib.request,urllib.parse,json,time
+          UA={"User-Agent":"Mozilla/5.0","Referer":"https://quote.eastmoney.com","Accept":"application/json,text/plain,*/*"}
+          tests=[
+           ("em_day_10000","1.000001","101","0","20500101",10000),
+           ("em_week_3000","1.000001","102","0","20500101",3000),
+           ("em_min15_5000","1.000001","15","0","20500101",5000),
+           ("em_min60_5000","1.000001","60","0","20500101",5000),
+           ("em_day_2000to2010","1.000001","101","20000101","20100101",3000),
+           ("em_day_1990to2000","1.000001","101","19900101","20000101",4000),
+           ("em_day_SZ","0.399001","101","0","20500101",10000),
+           ("em_day_ChiNext","0.399006","101","0","20500101",10000),
+           ("em_day_STAR50","1.000688","101","0","20500101",10000)
+          ]
+          for label,secid,klt,beg,end,lmt in tests:
+           params={"secid":secid,"ut":"fa5fd1943c7b386f172d6893dbfba10b","fields1":"f1,f2,f3,f4,f5,f6","fields2":"f51,f52,f53,f54,f55,f56,f57","klt":klt,"fqt":0,"beg":beg,"end":end,"lmt":lmt}
+           try:
+            url="https://push2his.eastmoney.com/api/qt/stock/kline/get?"+urllib.parse.urlencode(params)
+            req=urllib.request.Request(url,headers=UA)
+            with urllib.request.urlopen(req,timeout=8) as resp: data=json.load(resp)
+            rows=(data.get("data") or {}).get("klines") or []
+            print("PROBE",label,len(rows),rows[0][:22] if rows else "-",rows[-1][:22] if rows else "-",flush=True)
+           except Exception as e: print("PROBE",label,"ERROR",str(e)[:150],flush=True)
+          for label,url,kind in [
+           ("tx_15m_640","https://web.ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000001,m15,,,640","m15"),
+           ("tx_60m_640","https://web.ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000001,m60,,,640","m60"),
+           ("tx_daily_640","https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh000001,day,,,640","day"),
+           ("tx_daily_4000","https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh000001,day,,,4000","day"),
+           ("tx_week_4000","https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh000001,week,,,4000","week"),
+           ("tx_daily_span","https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh000001,day,19900101,20000101,4000","day"),
+           ("tx_min_old","https://web.ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000001,m15,20250101,20250601,640","m15")
+          ]:
+           try:
+            req=urllib.request.Request(url,headers=UA)
+            with urllib.request.urlopen(req,timeout=8) as resp:data=json.load(resp)
+            rows=((data.get("data") or {}).get("sh000001") or {}).get(kind) or []
+            print("PROBE",label,len(rows),str(rows[0])[:40] if rows else "-",str(rows[-1])[:40] if rows else "-",flush=True)
+           except Exception as e: print("PROBE",label,"ERROR",str(e)[:130],flush=True)
+          PY
