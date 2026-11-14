@@ -17,6 +17,8 @@
 - K 线和 MACD 之间的滑条共用同周期时间窗口。每根 K 线按实际行情时间放置，缺行情的槽位留空。横拖 K 线和任一滑条均能同步四图，手机竖滑继续浏览页面。日期和 OHLC、MACD 数值跟随实际光标或选定的历史点，滑条标题可查看行情覆盖。
 - 「历史触发记录」可翻页并点击定位，含钝化消失或失效、参考 DIF 破位及未配对卖点。纠错止损仍按一次市场触发归并，逐笔明细保留涉及的独立单元。逐笔复盘只由案例和交易链控制，返回看盘恢复原周期与窗口。
 - 浏览器验收集中到 `verify-ledger-ui.js`，覆盖鼠标、触控、早期指数缺档、密度、聚焦、历史事件定位及复盘。引擎、行情聚合和 API 沿用上一版。后续继续按本文第 5 节验证实盘可行性与行情覆盖。
+- 发布源码为 `874c805`。正式部署 `dpl_2Joas8oc2NF3iDUqFMhWzzqKskgq` 已就绪，正式域名 HTML 与该提交逐字节一致。首页、`api/latest` 及三个 `api/history` 请求全部返回 HTTP 200。[GitHub 提交](https://github.com/gavin0710/Test/commit/874c805fa450fea5f533eac97dbc6305affa10ed) · [Vercel 部署](https://vercel.com/gavinfunvip-7265/macd-resonance-monitor/2Joas8oc2NF3iDUqFMhWzzqKskgq)
+- 截至北京时间 2026-11-13 收盘，24 组真实历史的行情、信号、推演和交易账本逐项与基线一致。桌面和手机触控用例已在归档环境与正式站通过。旧筛选、图内买点和历史条的三个专项工作流合并到统一浏览器验收，保留可测试的交易规则与导航覆盖。[GitHub 规则回归](https://github.com/gavin0710/Test/actions/runs/43655661033) · [归档浏览器验收](https://github.com/gavin0710/Test/actions/runs/43655661018) · [正式站验收](https://github.com/gavin0710/Test/actions/runs/43655661066)
 
 ## 2026-11-14 接管审计与本轮变更
 
