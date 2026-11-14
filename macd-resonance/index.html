@@ -149,7 +149,7 @@ function scanStructure(bars,dif,hist){
    if(mode==="none"&&priceOK&&difOK){
     mode="watch";events.push({type:sign<0?"watchBuy":"watchSell",i,t:bars[i].t,ref,regionStart:rg.start,gap,price:bars[i].c,dif:dif[i]});
    }
-   if(mode==="watch"&&!difOK){
+   if((mode==="watch"||mode==="signal")&&!difOK){
     mode="invalid";events.push({type:"invalid",i,t:bars[i].t,ref,regionStart:rg.start,reason:"DIF破坏参考极值"});
    }
    if(mode==="watch"&&turning(i,sign)){
@@ -182,6 +182,9 @@ function projectNext(v){
  const colorPrice=priceForDIF(dea); // next histogram sign = sign(next DIF - current DEA)
  const zone=v.active;
  const result={k,a,colorPrice,mode:"none",direction:null,lossPrice:null,turnPrice:null,formation:null};
+ if(zone?.mode==="signal"||zone?.mode==="invalid"){
+  result.mode=zone.mode;return result;
+ }
  if(zone?.mode==="watch"&&zone.ref){
   result.mode="watch";result.direction=zone.sign<0?"bottom":"top";
   result.lossPrice=priceForDIF(zone.ref.dif);
@@ -350,6 +353,10 @@ function projectionHTML(v,label){
   const f=p.formation;
   items+='<span class="estimate-chip watch">'+(f.side==="bottom"?"新底钝化":"新顶钝化")+'条件区间</span>';
   items+='<span class="estimate-chip">约 '+valstr(f.lo)+' < 收盘 < '+valstr(f.hi)+'</span>';
+ }else if(p.mode==="signal"){
+  items+='<span class="estimate-chip buy">本区域DIF首次拐头已确认</span><span class="estimate-text">不重复推算买点</span>';
+ }else if(p.mode==="invalid"){
+  items+='<span class="estimate-chip loss">DIF已破坏参考区域极值</span>';
  }else{
   items+='<span class="estimate-text">目前无有效钝化条件区间；不推算虚假买点</span>';
  }
