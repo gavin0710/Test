@@ -17,6 +17,7 @@ const server=http.createServer((req,res)=>{
 });
 
 async function chartState(page){
+ await page.waitForFunction(()=>!renderBusy);
  return page.evaluate(()=>{
   const range=chartWindow();
   return {period:selectedP,start:range.startT,end:range.endT,times:range.times,density:visibleBars,
@@ -219,6 +220,8 @@ async function verifyNavigation(page,viewport){
    const row=history.locator("button.eventrow[data-type='invalid'],button.eventrow[data-type='expired']").first();
    const target=await row.locator("time").getAttribute("datetime");
    await row.click();
+   await page.waitForFunction(t=>
+    document.querySelector(".chart-card.history-focused .chart-time")?.getAttribute("datetime")===t,target);
    let window=await chartState(page);
    assert(window.start<=target&&target<=window.end&&window.charts.some(x=>x.shown===target),"History entries locate the actual candle");
    const windowBeforeReplay=window.end;
@@ -229,6 +232,7 @@ async function verifyNavigation(page,viewport){
    assert.equal(await page.locator(".history-slider:visible,#history-reset:visible").count(),0,"Manual scrolling controls are hidden during replay");
    assert(await page.locator(".replay-overview .replay-metric").count()>=5);
    await page.locator(".replay-node").filter({hasText:"首次买入"}).first().click();
+   await page.waitForFunction(()=>!renderBusy);
    const replay=await page.evaluate(()=>{
     const c=replayCurrent(),node=c.nodes[replayNodeIndex],confluence=replayResonance(c,node);
     return {direction:confluence.direction,matches:confluence.matched,node:node.t,
