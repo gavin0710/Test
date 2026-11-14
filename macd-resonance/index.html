@@ -102,8 +102,8 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
  <section class="secondary" aria-label="辅助信息">
   <details class="fold" id="statfold" open><summary>24周期历史结构统计 <span class="faint">按指数及同周期独立统计 · 点击查看明细</span></summary>
     <div class="foldbody"><p class="stats-explain" id="statsintro">按当前已加载K线的完整历史窗口统计，不外推更早历史。买点含首次及二次以上转向；卖点来自顶部结构，持仓按同一指数同一周期配对。</p><div class="stat-overall" id="statsoverall"></div>
-    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>止损结束</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
-    <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
+    <div class="stats-scroll"><table class="stats-table"><thead><tr><th>指数</th><th>周期</th><th>有效历史</th><th>钝化</th><th>消失</th><th>首次形成</th><th>二次</th><th>三次</th><th>四次+</th><th>失败止损</th><th>买点</th><th>卖点</th><th>顶部配对</th><th>未配对卖点</th><th>止损结束</th><th>待卖出</th></tr></thead><tbody id="statsbody"></tbody></table></div>
+    <div class="stat-disclaimer">统计范围有限；顶部配对与止损结束分别统计。未配对卖点是历史窗口内尚无对应底部持仓的顶部信号，不允许跨周期强行配对。同一周期第二、三次买点是同一持仓的后续信号，不重复建立独立仓位；配对仅是信号层面的状态模拟，不代表真实下单、回测收益或可成交性。存在买入后未出现顶部卖点的情况，会标为“待卖出”，绝不自动补卖点。</div></div>
   </details>
   <details class="fold" id="stopfold"><summary>止损事件与未配对买点 <span class="faint" id="stopsbadge">按周期追溯时间</span></summary>
    <div class="foldbody"><div id="stoprecords"></div><div id="openrecords"></div></div>
@@ -510,7 +510,7 @@ function cardHTML(i){const v=getSignal(i,selectedP),last=v&&v.bars.at(-1),prev=v
 }
 function renderMatrix(){byId("matrixbody").innerHTML=PERIODS.map(([p,label])=>{let buy=0,sell=0,rows=[];for(let i=0;i<4;i++){const v=getSignal(i,p);rows.push('<td>'+stateHTML(i,p)+'</td>');if(v?.state==="buy")buy++;if(v?.state==="sell")sell++}return '<tr><td><strong>'+label+'</strong></td>'+rows.join("")+'<td><span class="mstatus buy">↑'+buy+'</span> <span class="mstatus sell">↓'+sell+'</span></td></tr>'}).join("")}
 
-const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","failStop","buy","sell","sellExits","stopExits","open"];
+const STAT_KEYS=["watch","disappeared","formed","second","third","fourthPlus","failStop","buy","sell","sellExits","unpairedSells","stopExits","open"];
 function getHistoryStats(){
  const rows=[],total=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));
  for(let j=0;j<4;j++)for(const [period,label] of PERIODS){
@@ -522,11 +522,11 @@ function getHistoryStats(){
 }
 function renderStats(){
  const {rows,total}=getHistoryStats();
- const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["止损结束",total.stopExits],["待卖出",total.open]];
+ const items=[["钝化",total.watch],["钝化消失",total.disappeared],["首次形成",total.formed],["二次形成",total.second],["三次形成",total.third],["失败止损",total.failStop],["买点",total.buy],["卖点",total.sell],["顶部配对",total.sellExits],["未配对卖点",total.unpairedSells],["止损结束",total.stopExits],["待卖出",total.open]];
  byId("statsoverall").innerHTML=items.map(([name,value])=>'<div class="metric"><strong>'+value+'</strong><span>'+name+'</span></div>').join("");
  byId("statsbody").innerHTML=rows.map(({i,period,label,v,stats:q})=>{
   const hist=v.bars,range=hist[0].t.slice(0,10)+'～'+hist.at(-1).t.slice(0,10);
-  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.failStop,q.buy,q.sell,q.sellExits,q.stopExits,q.open];
+  const cells=[q.watch,q.disappeared,q.formed,q.second,q.third,q.fourthPlus,q.failStop,q.buy,q.sell,q.sellExits,q.unpairedSells,q.stopExits,q.open];
   return '<tr><td>'+IDX[i].name+'</td><td>'+label+'</td><td class="event-t">'+range+'（'+hist.length+'根）</td>'+
     cells.map((n,k)=>'<td class="'+(k===6?"fail":k===7||k===8?"important":"")+'">'+(n||0)+'</td>').join("")+'</tr>';
  }).join("");
