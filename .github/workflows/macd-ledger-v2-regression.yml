@@ -6,6 +6,7 @@ on:
     paths:
       - 'macd-resonance/index.html'
       - 'macd-resonance/verify.js'
+      - 'macd-resonance/verify-ledger-history.js'
       - '.github/workflows/macd-ledger-v2-regression.yml'
   workflow_dispatch:
 permissions:
@@ -21,6 +22,8 @@ jobs:
           node-version: '22'
       - name: Verify all original indicator and lifecycle assertions plus independent structure risk units
         run: node macd-resonance/verify.js
+      - name: Audit real 24-index-period historical ledgers
+        run: node macd-resonance/verify-ledger-history.js
       - name: JavaScript parse validation
         run: |
           node <<'NODE'
