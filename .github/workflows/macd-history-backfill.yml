@@ -1,0 +1,41 @@
+name: Backfill all available MACD index daily weekly history
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "12 21 * * 0"
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/backfill.py"
+      - ".github/workflows/macd-history-backfill.yml"
+permissions:
+  contents: write
+concurrency:
+  group: macd-resonance-data
+  cancel-in-progress: false
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download historical daily and weekly K lines
+        run: python macd-resonance/backfill.py
+      - name: Commit verified historical archives
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add macd-resonance/data/history-101.json macd-resonance/data/history-102.json
+          if git diff --cached --quiet; then
+            echo "No new historical OHLC"
+          else
+            git commit -m "data: extend market index daily weekly backfill"
+            git fetch origin master
+            git rebase origin/master
+            git push origin HEAD:master
+          fi
