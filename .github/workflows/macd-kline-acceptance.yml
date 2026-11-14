@@ -1,0 +1,73 @@
+name: Acceptance test of K-line primary dashboard
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-kline-acceptance.yml"
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Browser installation
+        run: |
+          npm install --prefix /tmp/macd-test --no-save playwright
+          /tmp/macd-test/node_modules/.bin/playwright install chromium
+      - name: Verify desktop/mobile rendering and timeframe switching
+        run: |
+          node <<'NODE'
+          const {chromium}=require('/tmp/macd-test/node_modules/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({args:['--no-sandbox']});
+            try{
+              const base='https://macd-resonance-monitor-gavinfunvip-7265.vercel.app';
+              const page=await browser.newPage({viewport:{width:1450,height:960}});
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              const response=await page.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
+              console.log('PAGE_HTTP',response.status());
+              assert.equal(response.status(),200);
+              await page.waitForFunction(()=>/24\/24周期有数据/.test(document.querySelector('#status')?.textContent||''),null,{timeout:50000});
+              assert.equal(await page.locator('canvas.kplot').count(),4,'Expected 4 main K-line canvases');
+              assert.equal(await page.locator('canvas.mplot').count(),4,'Expected 4 MACD canvases');
+              console.log('CANDLES',await page.locator('canvas.kplot').count(),'MACD',await page.locator('canvas.mplot').count());
+              console.log('DEFAULT_PERIOD',await page.locator('.periodbtn.active').innerText());
+              assert.equal((await page.locator('.periodbtn.active').innerText()),'日线');
+              console.log('FIRST_INDEX',await page.locator('.name').first().innerText());
+              assert((await page.locator('.price-row').first().innerText()).includes(','),'Price did not load');
+              const canvases=await page.locator('canvas.kplot').evaluateAll(elements=>elements.map(c=>{const b=c.getBoundingClientRect();const p=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let color=0;for(let k=3;k<p.length;k+=4){if(p[k]>0){color++; if(color>500)return {width:b.width,height:b.height,nonempty:true}}}return {width:b.width,height:b.height,nonempty:false}}));
+              console.log('KLINE_RENDERING',JSON.stringify(canvases));assert(canvases.every(x=>x.width>200&&x.nonempty),'A K-line chart was blank');
+              await page.locator('.periodbtn[data-p="15"]').click();
+              assert.equal(await page.locator('.periodbtn.active').innerText(),'15分钟');
+              await page.locator('.expand').first().click();
+              assert((await page.locator('#chartgrid').getAttribute('class')).includes('focus'));
+              await page.locator('.expand').first().click();
+              assert(!(await page.locator('#chartgrid').getAttribute('class')).includes('focus'));
+              await page.locator('.periodbtn[data-p="W"]').click();
+              assert.equal(await page.locator('.periodbtn.active').innerText(),'周线');
+              console.log('PERIOD_AND_FOCUS_OK');
+              await page.locator('#mfold > summary').click();
+              assert(await page.locator('#matrixbody tr').count()===6);
+              console.log('SUPPORT_MATRIX_OK');
+              const api=await page.request.get(base+'/api/latest');
+              console.log('API_HTTP',api.status());assert.equal(api.status(),200);
+              console.log('CURRENT_DATA_DATE',(await api.json()).generated_at_utc);
+              assert.deepEqual(errors,[],'JavaScript errors');
+              console.log('JS_ERRORS_0');
+              await page.screenshot({path:'/tmp/macd-kline.png',fullPage:true});
+              const mobile=await browser.newPage({viewport:{width:390,height:844}});
+              mobile.on('pageerror',e=>errors.push('mobile '+e.message));
+              const m=await mobile.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
+              assert.equal(m.status(),200);await mobile.waitForSelector('canvas.kplot');
+              console.log('MOBILE_PLOTS',await mobile.locator('canvas.kplot').count());
+              console.log('TEST_PASSED');
+            }finally{await browser.close()}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
