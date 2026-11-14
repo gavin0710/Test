@@ -1,0 +1,19 @@
+name: Test independent legacy-DIF stop rearming only after a later buy
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - macd-resonance/research-dif-rearm-after-new-buy.js
+      - .github/workflows/macd-dif-rearm-research.yml
+permissions: {contents: read}
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Counterfactual test on every daily weekly first-buy independently
+        run: node macd-resonance/research-dif-rearm-after-new-buy.js
