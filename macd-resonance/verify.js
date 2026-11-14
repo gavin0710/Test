@@ -89,6 +89,18 @@ equal(calculate(Array.from({length:40},(_,i)=>({t:"t"+i,o:100,c:100,h:100,l:100}
 const simple=calculate(Array.from({length:110},(_,i)=>({t:"t"+i,o:100+i*.05,c:100+i*.05,h:101+i*.05,l:99+i*.05})));
 ok(simple&&Number.isFinite(simple.dif.at(-1)),"MACD price calculation");
 ok(simple.projection!==null,"Projection attached to each complete signal unit");
+// Chart historical signal navigation must include every buy stage, and full mode all bars.
+const uiSegment=script.slice(script.indexOf("let visibleBars="),script.indexOf("function drawPrice("));
+ok(uiSegment.includes("const buyTypes=new Set"),"Historical buy type set exists");
+ok(uiSegment.includes("laterBuy"),"Fourth and later buys are retained");
+ok(uiSegment.includes("function buySignalEvents("),"Historical signal navigator implemented");
+ok(uiSegment.includes("function navigateBuy("),"Previous and next buy navigation implemented");
+ok(uiSegment.includes("function jumpToBuy("),"Exact candle index navigation implemented");
+ok(uiSegment.includes("visibleBars===0?v.bars.length"),"All-history plot range uses all available candles");
+const graphSection=script.slice(script.indexOf("function drawPrice("),script.indexOf("function drawMacd("));
+ok(graphSection.includes('const label=(bullish?"买":"卖")'),"Explicit buy/sell label in price chart");
+ok(graphSection.includes('signalAnchors[selectedP+":"+i]'),"Focused history marker highlighted");
+ok(graphSection.includes('["buy","secondBuy","thirdBuy","laterBuy"]'),"All stage buy events mapped onto K-line");
 // Profit classification uses exactly one initial buy and its first matched exit/stop.
 const winCalc=()=>{
  const parse=fs.readFileSync(path.join(root,"index.html"),"utf8").match(/<script>([\s\S]*?)<\/script>/)?.[1];
