@@ -268,4 +268,46 @@ ok(!html.includes('拟纠错止损')&&!html.includes('研究拟止损'),"No obso
 ok(script.includes('analyzeLifecycle(bars,dif,hist,structure.events,{enableCorrectionStop:true})'),"Production MACD analysis has correction stop explicitly enabled");
 ok(html.includes('value="correctionStop"')&&html.includes('纠错止损'),"Historical replay has actual correction stop filter");
 ok(html.includes('id="replay-confluence"'),"Four-chart historical resonance remains available");
+
+// Independent ledger: new bottom has a new risk unit even when an older one remains open.
+function overlappingLedger({breakNew=true,topExit=true}={}){
+ const bars=Array.from({length:27},(_,i)=>({t:"T"+String(i).padStart(3,"0"),
+  o:100+i*.3,c:100+i*.3,h:100+i*.3+.2,l:100+i*.3-.2}));
+ const d=Array(27).fill(-1.2),h=Array(27).fill(-1);
+ d[4]=-1.7;d[5]=-1.6;d[6]=-1.5;
+ for(let i=6;i<12;i++)h[i]=1;
+ d[12]=-1.4;d[13]=-1.55;d[14]=breakNew?-1.9:-1.6;
+ d[17]=-4.0; // expired structure A must never re-arm its old DIF stop
+ for(let i=18;i<27;i++)h[i]=1;
+ const base=[
+  {i:5,t:bars[5].t,type:"buy",regionStart:3,ref:{dif:-3,close:98}},
+  {i:12,t:bars[12].t,type:"buy",regionStart:10,ref:{dif:breakNew?-1.7:-10,close:99}}
+ ];
+ if(topExit)base.push({i:20,t:bars[20].t,type:"sell",regionStart:18,ref:{dif:5,close:110}});
+ return analyzeLifecycle(bars,d,h,base,{enableCorrectionStop:true});
+}
+const independent=overlappingLedger();
+equal(independent.structureLedger.length,2,"Two bottom structures generate separate ledger entries");
+equal(independent.trades.length,2,"Old and new positions have separately attributed exit");
+const oldUnit=independent.trades.find(t=>t.structureId==="B:5");
+const newUnit=independent.trades.find(t=>t.structureId==="B:12");
+ok(!!oldUnit&&!!newUnit,"Each exit carries its own structure ID");
+equal(newUnit.exitType,"stop","New bottom's DIF failure stops only its own structure");
+equal(newUnit.exitI,14,"New bottom stops on its own reference violation bar");
+equal(oldUnit.exitType,"topSell","Expired old unit survives until top sell");
+equal(oldUnit.exitI,20,"Old unit isn't stopped by the new failure");
+equal(independent.counts.failStop,1,"Only one independent structure stop");
+equal(independent.counts.sellExits,1,"Only old unit is sold at top");
+equal(independent.counts.open,0,"No phantom open units");
+const overlapOpen=overlappingLedger({breakNew:false,topExit:false});
+equal(overlapOpen.positions.length,2,"Two confirmed buys coexist in same index and timeframe");
+ok(overlapOpen.positions.some(p=>p.structureId==="B:5")&&overlapOpen.positions.some(p=>p.structureId==="B:12"),
+ "Coexisting positions carry distinct structure IDs");
+const overlapTop=overlappingLedger({breakNew:false,topExit:true});
+equal(overlapTop.trades.length,2,"One top signal closes both independent risk units");
+equal(overlapTop.counts.sell,1,"Top signal counts once");
+equal(overlapTop.counts.sellExits,2,"Two independent exit units counted");
+equal(overlapTop.events.find(e=>e.type==="sell")?.matchedStructureIds?.length,2,
+ "Top signal audits all exited units");
+ok(overlapTop.trades.every(t=>t.exitType==="topSell"),"Both exits are real top-sell links");
 console.log("PASS:",assertions,"assertions: close-price divergence, 3 opposite bars, linked buy-sell trade, enabled correction stop, four-chart replay");
