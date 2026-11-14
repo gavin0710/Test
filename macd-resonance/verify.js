@@ -172,7 +172,7 @@ equal(sold.trades[0].exitType,"topSell","Top exit tagged distinctly");
 
 // A top-side DIF breakout after a PAIRed top exit is a linked correction buy,
 // provided fewer than three consecutive non-red histogram columns elapsed.
-function topCorrection({equal=false,tooLate=false,unpaired=false,secondExit=false,stopOnBar23=false}={}){
+function topCorrection({equal=false,tooLate=false,unpaired=false,secondExit=false,stopOnBar23=false,enableStop=false}={}){
  const n=40,bars=Array.from({length:n},(_,i)=>({t:"T"+String(i).padStart(3,"0"),o:100+i,c:100+i,h:101+i,l:99+i}));
  const dif=Array(n).fill(1),hist=Array(n).fill(1);
  dif[20]=2;dif[21]=2.35;dif[22]=equal?2.5:2.8;
@@ -182,7 +182,7 @@ function topCorrection({equal=false,tooLate=false,unpaired=false,secondExit=fals
  if(!unpaired)raw.unshift({type:"buy",i:10,t:bars[10].t,regionStart:8,ref:{dif:-2,close:90}});
  if(tooLate){hist[21]=-1;hist[22]=-1;hist[23]=-1;dif[22]=2.4;dif[23]=2.4;dif[24]=2.9}
  if(secondExit){raw.push({type:"sell",i:30,t:bars[30].t,regionStart:28,ref:{dif:3.3,close:120}})}
- return analyzeLifecycle(bars,dif,hist,raw);
+ return analyzeLifecycle(bars,dif,hist,raw,{enableCorrectionStop:enableStop});
 }
 const corrected=topCorrection();
 equal(corrected.counts.correctionBuy,1,"Top DIF high breakout opens one linked correction buy");
@@ -197,7 +197,10 @@ equal(topCorrection({equal:true}).counts.correctionBuy,0,"DIF equal to reference
 equal(topCorrection({tooLate:true}).counts.correctionBuy,0,"Three opposite histogram columns invalidate correction");
 equal(topCorrection({unpaired:true}).counts.correctionBuy,0,"Unpaired top sell never opens phantom correction");
 
-const stoppedCorrection=topCorrection({stopOnBar23:true});
+const noAutomaticStop=topCorrection({stopOnBar23:true});
+equal(noAutomaticStop.counts.correctionStop,0,"Website trading rules do not execute unconfirmed correction stop proposals");
+equal(noAutomaticStop.position?.entryType,"correctionBuy","Normal live strategy continues to hold without candidate stop execution");
+const stoppedCorrection=topCorrection({stopOnBar23:true,enableStop:true});
 equal(stoppedCorrection.counts.correctionBuy,1,"Correction buy confirmed above previous top reference");
 equal(stoppedCorrection.counts.correctionStop,1,"DIF touching reference high on next completed bar causes correction stop");
 equal(stoppedCorrection.trades.length,2,"Original top exit and correction stop are separate audited legs");
@@ -258,4 +261,8 @@ ok(waveData.at[15].direction==="down","New high at 12 becomes confirmed index 15
 ok(waveData.at[18].direction==="down","New low at 16 cannot confirm before index 19");
 ok(waveData.at[19].direction==="up","New low at 16 confirms index 19");
 ok(!html.includes('id="wave-entry-body"'),"Wave win-rate subgroup removed from main view for current optimization phase");
-console.log("PASS:",assertions,"assertions: close prices, >=3 separators, region-DIF, second/third structures, stop before 3 opposite bars, time-frame-local sell exits, unresolved holds, EMA thresholds and verified OHLC");
+ok(html.includes('id="replay-confluence"'),"Historically synchronized four-index signal comparison is available");
+ok(!html.includes('id="replay-tag"'),"User did not request a review tagging form");
+ok(html.includes('拟纠错止损 · 待验证'),"Unconfirmed correction stop is visibly marked as research only");
+ok(script.includes('if(options.enableCorrectionStop===true'),"Independent correction stop can only execute with explicit opt-in");
+console.log("PASS:",assertions,"assertions: closed price divergence, paired trades, proposed stop is opt-in, historical event replay and K-line coverage");
