@@ -2,7 +2,13 @@
 
 极简市场信号矩阵：上证指数、深证成指、创业板指、科创50；15/60/90/120分钟、日、周六周期。
 
-## 访问入口（已通过独立的外网验收）
+## 正式站点（Vercel 生产部署，2026-11-13 外网验收）
+
+**https://macd-resonance-monitor.vercel.app/**
+
+生产部署状态 READY（deployment `dpl_8U3QbJMG8y3Q7nNrpmVefRzoSUMv`）。第三方 GitHub 云端浏览器验收 [#43531069871](https://github.com/gavin0710/Test/actions/runs/43531069871)：主页HTTP200、24/24周期有数据、行情API HTTP200、创业板日/周切换正常、零JavaScript运行时错误。Vercel API `/api/latest` 从 GitHub 行情归档获取真实K线，仓库定时采集成功提交后无需重新部署前端即可生效。**网页代码更新目前需要通过Vercel重新部署**，Vercel与GitHub尚未建立自动部署链接。
+
+## 临时预览入口（已通过独立的外网验收）
 
 [直接打开已托管看板](https://raw.githack.com/gavin0710/Test/master/macd-resonance/index.html)
 
