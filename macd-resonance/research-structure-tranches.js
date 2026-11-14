@@ -101,4 +101,8 @@ console.log('TRANCHE_SUMMARY',JSON.stringify({asOf:latest.generated_at_utc,total
  expiryDifferences:differences.filter(x=>x.diff!==0).sort((a,b)=>a.diff-b.diff).slice(0,10)}));
 console.log('TRANCHE_SSE_WEEKLY',JSON.stringify(sig));
 console.log('TRANCHE_GROUPS',JSON.stringify(groups));
+for(const yr of [2000,2010,2020]){
+ const newer=data.filter(e=>Number(e.entryT.slice(0,4))>=yr);
+ console.log('TRANCHE_RECENT_'+yr,JSON.stringify({start:yr,n:newer.length,methods:keys.map(key=>({name:key,...summary(newer,key)}))}));
+}
 console.log('TRANCHE_ALL_PASS');
