@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path"),assert=require("node:assert/strict");
-const {chromium}=require("/tmp/macd-ledger-v2/node_modules/playwright");
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"/tmp/macd-ledger-v2/node_modules/playwright");
+const viewports=[{width:1500,height:960},{width:390,height:844}];
 const root=__dirname,files={
  "/":path.join(root,"index.html"),"/api/latest":path.join(root,"data","latest.json"),
  "/api/history?period=15":path.join(root,"data","history-15.json"),
@@ -15,17 +16,25 @@ const server=http.createServer((req,res)=>{
  fs.createReadStream(item).pipe(res);
 });
 (async()=>{
- await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
- const base="http://127.0.0.1:"+server.address().port;
- const browser=await chromium.launch({headless:true,args:["--no-sandbox"]});
+ let base=process.env.MACD_BASE_URL;
+ const usingArchive=!base;
+ if(usingArchive){
+  await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
+  base="http://127.0.0.1:"+server.address().port;
+ }
+ const launchOptions={headless:true,args:["--no-sandbox",...JSON.parse(process.env.CHROMIUM_ARGS||"[]")],
+  executablePath:process.env.CHROMIUM_PATH};
  try{
-  for(const viewport of [{width:1500,height:960},{width:390,height:844}]){
+  for(const viewport of viewports){
+   const browser=await chromium.launch(launchOptions);
+   try{
    const page=await browser.newPage({viewport});
    const errors=[];page.on("pageerror",err=>errors.push(err.message));
-   await page.route(/eastmoney\.com/,route=>route.abort());
+   if(usingArchive)await page.route(/eastmoney\.com/,route=>route.abort());
    const resp=await page.goto(base,{waitUntil:"domcontentloaded",timeout:45000});
    assert.equal(resp.status(),200);
-   await page.waitForFunction(()=>getSignal(0,"D")?.bars?.length>=8763,null,{timeout:45000});
+   await page.waitForFunction(()=>!load.busy&&getSignal(0,"D")?.bars?.length>=8763&&
+    document.querySelector("#status")?.textContent.includes("24/24"),null,{timeout:65000});
    assert.equal(await page.locator(".chart-card:visible").count(),4);
    assert.equal(await page.locator(".kplot").count(),4);
    assert.equal(await page.locator(".mplot").count(),4);
@@ -71,8 +80,34 @@ const server=http.createServer((req,res)=>{
    assert.equal(await page.locator(".confluence-item").count(),4);
    assert.equal(await page.locator(".chart-card .estimate").count(),0,"Historical replay has no next-candle prediction footers");
    assert(await page.locator(".replay-overview .replay-metric").count()>=5);
+   await page.locator(".replay-node").filter({hasText:"首次买入"}).first().click();
+   const replay=await page.evaluate(()=>{
+    const c=replayCurrent(),node=c.nodes[replayNodeIndex],confluence=replayResonance(c,node);
+    return {direction:confluence.direction,matches:confluence.matched,node:node.t,
+     charts:[0,1,2,3].map(i=>{
+      const v=getSignal(i,c.period),at=findEndAtOrBefore(v.bars,node.t)-1;
+      const card=document.querySelector("#card"+i);
+      return {t:v.bars[at]?.t,close:v.bars[at]?.c,shown:card.querySelector(".closeprice").textContent,
+       inWindow:visible(i).bars.some(b=>b.t===v.bars[at]?.t)};
+     })};
+   });
+   assert.equal(replay.direction,"buy");
+   assert(replay.matches>=1);
+   assert(replay.charts.every(x=>x.t===undefined?x.shown==="—":x.t<=replay.node&&x.inWindow&&
+    Math.abs(Number(x.shown.replace(/,/g,""))-x.close)<.006),"Four replay charts render prices for the selected historical time");
+   await page.locator(".replay-node").filter({hasText:"纠错止损"}).first().click();
+   assert(await page.evaluate(()=>{
+    const c=replayCurrent(),node=c.nodes[replayNodeIndex];
+    return node.trade?.exitType==="correctionStop"&&node.trade.exitT===node.t&&node.reference===false;
+   }),"Correction stops shown in replay must be recorded exits");
+   assert.equal(await page.locator("#replay-memo,#replay-save").count(),0);
    await page.locator("#view-market").click();
    assert.equal(await page.locator(".chart-card:visible").count(),4);
+   for(const p of ["15","60","90","120","D","W"]){
+    await page.locator('#periodbar [data-p="'+p+'"]').click();
+    assert.equal(await page.locator(".chart-card:visible").count(),4);
+    assert(await page.evaluate(()=>[0,1,2,3].every(i=>getSignal(i,selectedP)?.bars.length>=60)));
+   }
    if(await page.evaluate(()=>maxPanOffset()>2)){
     await page.evaluate(()=>setPanOffset(3));
     assert.equal(await page.locator(".chart-card .estimate").count(),0,"Historical Kline browsing should not show forward projections");
@@ -80,7 +115,7 @@ const server=http.createServer((req,res)=>{
    }
    assert.deepEqual(errors,[],"Browser script errors");
    console.log("LEDGER_UI_PASS",JSON.stringify({viewport,...report,projectionPanels}));
-   await page.close();
+   }finally{await browser.close()}
   }
- }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
-})().catch(e=>{console.error(e);server.close();process.exitCode=1});
+ }finally{if(server.listening)await new Promise(resolve=>server.close(resolve))}
+})().catch(e=>{console.error(e);if(server.listening)server.close();process.exitCode=1});

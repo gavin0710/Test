@@ -289,21 +289,59 @@ const PERIODS=[["15","15分钟"],["60","60分钟"],["90","90分钟"],["120","120
 const byId=id=>document.getElementById(id);
 let store={},raw={},selectedI=0,selectedP="D",hidden={},lastFetch=0,dataErrors=[],usedSnapshot=false;
 function pad(n){return String(n).padStart(2,"0")}
-function shNow(){let s=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());return s.replace(" ","T")}
+function shNow(date=new Date()){return new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(date).replace(" ","T")}
 function dayKey(x){return x.slice(0,10)}
 function barTime(x){return x.replace(" ","T")}
-function shClock(){return shNow().slice(11,16)}
 function timestampLabel(t){return t.replace("T"," ")}
 function safeN(v){let n=Number(v);return Number.isFinite(n)?n:null}
 function parseBars(res){if(!res||!res.data||!Array.isArray(res.data.klines))throw Error("接口无K线数据");let out=[];for(const line of res.data.klines){const r=line.split(",");if(r.length<5)continue;const b={t:barTime(r[0]),o:safeN(r[1]),c:safeN(r[2]),h:safeN(r[3]),l:safeN(r[4])};if([b.o,b.c,b.h,b.l].every(Number.isFinite)&&b.o>0&&b.c>0&&b.h>=b.l)out.push(b)}if(out.length<55)throw Error("有效K线不足");out.sort((a,b)=>a.t.localeCompare(b.t));return out.filter((b,i)=>i===0||b.t!==out[i-1].t)}
 function endpoint(secid,klt,lmt){return "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid="+encodeURIComponent(secid)+"&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt="+klt+"&fqt=0&beg=0&end=20500101&lmt="+lmt}
 function jsonp(url){return new Promise((resolve,reject)=>{let done=false;const cb="emData_"+Date.now()+"_"+Math.random().toString(36).slice(2);const script=document.createElement("script");function finish(err,data){if(done)return;done=true;clearTimeout(timer);delete window[cb];script.remove();err?reject(err):resolve(data)}const timer=setTimeout(()=>finish(Error("行情接口超时")),8500);window[cb]=data=>finish(null,data);script.onerror=()=>finish(Error("行情接口访问受限"));script.src=url+"&cb="+cb+"&_="+Date.now();document.head.appendChild(script)})}
-function filterFinal(bars,p){const now=shNow(),today=dayKey(now),clock=shClock();return bars.filter(b=>{if(p==="15"||p==="60"){return b.t<now}if(p==="D"){return dayKey(b.t)<today||(dayKey(b.t)===today&&clock>="15:08")}if(p==="W"){const d=dayKey(b.t),day=new Date(today+"T12:00:00+08:00").getDay();const thisMon=new Date(today+"T12:00:00+08:00");thisMon.setDate(thisMon.getDate()-(day+6)%7);const monday=thisMon.toISOString().slice(0,10);return d<monday||(d<=today&&((day===5&&clock>="15:08")||day===6||day===0))}return true})}
-function resample(src,size){const days={};for(const b of src){const d=dayKey(b.t);(days[d]||(days[d]=[])).push(b)}const out=[];for(const d of Object.keys(days).sort()){const rows=days[d].sort((a,b)=>a.t.localeCompare(b.t));const slots=[];for(const b of rows){const hm=b.t.slice(11,16),end=hm.slice(0,2)*60+Number(hm.slice(3));let pos=end<=690?end-570:end>=795?end-660:-1; // 09:45=>15; 13:15=>135
-if(pos>0&&pos<=240){const index=Math.round(pos/15)-1;if(index>=0&&index<16)slots[index]=b}}
-for(let start=0;start<16;start+=size){const expected=Math.min(size,16-start),group=slots.slice(start,start+expected);if(group.length!==expected||group.some(x=>!x))continue;out.push({t:group[group.length-1].t,o:group[0].o,c:group[group.length-1].c,h:Math.max(...group.map(x=>x.h)),l:Math.min(...group.map(x=>x.l))})}}
-return out}
-function resampleHourly(src){const days={};for(const b of src){const d=dayKey(b.t);(days[d]||(days[d]=[])).push(b)}const out=[];for(const d of Object.keys(days).sort()){const a=days[d].sort((x,y)=>x.t.localeCompare(y.t));for(let k=0;k+1<a.length;k+=2){if(k>=4)break;const g=a.slice(k,k+2);if(g.length!==2)continue;out.push({t:g[1].t,o:g[0].o,c:g[1].c,h:Math.max(g[0].h,g[1].h),l:Math.min(g[0].l,g[1].l)})}}return out}
+function tradingMinute(t){
+ const [hour,minute]=t.slice(11,16).split(":").map(Number);
+ if(minute<0||minute>=60)return 0;
+ const end=hour*60+minute;
+ if(end>570&&end<=690)return end-570; // 09:30–11:30
+ if(end>780&&end<=900)return end-660; // 13:00–15:00
+ return 0;
+}
+function filterFinal(bars,p,now=shNow()){
+ const today=dayKey(now),clock=now.slice(11,16);
+ if(p==="15"||p==="60")return bars.filter(b=>{
+  const minute=tradingMinute(b.t);
+  return minute>0&&minute%Number(p)===0&&b.t<now;
+ });
+ if(p==="D")return bars.filter(b=>dayKey(b.t)<today||(dayKey(b.t)===today&&clock>="15:08"));
+ if(p==="W"){
+  // The Shanghai calendar date must not inherit the browser's local weekday.
+  const week=new Date(today+"T00:00:00Z"),day=week.getUTCDay();
+  week.setUTCDate(week.getUTCDate()-(day+6)%7);
+  const monday=week.toISOString().slice(0,10);
+  const closed=(day===5&&clock>="15:08")||day===6||day===0;
+  return bars.filter(b=>dayKey(b.t)<monday||(closed&&dayKey(b.t)<=today));
+ }
+ return bars;
+}
+function resample(src,size,sourceMinutes=15){
+ const slotCount=240/sourceMinutes,days=new Map(),out=[];
+ for(const bar of src){
+  const minute=tradingMinute(bar.t),day=dayKey(bar.t);
+  if(!minute||minute%sourceMinutes!==0)continue;
+  if(!days.has(day))days.set(day,Array(slotCount).fill(null));
+  days.get(day)[minute/sourceMinutes-1]=bar;
+ }
+ for(const day of [...days.keys()].sort()){
+  const slots=days.get(day);
+  for(let start=0;start<slotCount;start+=size){
+   const group=slots.slice(start,start+size);
+   if(group.includes(null))continue;
+   const last=group.at(-1);
+   out.push({t:last.t,o:group[0].o,c:last.c,h:Math.max(...group.map(b=>b.h)),l:Math.min(...group.map(b=>b.l))});
+  }
+ }
+ return out;
+}
+function resampleHourly(src){return resample(src,2,60)}
 function ema(series,n){const out=[];const k=2/(n+1);for(let i=0;i<series.length;i++){out.push(i===0?series[i]:out[i-1]*(1-k)+series[i]*k)}return out}
 const EPS=1e-9;
 function scanStructure(bars,dif,hist){
@@ -638,7 +676,23 @@ function calculate(bars){
  }
  return output;
 }
-function processAll(){store={};replayCache=null;for(let j=0;j<4;j++){const a=raw[j];if(!a)continue;const m=filterFinal(a["15"]||[],"15"),h=filterFinal(a["60"]||[],"60"),d=filterFinal(a["101"]||[],"D"),w=filterFinal(a["102"]||[],"W");store[j]={};store[j]["15"]=calculate(m);store[j]["60"]=calculate(h.length>65?h:resample(m,4));store[j]["90"]=calculate(resample(m,6));store[j]["120"]=calculate(h.length>65?resampleHourly(h):resample(m,8));store[j].D=calculate(d);store[j].W=calculate(w)}render()}
+function completedPeriodBars(series,now=shNow()){
+ const minute=filterFinal(series["15"]||[],"15",now);
+ // Keep archived coverage and fill gaps in the direct feed from complete 15-minute groups.
+ const hourly=mergeHistoricalBars(resample(minute,4),filterFinal(series["60"]||[],"60",now));
+ return {"15":minute,"60":hourly,"90":resample(minute,6),"120":resampleHourly(hourly),
+  D:filterFinal(series["101"]||[],"D",now),W:filterFinal(series["102"]||[],"W",now)};
+}
+function processAll(){
+ store={};replayCache=null;
+ const now=shNow();
+ for(let j=0;j<4;j++){
+  if(!raw[j])continue;
+  const series=completedPeriodBars(raw[j],now);
+  store[j]=Object.fromEntries(PERIODS.map(([p])=>[p,calculate(series[p])]));
+ }
+ render();
+}
 function getSignal(i,p){return store[i]&&store[i][p]||null}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function nLabel(v){return v>0?"高"+v:v<0?"低"+(-v):"九转—"}
@@ -1473,10 +1527,10 @@ function render(){renderPeriods();renderResonance();renderQuick();renderReplay()
 
 function paintDataSource(directHits){
  const valid=Object.values(store).reduce((a,m)=>a+PERIODS.filter(p=>m[p[0]]).length,0);
- const recent15=Object.values(raw).flatMap(q=>q["15"]?[q["15"].at(-1).t]:[]).sort().at(-1)||"未知";
+ const recent15=Object.values(store).map(q=>q["15"]?.bars.at(-1)?.t).filter(Boolean).sort().at(-1)||"未知";
  byId("statusdot").className="dot "+(valid?"ok":"bad");
  byId("status").textContent=valid===24?"24/24周期有数据":valid?valid+"/24周期有数据":"行情暂不可用";
- byId("updated").textContent="最新15分K线 "+recent15.slice(0,16).replace("T"," ")+"（北京时间）";
+ byId("updated").textContent="最新已完成15分K线 "+recent15.slice(0,16).replace("T"," ")+"（北京时间）";
  const detail=directHits===16?"行情直连":directHits?"直连+归档补充":usedSnapshot?"归档快照":"行情源无响应";
  byId("sourceline").textContent="数据：东方财富公开指数K线 / 腾讯归档备用源 · "+detail+
  (Object.keys(historyCache).length?" · 历史库"+Object.keys(historyCache).join("/"):" · 历史扩展尚未载入");

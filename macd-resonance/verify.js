@@ -7,8 +7,8 @@ assert(script,"Dashboard script missing");new vm.Script(script,{filename:"dashbo
 const cut=script.indexOf('byId("refresh").onclick=load;');assert(cut>0,"Engine isolation failed");
 const sandbox={window:{},document:{},console};
 vm.createContext(sandbox);
-vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,projectionHTML,isFocusedProjection,resample,resampleHourly,ema,localWave};",sandbox,{timeout:3000});
-const {calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,ema}=sandbox.testApi;
+vm.runInContext(script.slice(0,cut)+";this.testApi={calculate,scanStructure,analyzeLifecycle,projectNext,projectionHTML,isFocusedProjection,resample,resampleHourly,completedPeriodBars,shNow,ema,localWave};",sandbox,{timeout:3000});
+const {calculate,scanStructure,analyzeLifecycle,projectNext,resample,resampleHourly,completedPeriodBars,shNow,ema}=sandbox.testApi;
 let assertions=0;
 function ok(value,label){assert(value,label);assertions++}
 function equal(actual,expected,label){assert.equal(actual,expected,label);assertions++}
@@ -84,6 +84,31 @@ equal(resample(minute,6)[1].t,"2026-11-12T14:00","90m middle bar ends at 14:00")
 const hourly=[minute[3],minute[7],minute[11],minute[15]];
 equal(resampleHourly(hourly).length,2,"120m morning/afternoon buckets");
 equal(resampleHourly(hourly)[0].t,"2026-11-12T11:30","120m morning close");
+for(const missing of [0,1,5]){
+ const partial=minute.filter((_,i)=>i!==missing);
+ for(const size of [4,6,8]){
+  const expected=Array.from(resample(minute,size).filter((_,i)=>i!==Math.floor(missing/size)),b=>b.t);
+  assert.deepEqual(Array.from(resample(partial,size),b=>b.t),expected,"A missing slot drops only its own bucket");
+ }
+}
+const irregular={...minute[0],t:"2026-11-12T09:46"};
+equal(resample([irregular,...minute.slice(1)],6).length,2,"Off-grid timestamp cannot fill the 09:45 slot");
+const completeAfternoon=resampleHourly(hourly.slice(1));
+equal(completeAfternoon.length,1,"120m must never pair morning and afternoon hours");
+equal(completeAfternoon[0].t,"2026-11-12T15:00","A missing morning hour does not discard the valid afternoon session");
+equal(completeAfternoon[0].o,hourly[2].o,"120m afternoon open comes from the 14:00 hour");
+const augmented=completedPeriodBars({"15":minute,"60":[{...hourly[0],c:100.01}]},"2026-11-12T15:01");
+equal(augmented["60"].length,4,"Direct 60m delivery can extend or fill the archive without replacing its coverage");
+equal(augmented["60"][0].c,100.01,"Verified direct 60m candle takes precedence for the same timestamp");
+equal(augmented["120"].length,2,"Two hours from either source still close a session");
+const unfinished=completedPeriodBars({"15":minute,"60":hourly},"2026-11-12T15:00");
+equal(unfinished["15"].at(-1).t,"2026-11-12T14:45","Do not admit a source bar until after its label minute");
+equal(unfinished["90"].at(-1).t,"2026-11-12T14:00","Ignore the unfinished final 60m bucket in the 90m view");
+equal(unfinished["120"].at(-1).t,"2026-11-12T11:30","Ignore incomplete afternoon session");
+const weeklyProbe=[{t:"2026-11-06"},{t:"2026-11-12"},{t:"2026-11-13"}];
+equal(completedPeriodBars({"102":weeklyProbe},"2026-11-13T15:07").W.length,1,"The current Shanghai week remains open before the Friday close buffer");
+equal(completedPeriodBars({"102":weeklyProbe},shNow(new Date("2026-11-13T07:08:00Z"))).W.at(-1).t,"2026-11-13","Friday weekly close is independent of the browser's timezone");
+equal(completedPeriodBars({"102":weeklyProbe},shNow(new Date("2026-11-15T16:00:00Z"))).W.at(-1).t,"2026-11-13","A completed Friday bar stays completed on Shanghai Monday");
 equal(ema(Array(70).fill(100),12).at(-1),100,"EMA constant input");
 equal(calculate(Array.from({length:40},(_,i)=>({t:"t"+i,o:100,c:100,h:100,l:100}))),null,"Insufficient bars");
 const simple=calculate(Array.from({length:110},(_,i)=>({t:"t"+i,o:100+i*.05,c:100+i*.05,h:101+i*.05,l:99+i*.05})));

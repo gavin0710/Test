@@ -8,6 +8,13 @@ on:
       - "macd-resonance/verify.js"
       - "macd-resonance/verify-ledger-history.js"
       - ".github/workflows/macd-structure-verification.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "macd-resonance/index.html"
+      - "macd-resonance/verify.js"
+      - "macd-resonance/verify-ledger-history.js"
+      - ".github/workflows/macd-structure-verification.yml"
 permissions:
   contents: read
 jobs:

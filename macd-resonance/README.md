@@ -77,10 +77,29 @@
 
 长历史源由api/history.js提供；即时归档由api/latest.js提供。前端仅用已完成K线形成正式信号。
 
+60/90/120分钟的15分钟派生K线使用北京时间固定交易时段。有缺柱时跳过所在组，保留同日其余完整组。60分钟直采与派生合并，同一收盘时点优先取直采。90分钟为90、90和尾段60分钟，120分钟按上午和下午各自完整的两小时聚合。
+
+## 上证日线 ETF 执行试验
+
+`research-etf-execution.js` 读取东方财富 510210 未复权日线原始 JSON，并调用同一套上证指数日线信号引擎。输出每日净值、模拟成交和资金不足等未成交记录。样本、执行假设、结果和局限见 [HANDOFF.md](./HANDOFF.md#上证日线-etf-执行试验)。
+
+```sh
+cd macd-resonance
+curl --fail --silent --show-error \
+  'https://push2his.eastmoney.com/api/qt/stock/kline/get?fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57&klt=101&beg=20100101&end=20261113&lmt=10000&secid=1.510210&fqt=0' \
+  -o /tmp/macd-510210.json
+node research-etf-execution.js /tmp/macd-510210.json > /tmp/macd-510210-execution.json
+```
+
+- [标的指数与上市日期](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2026-11-10/510210_20261110_1JB0.pdf)
+- [上交所 ETF 买卖、交易单位和 T+1](https://www.sse.com.cn/assortment/fund/etf/question/)
+- [2021年份额拆分](https://www.sse.com.cn/disclosure/fund/announcement/c/2021-01-25/510210_20210125_1.pdf)
+- 2023年现金分红公告：[6月](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2023-06-15/510210_20230615_FMT6.pdf)、[8月](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2023-08-18/510210_20230818_9JSP.pdf)、[12月](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2023-12-15/510210_20231215_KIPN.pdf)
+
 ## 验收
 
 规则回归：`node macd-resonance/verify.js`；真实历史结构账本：`node macd-resonance/verify-ledger-history.js`；桌面和手机四图界面验收：`node macd-resonance/verify-ledger-ui.js`（需 Playwright + Chromium）。
 
-生产界面实测：.github/workflows/macd-four-chart-replay-acceptance.yml（包括同日四图回看、历史共振、纠错止损实际执行并计入正式交易统计、移动端与无复盘笔记）。
+生产界面实测：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-ledger-ui.js`。`.github/workflows/macd-four-chart-replay-acceptance.yml` 先比对正式HTML，再执行该验收。浏览器脚本检查四图同日回看、历史共振、已入账的纠错止损和移动端。
 
 所有统计随行情归档更新动态回算，任何历史个数都必须同时交代数据截止时间及不同周期历史长度差异。
