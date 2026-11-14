@@ -9,133 +9,28 @@ permissions: {contents: read}
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
+    env:
+      MACD_BASE_URL: https://macd-resonance-monitor.vercel.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Unit tests - ensure candidate stop is disabled in production
-        run: node macd-resonance/verify.js
       - name: Install Chromium
         run: |
-          npm install --prefix /tmp/macd-fourchart --no-save playwright
-          /tmp/macd-fourchart/node_modules/.bin/playwright install chromium
-      - name: Verify production four-chart synchronized historical replay
+          npm install --prefix /tmp/macd-ledger-v2 --no-save playwright
+          /tmp/macd-ledger-v2/node_modules/.bin/playwright install chromium
+      - name: Wait for the published HTML to match the tested revision
         run: |
-          node <<'NODE'
-          const assert=require('node:assert/strict');
-          const {chromium}=require('/tmp/macd-fourchart/node_modules/playwright');
-          (async()=>{
-            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
-            try{
-              const base='https://macd-resonance-monitor.vercel.app';
-              const page=await browser.newPage({viewport:{width:1500,height:1050}});
-              const errors=[];page.on('pageerror',e=>errors.push(e.message));
-              const response=await page.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
-              assert.equal(response.status(),200);
-              await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:60000});
-              await page.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:60000});
-              const baseline=await page.evaluate(()=>{
-                const rows=getHistoryStats().rows;
-                return {
-                 corrections:rows.reduce((n,r)=>n+(r.v.stats.correctionBuy||0),0),
-                 correctionStops:rows.reduce((n,r)=>n+(r.v.stats.correctionStop||0),0),
-                 completed:rows.reduce((n,r)=>n+r.v.trades.length,0),
-                 cases:replayBuildCases().length,
-                 candidateCases:replayBuildCases().filter(c=>c.hasCandidateStop).length
-                };
-              });
-              console.log('FORMAL_BASELINE',JSON.stringify(baseline));
-              assert(baseline.corrections>=8,'Original correction entries were lost after disabling trial stop');
-              assert.equal(baseline.correctionStops,0,'Candidate stop leaked into official transactions');
-              assert(baseline.candidateCases>0,'No hypothetical stop found in correction history');
-              assert.equal(await page.locator('#replay-memo').count(),0,'Unwanted note editor remains');
-              assert.equal(await page.locator('#replay-save').count(),0,'Unwanted note saving remains');
-              assert.equal(await page.locator('.chart-card:visible').count(),4,'Four charts must appear in market view');
-              await page.locator('#view-replay').click();
-              assert.equal(await page.locator('#replay-kind').inputValue(),'correction');
-              assert.equal(await page.locator('.chart-card:visible').count(),4,'Replay MUST preserve ALL four Kline charts');
-              const cards=await page.locator('.chart-card:visible').count();
-              const sizes=await page.locator('.kplot').evaluateAll(es=>es.map(e=>({w:Math.round(e.getBoundingClientRect().width),h:Math.round(e.getBoundingClientRect().height)})));
-              console.log('CHART_SIZES',JSON.stringify(sizes));
-              assert(sizes.every(x=>x.w>260&&x.h>200),'Replay chart sizing is unusable');
-              const summary=await page.locator('#replay-number').innerText();
-              const chain=await page.locator('.replay-node .node-label').allInnerTexts();
-              console.log('REPLAY_CASENUMBER',summary);
-              console.log('REPLAY_CHAIN',JSON.stringify(chain));
-              assert(chain.some(x=>x.includes('首次买入')));
-              assert(chain.some(x=>x.includes('顶部卖出')));
-              assert(chain.some(x=>x.includes('纠错买回')));
-              assert(chain.some(x=>x.includes('拟纠错止损')));
-              const originalCounts=await page.evaluate(()=>getHistoryStats().rows.reduce((n,r)=>n+r.v.trades.length,0));
-              await page.locator('.replay-node').filter({hasText:'首次买入'}).first().click();
-              const sync=await page.evaluate(()=>{
-               const c=replayCurrent(),node=c.nodes[replayNodeIndex],day=node.t;
-               return {
-                originalIndex:c.index,period:c.period,selectedTime:day,
-                four:[0,1,2,3].map(i=>{
-                 const data=visible(i),at=findEndAtOrBefore(data.bars,day)-1;
-                 return {index:i,first:data.bars[0]?.t,last:data.bars.at(-1)?.t,near:at>=0?data.bars[at].t:null,
-                   centered:at>=0&&at>Math.floor(data.bars.length*.15)&&at<Math.floor(data.bars.length*.85)};
-                }),
-                confluence:replayResonance(c,node)
-               }
-              });
-              console.log('FOUR_CHART_TIME',JSON.stringify(sync));
-              assert(sync.four.every(x=>x.centered||x.first===undefined),'Four charts should align selected historical time in visible center');
-              assert(sync.four.some(x=>x.near===sync.selectedTime),'At least selected index should have exact candle');
-              assert.equal(sync.confluence.direction,'buy');
-              assert(sync.confluence.items.length===4);
-              assert(sync.confluence.matched>=1);
-              const historicCard=await page.evaluate(()=>{
-                const c=replayCurrent(),v=getSignal(c.index,c.period),node=c.nodes[replayNodeIndex];
-                const at=findEndAtOrBefore(v.bars,node.t)-1;
-                return {
-                 header:document.querySelector('#card'+c.index+' .closeprice')?.textContent,
-                 close:v.bars[at]?.c,
-                 last:v.bars.at(-1).c,
-                 label:document.querySelector('#card'+c.index+' .latest')?.textContent
-                };
-              });
-              console.log('HISTORICAL_PRICE_HEADER',JSON.stringify(historicCard));
-              assert(Math.abs(parseFloat(historicCard.header.replace(/,/g,''))-historicCard.close)<0.02,'Header must display selected historical close, not last-day close');
-              assert(historicCard.label.includes('复盘时点'));
-              assert.equal(await page.locator('.confluence-item').count(),4);
-              await page.locator('.replay-node').filter({hasText:'拟纠错止损'}).first().click();
-              const candidate=await page.evaluate(()=>{
-                const c=replayCurrent(),node=c.nodes[replayNodeIndex];
-                return {label:node.title,kind:node.ev?.type,reference:node.reference,
-                 visible:visible(c.index).bars.some(b=>b.t===node.t),
-                 trades:getHistoryStats().rows.reduce((n,r)=>n+r.v.trades.length,0)};
-              });
-              console.log('CANDIDATE_ONLY',JSON.stringify(candidate));
-              assert.equal(candidate.kind,'candidateCorrectionStop');
-              assert.equal(candidate.reference,true);
-              assert(candidate.visible);
-              assert.equal(candidate.trades,originalCounts,'Review candidate stop must NEVER alter trades');
-              assert((await page.locator('#replay-compare').innerText()).includes('未启用'));
-              await page.locator('#replay-kind').selectOption('candidateStop');
-              console.log('CANDIDATE_FILTER',await page.locator('#replay-number').innerText());
-              assert(await page.locator('.replay-node').filter({hasText:'拟纠错止损'}).count()>0);
-              await page.locator('#replay-kind').selectOption('unpairedSell');
-              assert((await page.locator('#replay-number').innerText()).includes('/'));
-              await page.locator('#replay-kind').selectOption('all');
-              await page.locator('#view-market').click();
-              assert.equal(await page.locator('.chart-card:visible').count(),4);
-              assert.deepEqual(errors,[]);
-              console.log('DESKTOP_ALL_PASS');
-              const mobile=await browser.newPage({viewport:{width:390,height:844}});
-              const mobilestatus=await mobile.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
-              assert.equal(mobilestatus.status(),200);
-              await mobile.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('24/24'),null,{timeout:60000});
-              await mobile.waitForFunction(()=>getSignal(0,'D')?.bars?.length>=8763,null,{timeout:60000});
-              await mobile.locator('#view-replay').click();
-              assert.equal(await mobile.locator('.chart-card:visible').count(),4);
-              assert.equal(await mobile.locator('.confluence-item').count(),4);
-              assert(await mobile.locator('#replay-confluence').isVisible());
-              console.log('MOBILE_FOUR_CHARTS_PASS');
-              console.log('ALL_PASS');
-            }finally{await browser.close()}
-          })().catch(err=>{console.error(err);process.exit(1)});
-          NODE
+          for attempt in {1..12}; do
+            if curl --silent --show-error --fail --max-time 10 "$MACD_BASE_URL/?verify=$GITHUB_SHA-$attempt" -o /tmp/macd-production.html \
+               && cmp -s /tmp/macd-production.html macd-resonance/index.html; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "The production alias does not serve this revision."
+          exit 1
+      - name: Verify production desktop and mobile replay
+        run: node macd-resonance/verify-ledger-ui.js

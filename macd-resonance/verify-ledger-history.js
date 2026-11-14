@@ -7,28 +7,36 @@ const code=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 const cut=code.indexOf('byId("refresh").onclick=load;');
 assert(cut>0);
 const ctx=vm.createContext({window:{},document:{},console});
-vm.runInContext(code.slice(0,cut)+";this.api={calculate,resample,resampleHourly};",ctx,{timeout:5000});
-const {calculate,resample,resampleHourly}=ctx.api;
+vm.runInContext(code.slice(0,cut)+";this.api={calculate,completedPeriodBars,mergeHistoricalBars};",ctx,{timeout:5000});
+const {calculate,completedPeriodBars,mergeHistoricalBars:merge}=ctx.api;
 const data=name=>JSON.parse(fs.readFileSync(path.join(root,"data",name),"utf8"));
 const latest=data("latest.json"),daily=data("history-101.json"),weekly=data("history-102.json"),minute=data("history-15.json");
 const names=["上证指数","深证成指","创业板指","科创50"];
-const merge=(...xs)=>{
- const m=new Map();
- for(const arr of xs)for(const b of arr||[])if(b&&typeof b.t==="string"&&Number.isFinite(b.c))m.set(b.t,b);
- return [...m.values()].sort((a,b)=>a.t.localeCompare(b.t));
-};
+const now=process.env.MACD_HISTORY_AS_OF;
 const outputs=[];
 for(let j=0;j<4;j++){
  const m=merge(minute.data[j]["15"],latest.data[j]["15"]);
- const h=merge(latest.data[j]["60"]);
- const barsByPeriod={
-  "15":m,"60":h.length>65?h:resample(m,4),
-  "90":resample(m,6),"120":h.length>65?resampleHourly(h):resample(m,8),
-  D:merge(daily.data[j]["101"],latest.data[j]["101"]),
-  W:merge(weekly.data[j]["102"],latest.data[j]["102"])
- };
+ const barsByPeriod=completedPeriodBars({
+  "15":m,"60":latest.data[j]["60"],
+  "101":merge(daily.data[j]["101"],latest.data[j]["101"]),
+  "102":merge(weekly.data[j]["102"],latest.data[j]["102"])
+ },now);
+ const minuteDates=[...new Set(m.map(b=>b.t.slice(0,10)))];
+ const missingOpen=new Set(minuteDates.map(d=>d+"T09:45"));
+ const missingInterior=new Set(minuteDates.map(d=>d+"T10:00"));
+ for(const removed of [missingOpen,missingInterior]){
+  const complete=completedPeriodBars({"15":m},now);
+  const partial=completedPeriodBars({"15":m.filter(b=>!removed.has(b.t))},now);
+  for(const [period,close] of [["60","10:30"],["90","11:00"],["120","11:30"]]){
+   assert.deepEqual(partial[period],complete[period].filter(b=>b.t.slice(11)!==close),
+    "A real source gap can only remove its own aggregation bucket: "+names[j]+" "+period);
+  }
+ }
  for(const [p,bars]of Object.entries(barsByPeriod)){
   const v=calculate(bars);assert(v&&v.bars.length>60,"No data "+names[j]+" "+p);
+  assert(bars.every((b,i)=>[b.o,b.c,b.h,b.l].every(Number.isFinite)&&b.l>0&&
+   b.l<=Math.min(b.o,b.c)+.011&&b.h>=Math.max(b.o,b.c)-.011&&(!i||bars[i-1].t<b.t)),
+   "Finite, ordered OHLC for "+names[j]+" "+p);
   const buys=v.events.filter(e=>e.type==="buy"),ledger=v.structureLedger;
   assert.equal(ledger.length,buys.length,"Every first buy requires one bottom structure");
   assert.equal(new Set(ledger.map(c=>c.structureId)).size,ledger.length,"Unique bottom structure keys");
@@ -72,7 +80,7 @@ for(let j=0;j<4;j++){
    topExits:v.stats.sellExits,correctionStops:v.stats.correctionStop,correctionStopUnits:v.stats.correctionStopUnits});
  }
 }
-const sse=calculate(merge(daily.data[0]["101"],latest.data[0]["101"]));
+const sse=calculate(completedPeriodBars({"101":merge(daily.data[0]["101"],latest.data[0]["101"])},now).D);
 const janBuy=sse.events.find(e=>e.type==="buy"&&e.t.startsWith("2024-01-16"));
 if(janBuy){
  const stop=sse.events.find(e=>e.type==="stopLoss"&&e.structureId===janBuy.structureId);

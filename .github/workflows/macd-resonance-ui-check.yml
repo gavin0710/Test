@@ -7,6 +7,12 @@ on:
       - ".github/workflows/macd-resonance-ui-check.yml"
       - "macd-resonance/index.html"
       - "macd-resonance/verify-ledger-ui.js"
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/macd-resonance-ui-check.yml"
+      - "macd-resonance/index.html"
+      - "macd-resonance/verify-ledger-ui.js"
 permissions:
   contents: read
 jobs:
