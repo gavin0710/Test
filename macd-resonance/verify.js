@@ -96,7 +96,7 @@ ok(uiSegment.includes("laterBuy"),"Fourth and later buys are retained");
 ok(script.includes("function buySignalEvents("),"Historical signal navigator implemented");
 ok(script.includes("function navigateBuy("),"Previous and next buy navigation implemented");
 ok(script.includes("function jumpToBuy("),"Exact candle index navigation implemented");
-ok(uiSegment.includes("visibleBars===0?100:visibleBars"),"Full-history mode stays legible at 100 bars and pans through entire range");
+ok(uiSegment.includes("visibleBars===0?densityBars:visibleBars"),"Full-history mode stays legible at user-adjustable candle density");
 ok(uiSegment.includes("function setPanOffset("),"Horizontal chart panning implemented");
 ok(uiSegment.includes("function pointerStart(")&&uiSegment.includes("function pointerMove("),"Pointer-drag supports history navigation");
 ok(uiSegment.includes("panOffsetByPeriod"),"Panning retains independent scroll positions by period");
@@ -169,6 +169,42 @@ equal(sold.counts.sellExits,1,"Bottom buy and same-timeframe top sell paired");
 equal(sold.counts.stopExits,0,"Valid top exit not counted as stop");
 equal(sold.counts.open,0,"Matched trade no longer pending");
 equal(sold.trades[0].exitType,"topSell","Top exit tagged distinctly");
+
+// A top-side DIF breakout after a PAIRed top exit is a linked correction buy,
+// provided fewer than three consecutive non-red histogram columns elapsed.
+function topCorrection({equal=false,tooLate=false,unpaired=false,secondExit=false}={}){
+ const n=40,bars=Array.from({length:n},(_,i)=>({t:"T"+String(i).padStart(3,"0"),o:100+i,c:100+i,h:101+i,l:99+i}));
+ const dif=Array(n).fill(1),hist=Array(n).fill(1);
+ dif[20]=2;dif[21]=2.35;dif[22]=equal?2.5:2.8;
+ const raw=[{type:"sell",i:20,t:bars[20].t,regionStart:18,ref:{dif:2.5,close:100}}];
+ if(!unpaired)raw.unshift({type:"buy",i:10,t:bars[10].t,regionStart:8,ref:{dif:-2,close:90}});
+ if(tooLate){hist[21]=-1;hist[22]=-1;hist[23]=-1;dif[22]=2.4;dif[23]=2.4;dif[24]=2.9}
+ if(secondExit){raw.push({type:"sell",i:30,t:bars[30].t,regionStart:28,ref:{dif:3.3,close:120}})}
+ return analyzeLifecycle(bars,dif,hist,raw);
+}
+const corrected=topCorrection();
+equal(corrected.counts.correctionBuy,1,"Top DIF high breakout opens one linked correction buy");
+equal(corrected.events.filter(e=>e.type==="correctionBuy").length,1,"Correction event appears once");
+equal(corrected.trades.length,1,"Original top-sell leg closed normally");
+equal(corrected.trades[0].exitType,"topSell","Correction requires actual completed top sale");
+equal(corrected.position?.entryType,"correctionBuy","Correction stays open absent later sell");
+equal(corrected.position?.campaignI,10,"Correction retains the original buy index");
+equal(corrected.position?.originalEntryT,"T010","Original entry date preserved");
+equal(corrected.position?.correctionCount,1,"Correction sequence is named");
+equal(topCorrection({equal:true}).counts.correctionBuy,0,"DIF equal to reference high cannot trigger correction");
+equal(topCorrection({tooLate:true}).counts.correctionBuy,0,"Three opposite histogram columns invalidate correction");
+equal(topCorrection({unpaired:true}).counts.correctionBuy,0,"Unpaired top sell never opens phantom correction");
+const soldAgain=topCorrection({secondExit:true});
+equal(soldAgain.trades.length,2,"Rebuy and second top sell form two auditable legs");
+equal(soldAgain.trades[0].campaignI,soldAgain.trades[1].campaignI,"Both legs link the same original buy");
+equal(soldAgain.trades[1].entryType,"correctionBuy","Second leg identifies correction entry");
+equal(soldAgain.counts.completed,2,"Completed correction counts as a leg, not an independent root campaign");
+ok(html.includes('id="density-minus"')&&html.includes('id="density-plus"'),"K-line density +/- buttons present");
+ok(html.includes('id="quick-chips"')&&html.includes('id="quick-list"'),"Main-view signal event selector present");
+ok(script.includes("function quickCollect(")&&script.includes("function quickPairStatus("),"Buy/sell matched and unmatched filters implemented");
+ok(html.includes("波浪周期成功了待验证"),"Wave analysis explicitly deferred in main statistics");
+ok(html.includes("纠错买回"),"Correction event and linked trade report are visible");
+
 const unpairedSell=analyzeLifecycle(
  Array.from({length:28},(_,i)=>({t:"t"+i,c:100})),Array(28).fill(2),Array(28).fill(1),
  [{type:"sell",i:20,t:"t20",regionStart:16,ref:{dif:3,close:100}}]);
@@ -197,6 +233,5 @@ ok(waveData.at[10].direction==="down","No use of future right-hand bars before c
 ok(waveData.at[15].direction==="down","New high at 12 becomes confirmed index 15");
 ok(waveData.at[18].direction==="down","New low at 16 cannot confirm before index 19");
 ok(waveData.at[19].direction==="up","New low at 16 confirms index 19");
-ok(html.includes('id="wave-entry-body"'),"Wave success rate breakdown table present");
-ok(html.includes('四指数当前波段（临时）'),"Current wave table column present");
+ok(!html.includes('id="wave-entry-body"'),"Wave win-rate subgroup removed from main view for current optimization phase");
 console.log("PASS:",assertions,"assertions: close prices, >=3 separators, region-DIF, second/third structures, stop before 3 opposite bars, time-frame-local sell exits, unresolved holds, EMA thresholds and verified OHLC");
