@@ -10,7 +10,7 @@ vm.runInContext(script.slice(0,cut)+';this.api={calculate,resample,resampleHourl
 const {calculate,resample,resampleHourly}=scope.api,j=p=>JSON.parse(fs.readFileSync(path.join(root,'data',p),'utf8'));
 const latest=j('latest.json'),hd=j('history-101.json'),hw=j('history-102.json'),hm=j('history-15.json');
 const idxNames=['上证指数','深证成指','创业板指','科创50'],periods=[['15','15分钟'],['60','60分钟'],['90','90分钟'],['120','120分钟'],['D','日线'],['W','周线']];
-const keys=['activeOnly','rearmActiveNew','rearmAfterNewBuy','permanentOwnDIF'];
+const keys=['activeOnly','rearmOnNewFailure','rearmCrossNew','rearmActiveNew','rearmAfterNewBuy','permanentOwnDIF'];
 const merge=(...series)=>{const x=new Map();for(const s of series)for(const b of s||[])if(b?.t&&Number.isFinite(b.c))x.set(b.t,b);return [...x.values()].sort((a,b)=>a.t.localeCompare(b.t))};
 const round=x=>Number.isFinite(x)?+x.toFixed(3):null;
 const atr=bars=>{
@@ -48,6 +48,24 @@ for(let ix=0;ix<4;ix++){
      const isFailure=cyc.endReason==='DIF made new reference extreme'&&cyc.endedAt===k;
      if(key==='activeOnly'){if(isFailure){trigger='ownStructureFailure';stopI=k;break}}
      else if(key==='permanentOwnDIF'){if(v.dif[k]<rootRef-1e-9){trigger=previouslyClosed?'oldDIFBelowAfterExpiry':'ownDIFBelow';stopI=k;break}}
+     else if(key==='rearmOnNewFailure'||key==='rearmCrossNew'){
+      if(isFailure){trigger='ownStructureFailure';stopI=k;break}
+      if(previouslyClosed&&v.dif[k]<rootRef-1e-9){
+       const activeNew=newerBuys.filter(x=>{
+        const c=cycs.get(x.i);
+        return x.i<=k && c && (!Number.isInteger(c.endedAt)||c.endedAt>=k);
+       });
+       const isNewFailure=activeNew.some(x=>{
+        const c=cycs.get(x.i);
+        return c?.endedAt===k&&c?.endReason==='DIF made new reference extreme';
+       });
+       const justCrossed=v.dif[k-1]>=rootRef-1e-9;
+       if(activeNew.length&&(key==='rearmOnNewFailure'?isNewFailure:justCrossed)){
+        trigger=key==='rearmOnNewFailure'?'oldFloorOnNewStructureFailure':'oldFloorCrossDuringNewStructure';
+        stopI=k;break;
+       }
+      }
+     }
      else if(key==='rearmActiveNew'||key==='rearmAfterNewBuy'){
       if(isFailure){trigger='ownStructureFailure';stopI=k;break}
       if(previouslyClosed&&v.dif[k]<rootRef-1e-9){
@@ -117,6 +135,18 @@ const cases=changed.map(x=>({
  originalExit:x.methods.activeOnly.exitT,improve:round(x.methods.rearmActiveNew.returnPct-x.methods.activeOnly.returnPct),
  originReturn:round(x.methods.activeOnly.returnPct),rearmReturn:round(x.methods.rearmActiveNew.returnPct)
 }));
+const outcomes={};
+for(const k of keys.filter(k=>k!=='activeOnly')){
+ const modified=data.filter(r=>r.methods[k].exitT!==r.methods.activeOnly.exitT);
+ outcomes[k]={changed:modified.length,
+  improved:modified.filter(r=>r.methods[k].returnPct>r.methods.activeOnly.returnPct).length,
+  worsened:modified.filter(r=>r.methods[k].returnPct<r.methods.activeOnly.returnPct).length,
+  changes:modified.map(r=>({index:r.index,period:r.period,entryT:r.entryT,stopT:r.methods[k].exitT,
+   baseExit:r.methods.activeOnly.exitT,baseReturn:round(r.methods.activeOnly.returnPct),candidateReturn:round(r.methods[k].returnPct),
+   reason:r.methods[k].reason})).slice(0,50)
+ };
+}
+console.log('REARM_VARIANTS',JSON.stringify({outcomes,summary:keys.map(k=>({name:k,...summary(data,k)})),recent2020:keys.map(k=>({name:k,...summary(data.filter(e=>Number(e.entryT.slice(0,4))>=2020),k)}))}));
 console.log('REARM_FINDINGS',JSON.stringify({cases,changed:changed.length,better:cases.filter(x=>x.improve>0).length,worse:cases.filter(x=>x.improve<0).length,
  across:keys.map(k=>({name:k,...summary(data,k)})),recent2020:keys.map(k=>({name:k,...summary(data.filter(e=>Number(e.entryT.slice(0,4))>=2020),k)}))}));
 console.log('TRANCHE_ALL_PASS');
