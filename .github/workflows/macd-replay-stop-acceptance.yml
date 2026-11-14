@@ -1,4 +1,5 @@
 name: MACD linked trade replay and correction stop acceptance
+# Final rerun after mobile asynchronous data hydration and production table repairs
 on:
   workflow_dispatch:
   push:
