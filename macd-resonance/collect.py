@@ -96,6 +96,40 @@ def get(secid,ticker,klt,count):
                 time.sleep(3+attempt*4)
     raise RuntimeError(f"Failed {secid}/{klt}: "+"; ".join(errors))
 
+
+def archive_intraday(old_data, updated_data):
+    """Append verified 15-minute bars over time; never truncate older history."""
+    destination=DEST.parent/"history-15.json"
+    try:
+        archive=json.loads(destination.read_text("utf-8")) if destination.exists() else {}
+    except (OSError,json.JSONDecodeError):
+        archive={}
+    existing=archive.get("data") if isinstance(archive.get("data"),list) and len(archive["data"])==4 else [{} for _ in INDICES]
+    result=[]
+    for i in range(len(INDICES)):
+        combined={}
+        for batch in [existing[i].get("15",[]),old_data[i].get("15",[]),updated_data[i].get("15",[])]:
+            for b in batch:
+                try:
+                    t=b["t"]
+                    o,c,h,l=(float(b[k]) for k in ("o","c","h","l"))
+                    if not t or o<=0 or c<=0 or not(l<=min(o,c)<=h and l<=max(o,c)<=h):
+                        continue
+                    combined[t]={"t":t,"o":o,"c":c,"h":h,"l":l}
+                except (KeyError,TypeError,ValueError):
+                    continue
+        result.append({"15":[combined[t] for t in sorted(combined)]})
+    if archive.get("data")==result:return
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    payload={"source":"Accumulated verified intraday OHLC, Eastmoney/Tencent",
+            "period":"15",
+            "generated_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
+            "data":result}
+    tmp=destination.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+    os.replace(tmp,destination)
+    print("ARCHIVED_15M",[len(x["15"]) for x in result],flush=True)
+
 def main():
     old={}
     if DEST.exists():
@@ -125,6 +159,7 @@ def main():
         "data":data,"providers":sources,"codes":[x[0] for x in INDICES],"periods":list(PERIODS),
         "failed_sources":failed,
     }
+    archive_intraday(old.get("data") if isinstance(old.get("data"),list) and len(old["data"])==4 else [{} for _ in INDICES],data)
     old_compare={k:old.get(k) for k in ("data","providers","failed_sources")}
     new_compare={k:payload.get(k) for k in old_compare}
     if old_compare==new_compare:
