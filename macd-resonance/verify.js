@@ -89,6 +89,28 @@ equal(calculate(Array.from({length:40},(_,i)=>({t:"t"+i,o:100,c:100,h:100,l:100}
 const simple=calculate(Array.from({length:110},(_,i)=>({t:"t"+i,o:100+i*.05,c:100+i*.05,h:101+i*.05,l:99+i*.05})));
 ok(simple&&Number.isFinite(simple.dif.at(-1)),"MACD price calculation");
 ok(simple.projection!==null,"Projection attached to each complete signal unit");
+// Profit classification uses exactly one initial buy and its first matched exit/stop.
+const winCalc=()=>{
+ const parse=fs.readFileSync(path.join(root,"index.html"),"utf8").match(/<script>([\s\S]*?)<\/script>/)?.[1];
+ const section=parse.slice(parse.indexOf("function tradeSummary("),parse.indexOf("function renderWinRates("));
+ return vm.runInNewContext(section+";tradeSummary");
+};
+const winRate=winCalc();
+const testTrades=[
+ {entryClose:100,exitClose:105,exitType:"topSell"},
+ {entryClose:100,exitClose:98,exitType:"stop"},
+ {entryClose:100,exitClose:100,exitType:"topSell"}
+];
+const sample=winRate(testTrades);
+equal(sample.completed,3,"Exactly three completed trades");
+equal(sample.wins,1,"One positive return is successful");
+equal(sample.losses,1,"One negative return is unsuccessful");
+equal(sample.flats,1,"Breakeven is not a successful trade");
+equal(sample.sellExits,2,"Top sell exit count distinct");
+equal(sample.stopExits,1,"Stop exit included in success-rate denominator");
+ok(Math.abs(sample.winRate-100/3)<1e-8,"Win rate = profitable exits / all completed exits");
+equal(winRate([]).winRate,null,"No completed trades means missing win rate, not zero");
+equal(winRate([{entryClose:0,exitClose:100,exitType:"topSell"}]).completed,0,"Invalid entry price excluded");
 // Lifecycle tests: first turn is buy; later qualifying turns before three opposite-color
 // columns are second and third structure, with a reference DIF break causing a stop.
 function campaign({stop=false,top=false,breakAfterThree=false,closingAt=23}={}){
