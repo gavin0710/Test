@@ -1,49 +1,38 @@
-name: Verify MACD dashboard public preview
-
+name: Verify MACD Vercel public dashboard and history API
 on:
   workflow_dispatch:
   push:
     branches: [master]
     paths:
-      - '.github/workflows/macd-resonance-preview-check.yml'
-      - 'macd-resonance/index.html'
-
+      - ".github/workflows/macd-resonance-preview-check.yml"
 permissions:
   contents: read
-
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
-      - name: Check dashboard is publicly served as HTML
+      - name: Confirm production HTML is public and contains independent structure ledger
         run: |
           set -euo pipefail
-          url='https://raw.githack.com/gavin0710/Test/master/macd-resonance/index.html'
-          for attempt in 1 2 3 4 5; do
-            sleep 4
-            status=$(curl --location --retry 2 --retry-delay 2 --max-time 30 --silent --show-error --output /tmp/preview.html --dump-header /tmp/headers.txt --write-out '%{http_code}' "$url" || true)
-            echo "Attempt $attempt: HTTP $status"
-            if [ "$status" = 200 ] && grep -q 'MACD × 九转' /tmp/preview.html && grep -q 'multi-index' /tmp/preview.html; then break; fi
-            # This page is Chinese. No magic marker required other than real dashboard source.
-            if [ "$status" = 200 ] && grep -q '多指数信号矩阵' /tmp/preview.html && grep -q 'function calculate' /tmp/preview.html; then break; fi
-          done
-          grep -q '多指数信号矩阵' /tmp/preview.html
-          grep -q 'function calculate' /tmp/preview.html
-          grep -i 'content-type:' /tmp/headers.txt | tail -1
-          echo "Dashboard HTML size: $(wc -c < /tmp/preview.html)"
-      - name: Check public market snapshot resolves
+          base='https://macd-resonance-monitor.vercel.app'
+          curl --location --retry 3 --retry-delay 2 --max-time 45 --fail --silent --show-error "$base/" -o /tmp/dashboard.html
+          grep -q '四指共振' /tmp/dashboard.html
+          grep -q 'structureLedger' /tmp/dashboard.html
+          grep -q '新结构买1独立' /tmp/dashboard.html
+          echo "LIVE_HTML_OK $(wc -c < /tmp/dashboard.html)"
+      - name: Verify live archived API structure and all four indices
         run: |
           set -euo pipefail
-          url='https://raw.githack.com/gavin0710/Test/master/macd-resonance/data/latest.json'
-          curl --location --retry 3 --retry-delay 4 --max-time 40 --fail --silent --show-error "$url" -o /tmp/latest.json
+          base='https://macd-resonance-monitor.vercel.app'
+          curl --location --retry 3 --retry-delay 2 --max-time 45 --fail --silent --show-error "$base/api/latest" -o /tmp/latest.json
+          curl --location --retry 3 --retry-delay 2 --max-time 45 --fail --silent --show-error "$base/api/history?period=101" -o /tmp/daily.json
           python - <<'PY'
           import json
-          data=json.load(open('/tmp/latest.json',encoding='utf-8'))
-          assert len(data['data']) == 4
-          print('Source:',data['source'])
-          print('Last archive update:',data['generated_at_utc'])
-          print('Series:',[(i, {k:len(v) for k,v in d.items()}) for i,d in enumerate(data['data'])])
+          latest=json.load(open('/tmp/latest.json',encoding='utf-8'))
+          daily=json.load(open('/tmp/daily.json',encoding='utf-8'))
+          assert len(latest['data'])==4
+          assert daily['period']=='101' and len(daily['data'])==4
+          assert len(daily['data'][0]['101'])>=8763
+          print('LIVE_API_OK',latest['generated_at_utc'],len(daily['data'][0]['101']))
           PY
-      - name: Public preview verified
-        run: echo 'Preview address https://raw.githack.com/gavin0710/Test/master/macd-resonance/index.html'
