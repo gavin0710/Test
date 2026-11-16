@@ -7,6 +7,8 @@ on:
       - "macd-resonance/index.html"
       - "macd-resonance/verify.js"
       - "macd-resonance/verify-ledger-history.js"
+      - "macd-resonance/collect.py"
+      - "macd-resonance/verify-collect.py"
       - ".github/workflows/macd-structure-verification.yml"
   pull_request:
     branches: [master]
@@ -14,6 +16,8 @@ on:
       - "macd-resonance/index.html"
       - "macd-resonance/verify.js"
       - "macd-resonance/verify-ledger-history.js"
+      - "macd-resonance/collect.py"
+      - "macd-resonance/verify-collect.py"
       - ".github/workflows/macd-structure-verification.yml"
 permissions:
   contents: read
@@ -27,3 +31,5 @@ jobs:
         run: node macd-resonance/verify.js
       - name: Verify independent structure ownership against all 24 real historical series
         run: node macd-resonance/verify-ledger-history.js
+      - name: Verify snapshot publication and archive fallback
+        run: python3 macd-resonance/verify-collect.py

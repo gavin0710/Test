@@ -64,10 +64,14 @@ def shift_tencent_minute(t, minute_length, start_times):
     return date.strftime("%Y-%m-%dT%H:%M")
 
 def tencent(ticker, klt, count):
-    if klt in ("15", "60"):
-        typ="m"+klt
-        param=f"{ticker},{typ},,,{min(640,count)}"
-        url="https://web.ifzq.gtimg.cn/appstock/app/kline/mkline?"+urllib.parse.urlencode({"param":param})
+    if klt == "15":
+        typ = "m15"
+        param = f"{ticker},{typ},,{min(640, count)}"
+        url = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?" + urllib.parse.urlencode({"param": param})
+    elif klt == "60":
+        typ = "m60"
+        param = f"{ticker},{typ},,,{min(640, count)}"
+        url = "https://web.ifzq.gtimg.cn/appstock/app/kline/mkline?" + urllib.parse.urlencode({"param": param})
     else:
         typ="day" if klt=="101" else "week"
         param=f"{ticker},{typ},,,{min(640,count)}"
@@ -88,7 +92,10 @@ def get(secid,ticker,klt,count):
     for fn,source in ((lambda: eastmoney(secid,klt,count),"东方财富"),(lambda:tencent(ticker,klt,count),"腾讯备用源")):
         for attempt in range(2):
             try:
+                requested_at = dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime("%Y-%m-%dT%H:%M")
                 rows=fn()
+                if klt == "15":
+                    rows = [bar for bar in rows if bar["t"] < requested_at]
                 if len(rows)<65:raise ValueError(f"Only {len(rows)} usable bars")
                 return rows,source
             except (OSError,ValueError,KeyError,TypeError,IndexError,json.JSONDecodeError) as exc:
@@ -97,14 +104,32 @@ def get(secid,ticker,klt,count):
     raise RuntimeError(f"Failed {secid}/{klt}: "+"; ".join(errors))
 
 
-def archive_intraday(old_data, updated_data):
-    """Append verified 15-minute bars over time; never truncate older history."""
-    destination=DEST.parent/"history-15.json"
+def merge_minute_fallback(previous, archived, incoming, count):
+    # Vendor OHLC can differ at the afternoon open. Keep recorded values on overlap.
+    first = previous[0]["t"] if previous else archived[0]["t"] if archived else ""
+    by_time = {bar["t"]: bar for bar in incoming if bar["t"] >= first}
+    by_time.update((bar["t"], bar) for bar in archived if bar["t"] >= first)
+    by_time.update((bar["t"], bar) for bar in previous)
+    return [by_time[t] for t in sorted(by_time)[-count:]]
+
+
+def snapshot_copy(payload, key):
+    series = payload.get(key)
+    if isinstance(series, list) and len(series) == len(INDICES):
+        return [dict(item) for item in series]
+    return [{} for _ in INDICES]
+
+
+def read_snapshot(path):
     try:
-        archive=json.loads(destination.read_text("utf-8")) if destination.exists() else {}
-    except (OSError,json.JSONDecodeError):
-        archive={}
-    existing=archive.get("data") if isinstance(archive.get("data"),list) and len(archive["data"])==4 else [{} for _ in INDICES]
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def archive_intraday(destination, archive, old_data, updated_data):
+    """Append verified 15-minute bars over time; never truncate older history."""
+    existing = snapshot_copy(archive, "data")
     result=[]
     for i in range(len(INDICES)):
         combined={}
@@ -131,18 +156,20 @@ def archive_intraday(old_data, updated_data):
     print("ARCHIVED_15M",[len(x["15"]) for x in result],flush=True)
 
 def main():
-    old={}
-    if DEST.exists():
-        try:old=json.loads(DEST.read_text(encoding="utf-8"))
-        except (OSError,json.JSONDecodeError):pass
-    data=old.get("data") if isinstance(old.get("data"),list) and len(old["data"])==4 else [{} for _ in INDICES]
-    sources=old.get("providers") if isinstance(old.get("providers"),list) and len(old["providers"])==4 else [{} for _ in INDICES]
+    old = read_snapshot(DEST)
+    data = snapshot_copy(old, "data")
+    sources = snapshot_copy(old, "providers")
+    archive_path = DEST.with_name("history-15.json")
+    archive = read_snapshot(archive_path)
+    archived_data = snapshot_copy(archive, "data")
     failed=[]
     # Prioritize 15m and 60m for all four indexes. Stagger to reduce endpoint throttling.
     for klt,count in PERIODS.items():
         for i,(secid,ticker,name) in enumerate(INDICES):
             try:
                 rows,provider=get(secid,ticker,klt,count)
+                if klt == "15" and provider == "腾讯备用源":
+                    rows = merge_minute_fallback(data[i].get(klt, []), archived_data[i].get(klt, []), rows, count)
                 data[i][klt]=rows
                 sources[i][klt]=provider
                 print(f"{name} {klt} {provider}: {len(rows)} bars, latest {rows[-1]['t']}",flush=True)
@@ -159,7 +186,7 @@ def main():
         "data":data,"providers":sources,"codes":[x[0] for x in INDICES],"periods":list(PERIODS),
         "failed_sources":failed,
     }
-    archive_intraday(old.get("data") if isinstance(old.get("data"),list) and len(old["data"])==4 else [{} for _ in INDICES],data)
+    archive_intraday(archive_path, archive, snapshot_copy(old, "data"), data)
     old_compare={k:old.get(k) for k in ("data","providers","failed_sources")}
     new_compare={k:payload.get(k) for k in old_compare}
     if old_compare==new_compare:

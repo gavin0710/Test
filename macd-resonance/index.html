@@ -1517,10 +1517,14 @@ function bindDashboard(){
 
 function paintDataSource(directHits){
  const valid=Object.values(store).reduce((a,m)=>a+PERIODS.filter(p=>m[p[0]]).length,0);
- const recent15=Object.values(store).map(q=>q["15"]?.bars.at(-1)?.t).filter(Boolean).sort().at(-1)||"未知";
+ const minuteEnds=IDX.map((_,i)=>store[i]?.["15"]?.bars.at(-1)?.t);
+ const recent15=minuteEnds.filter(Boolean).sort().at(-1);
+ const lagging=IDX.filter((_,i)=>minuteEnds[i]!==recent15).map(index=>index.short);
  byId("statusdot").className="dot "+(valid?"ok":"bad");
  byId("status").textContent=valid===24?"24/24周期有数据":valid?valid+"/24周期有数据":"行情暂不可用";
- byId("updated").textContent="最新已完成15分K线 "+recent15.slice(0,16).replace("T"," ")+"（北京时间）";
+ byId("updated").textContent=recent15
+  ?"最新已完成15分K线 "+timestampLabel(recent15)+"（北京时间）"+(lagging.length?" · "+lagging.join("、")+"未同步":"")
+  :"暂无已完成15分K线";
  const detail=directHits===16?"行情直连":directHits?"直连+归档补充":usedSnapshot?"归档快照":"行情源无响应";
  byId("sourceline").textContent="数据：东方财富公开指数K线 / 腾讯归档备用源 · "+detail+
  (Object.keys(historyCache).length?" · 历史库"+Object.keys(historyCache).join("/"):" · 历史扩展尚未载入");
