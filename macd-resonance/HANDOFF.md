@@ -5,11 +5,22 @@
 > 现有本文件保留完整规则、执行试验和历史结论；**START_HERE.md 是给新任务快速上手、了解最新页面待办及双任务协作流程的第一站**，之后仍须核查源代码与实时运行状态。
 
 
-**更新：2026-11-14｜项目：技术分析｜状态：正式看板已上线，持续优化与验证中**
+**更新：2026-11-17（北京时间）｜项目：技术分析｜状态：正式看板已上线，持续优化与验证中**
 
 **入口**：https://macd-resonance-monitor.vercel.app/  
 **源码**：GitHub `gavin0710/Test`，目录 `macd-resonance/`；主文件 `index.html`，说明 `README.md`。  
 **使用方法**：接手新任务时先读本文件及 `README.md`，再检查正式站点、源码、最近 CI 结果；不要从旧聊天或固定统计值猜测现状。
+
+## 2026-11-16 交易日巡检与分钟行情修复
+
+- 沪深两市 11 月 16 日正常交易。巡检时四指数日线已更新，科创 50 的分钟行情仍停在 11 月 13 日 15:00。11 月 16 日 15:24:21（北京时间）采集工作流实际由 `schedule` 触发，东方财富连接失败，原腾讯分钟地址未能解析。当天仅查到这一条常规采集的定时运行记录，仍需观察每 15 分钟的触发覆盖。周度长历史任务也由 `schedule` 触发，08:59:35 开始，沿用上周五的长历史。[上交所休市安排](https://www.sse.com.cn/disclosure/dealinstruc/closed/) · [深交所休市安排](https://www.szse.cn/disclosure/notice/t20251222_618087.html) · [采集记录](https://github.com/gavin0710/Test/actions/runs/43823617409) · [周度归档](https://github.com/gavin0710/Test/actions/runs/43783594267)
+- 从东方财富补录科创 50 当天 16 根 15 分钟 OHLC，原有记录逐根保留。腾讯返回的 16 个时间戳和收盘价全部一致，13:15 的开盘价与最高价存在源差异。采用新浪核对一致的东方财富值。全日 15 分钟线聚合与腾讯日线 OHLC 一致。补录写入 `latest.json` 和 `history-15.json`。[东方财富分钟源](https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.000688&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57&klt=15&fqt=0&beg=0&end=20500101&lmt=640) · [腾讯分钟源](https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000688%2Cm15%2C%2C640) · [新浪分钟源](https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh000688&scale=15&ma=no&datalen=640) · [固定版本归档](https://github.com/gavin0710/Test/blob/b198a4c96683855133340107414c1bdcc1d56769/macd-resonance/data/history-15.json)
+- 修复 `collect.py` 的快照比较。旧代码原地更新源数据和来源映射，来源及报错均相同时会误判为无行情更新。现在以独立映射比较，补充腾讯 15 分钟备用地址，在同一时点优先保留已有 OHLC，并以北京时间已完成后再收录。本轮已用新地址实测四个指数。首页在现有时间栏显示未同步指数。新增采集回归覆盖同源新增、重复采集、已收盘确认与备源补缺。
+- 正式四指数的 15／60／90／120 分钟线均到 **11 月 16 日 15:00**，每个指数当天 16 根 15 分钟线。60 分钟直采四指数仍缺，由完整 15 分钟分桶补齐。页面日线通过近期快照更新到 **11 月 16 日**，`/api/history?period=101` 长归档到 **11 月 13 日**；四指数最后已完成周线也是 **11 月 13 日**。正式首页和四个行情接口均返回 HTTP 200。
+- [PR #7](https://github.com/gavin0710/Test/pull/7) 已合并，发布源码 [`b198a4c`](https://github.com/gavin0710/Test/commit/b198a4c96683855133340107414c1bdcc1d56769)。Vercel 拉取 GitHub 返回 429，改用该提交中的 `index.html`、`api/history.js`、`api/latest.js` 直传原正式项目。[部署 `dpl_7EGhkhJtPiRQwM9bu5kW5DbAYMLk`](https://vercel.com/gavinfunvip-7265/macd-resonance-monitor/7EGhkhJtPiRQwM9bu5kW5DbAYMLk) READY，线上 HTML 与提交逐字节一致。
+- 合并版本的 5651 条规则断言、3 个采集回归和 24 组真实历史账本通过。截至 11 月 13 日的逐根行情、信号、推演及账本与修复前一致。本轮只向科创 50 四个分钟周期增加新行情（16／4／3／2 根）。正式桌面及移动端四图回放通过，单独复验未同步提示与移动版宽度。发布验收的首次运行在别名切换前结束，发布后第 2 次通过。[规则及采集回归](https://github.com/gavin0710/Test/actions/runs/43906304432) · [归档浏览器验收](https://github.com/gavin0710/Test/actions/runs/43906304401) · [正式站验收](https://github.com/gavin0710/Test/actions/runs/43906520121/attempts/2)
+- 合并后原采集工作流完成一次 `push` 运行，GitHub runner 通过腾讯备用地址取到四指数 15 分钟线。已有分钟 OHLC 与回补值逐根保持一致，线上 `/api/latest` 已返回该次采集快照。采集后的 24 组账本复验通过。[发布后采集](https://github.com/gavin0710/Test/actions/runs/43906520237) · [采集提交 `4398ea2`](https://github.com/gavin0710/Test/commit/4398ea27109406a254ce9d4b71cba9ec7e56a35e)
+- 下次巡检对照交易所日历检查日内 `schedule` 记录与四指数 15 分钟档，重点关注连续交易日的收盘补齐和腾讯备源；60 分钟直采继续观察。现有自动采集配置和权限沿用。
 
 ## 2026-11-14 看盘布局与历史同步
 
