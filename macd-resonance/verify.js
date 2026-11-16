@@ -141,6 +141,30 @@ const winCalc=()=>{
  return vm.runInNewContext(section+";tradeSummary");
 };
 const winRate=winCalc();
+
+// A shared latest time must identify indices whose completed minute bars lag behind it.
+const freshness = vm.runInContext("(" + (() => {
+ const elements = {};
+ document.getElementById = id => elements[id] ||= {};
+ const minuteSeries = t => ({"15": {bars: [{t}]}});
+ store = {
+  0: minuteSeries("2026-11-16T15:00"),
+  1: minuteSeries("2026-11-16T15:00"),
+  2: minuteSeries("2026-11-16T15:00"),
+  3: minuteSeries("2026-11-13T15:00")
+ };
+ paintDataSource(0);
+ const lagging = elements.updated.textContent;
+ store[3] = minuteSeries("2026-11-16T15:00");
+ paintDataSource(0);
+ const current = elements.updated.textContent;
+ store = {};
+ paintDataSource(0);
+ return {lagging, current, missing: elements.updated.textContent};
+}).toString() + ")()", sandbox);
+ok(freshness.lagging.includes("科创50未同步"),"Latest timestamp also identifies the lagging index");
+ok(freshness.current.includes("2026-11-16 15:00")&&!freshness.current.includes("未同步"),"All four minute timestamps match");
+equal(freshness.missing,"暂无已完成15分K线","Empty market feed does not present a timestamp");
 const testTrades=[
  {entryClose:100,exitClose:105,exitType:"topSell"},
  {entryClose:100,exitClose:98,exitType:"stop"},
