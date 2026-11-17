@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f4f7f9">
+<title>MACD 成功率分析 | 四指共振</title>
+<style>
+:root{color-scheme:light;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#1b2d3d;background:#f4f7f9;font-synthesis:none;--muted:#526777;--quiet:#647889;--line:#e1e8ed;--teal:#0f6f74;--light:#eef6f6;--wash:#f3f7fa}
+*{box-sizing:border-box}
+body{margin:0;-webkit-font-smoothing:antialiased}
+a{color:var(--teal);text-decoration:none}
+a:hover{text-decoration:underline}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{cursor:default;opacity:.45}
+button:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #11828a;outline-offset:2px}
+[hidden]{display:none!important}
+.wrap{width:min(1280px,100%);margin:auto;padding:22px 24px 44px}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px;font-size:13px}
+.back{min-height:36px;display:inline-flex;gap:8px;align-items:center;font-weight:650}
+.back::before{content:"";height:7px;width:7px;border-left:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);margin-left:3px}
+.asof{color:var(--muted);font-variant-numeric:tabular-nums}
+h1,h2,p{margin:0}
+h1{font-size:clamp(25px,3.2vw,36px);font-weight:760;letter-spacing:-.035em;margin-bottom:18px}
+h2{font-size:17px;line-height:1.4;font-weight:720}
+.filters{display:flex;gap:9px 12px;align-items:end;flex-wrap:wrap}
+.modes{display:flex;align-items:center;gap:3px;padding:3px;border:1px solid var(--line);border-radius:9px;background:#eaf0f4}
+.modes button{min-height:34px;border:0;border-radius:6px;background:transparent;padding:4px 12px;white-space:nowrap;font-size:13px;color:#486071}
+.modes button[aria-pressed=true]{background:#fff;color:#153247;box-shadow:0 1px 3px #16364c15;font-weight:700}
+.field{display:flex;min-height:42px;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+select{border:1px solid #dce5eb;border-radius:7px;min-height:37px;padding:3px 6px;background:#fff;color:#263e51;font-size:13px;max-width:100%}
+.context{font-size:13px;line-height:1.65;color:var(--muted);margin:10px 0 16px}
+.card{margin-top:12px;border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden}
+.inset{padding:16px 18px 14px}
+.section-head{display:flex;align-items:baseline;flex-wrap:wrap;justify-content:space-between;gap:5px 12px;margin:0 0 8px}
+.caption{font-size:12px;line-height:1.65;color:var(--quiet)}
+.reading{margin:8px 0 0;border-left:2px solid #9ababc;padding:3px 0 3px 9px;color:#355668;font-size:12px;line-height:1.7}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid #edf1f4;text-align:left}
+thead th{color:var(--muted);font-weight:590;font-size:12px;line-height:1.2}
+tbody tr:last-child>*{border-bottom:0}
+.overview th,.overview td{padding:7px 9px}
+.overview thead th{padding-top:4px;padding-bottom:4px}
+.overview th:first-child,.overview td:first-child{padding-left:3px}
+.overview tbody th{white-space:nowrap;font-weight:660}
+.overview td:nth-last-child(-n+2),.overview th:nth-last-child(-n+2){text-align:right}
+.scale{display:flex;justify-content:space-between;padding-right:calc(6.7ch + 8px);font-size:11px;font-weight:500;color:var(--quiet)}
+.result-label{display:none}
+.metric{min-width:15ch}
+.rate-button{display:flex;align-items:center;gap:8px;width:100%;min-height:30px;border:0;padding:0;background:transparent;font-variant-numeric:tabular-nums;text-align:left;color:inherit}
+.rate-button:enabled:hover .rate-text{text-decoration:underline}
+.rate-button:disabled{opacity:1}
+.track{flex:1;height:6px;display:block;border-radius:8px;background:#e9eff3;overflow:hidden}
+.fill{display:block;height:100%;min-width:0;border-radius:8px;background:var(--teal)}
+.thin .fill{background:#91a8b4}
+.rate-text{min-width:5.7ch;text-align:right;font-weight:730}
+.thin .rate-text{color:var(--muted)}
+.count{white-space:nowrap}
+.count strong{font-weight:710}
+.cut td,.cut th{border-top:2px solid var(--line)}
+.matrix{table-layout:fixed}
+.matrix :is(td,th){padding:4px 6px;text-align:center}
+.matrix thead tr:first-child th:first-child,.matrix tbody th{text-align:left;width:16%;white-space:nowrap}
+.matrix tbody th{font-weight:660}
+.matrix thead tr:first-child th{padding-top:6px;padding-bottom:6px;background:var(--wash);border-bottom:0}
+.matrix thead tr:first-child th:first-child{border-radius:6px 0 0 6px}
+.matrix thead tr:first-child th:last-child{border-radius:0 6px 6px 0}
+.matrix thead tr:nth-child(2) th{padding-top:6px;padding-bottom:6px;white-space:nowrap}
+.matrix .split{border-left:1px solid #e8eef2}
+.cell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid transparent;border-radius:6px;padding:3px 0;min-height:41px;width:100%;background:transparent;font-variant-numeric:tabular-nums;line-height:1.12}
+.cell:enabled:hover{background:var(--light);border-color:#d7e9ea}
+.cell:disabled{opacity:1}
+.cell strong{font-size:15px;font-weight:710;color:var(--teal)}
+.cell.small strong{font-weight:610;color:var(--muted)}
+.cell span{font-size:11px;color:var(--quiet);white-space:nowrap}
+details>summary{padding:15px 18px;font-size:15px;font-weight:680;cursor:pointer}
+details[open]>summary{border-bottom:1px solid var(--line)}
+.details-body{padding:10px 16px 15px}
+.case-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.case-selects{display:flex;flex-wrap:wrap;gap:9px}
+.case-footer{display:flex;align-items:center;justify-content:flex-end;gap:9px;margin-top:9px;font-size:12px;color:var(--muted)}
+.case-footer button{min-height:36px;padding:3px 9px;border:1px solid var(--line);background:#fff;border-radius:6px}
+.table-scroll{overflow:auto;max-width:100%}
+.records{min-width:575px}
+.records td,.records th,.sources td,.sources th{padding:7px 7px}
+.records td{white-space:nowrap}
+.records td:nth-child(3),.records td:nth-child(4){font-size:12px;color:var(--muted)}
+.sub{display:block;font-size:11px;color:var(--quiet);margin-top:3px}
+.win{color:var(--teal);font-weight:680}
+.loss{color:#8e4d42}
+.empty{color:var(--quiet);text-align:center!important;padding:15px!important}
+.terms{margin:0 0 9px;font-size:12px;color:var(--muted);line-height:1.75}
+.terms div{display:grid;grid-template-columns:5.5em 1fr;gap:8px;padding:4px 0}
+.terms dt{font-weight:700;color:#324b5d}
+.terms dd{margin:0}
+.sources{min-width:380px}
+.source-links{margin:9px 0 0;font-size:12px;color:var(--quiet);line-height:1.65}
+@media(min-width:1120px){
+ .comparison{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:12px;align-items:start}
+ .comparison .card{min-width:0}.comparison .section-head{min-height:24px}
+ .overview thead tr{height:45px}.comparison tbody tr{height:49px}
+}
+@media(max-width:600px){
+ .wrap{padding:14px 10px 32px}.nav{margin:0 3px 12px}.asof{font-size:12px}h1{margin:0 3px 12px}
+ .filters,.context{margin-left:3px;margin-right:3px}.filters{gap:5px 9px}.modes{flex-basis:100%}.modes button{flex:1;padding:3px 6px;min-height:38px}
+ .field{min-height:40px}.context{font-size:12px;margin-top:7px;margin-bottom:11px}.inset{padding:12px 9px 10px}.card{border-radius:10px;margin-top:9px}
+ .overview :is(th,td){padding:6px 4px}.metric{min-width:8.5ch}.rate-button{gap:4px}.rate-text{min-width:5.3ch}.scale{display:none}.result-label{display:inline}
+ .matrix :is(td,th){padding-inline:2px}.cell{min-height:43px}.cell strong{font-size:13px}
+ details>summary{padding:12px}.details-body{padding:8px 10px 12px}.section-head{gap:3px 9px}
+}
+@media(max-width:360px){table{font-size:12px}thead th{font-size:11px}.overview :is(th,td){padding-inline:3px}.matrix thead tr:first-child th:first-child{width:18%}.matrix .cell span{font-size:10px}}
+</style>
+<script src="./analysis-metrics.js" defer></script>
+</head>
+<body>
+<main class="wrap">
+ <nav class="nav" aria-label="页面导航"><a class="back" href="./">四指共振</a><span class="asof" id="asof"></span></nav>
+ <h1>MACD 成功率分析</h1>
+ <p class="context" id="status" role="status">正在读取历史样本…</p>
+ <div id="dashboard" hidden>
+  <div class="filters" aria-label="样本筛选">
+   <div class="modes" role="group" aria-label="结果口径">
+    <button type="button" data-mode="trade" aria-pressed="true">交易胜率</button>
+    <button type="button" data-mode="buy" aria-pressed="false">买1后上涨</button>
+    <button type="button" data-mode="sell" aria-pressed="false">卖1后下跌</button>
+   </div>
+   <label class="field">指数 <select id="index"><option value="all">四指数合计</option></select></label>
+   <label class="field">范围 <select id="scope">
+    <option value="all">各周期全历史</option><option value="four">四指共同历史</option><option value="same">六周期同窗</option>
+   </select></label>
+   <label class="field" id="horizon-field" hidden>观察 <select id="horizon"><option value="5">后 5 根</option><option value="10" selected>后 10 根</option><option value="20">后 20 根</option></select></label>
+  </div>
+  <p class="context" id="context" aria-live="polite"></p>
+  <div class="comparison">
+  <section class="card inset" aria-labelledby="period-heading">
+   <div class="section-head"><h2 id="period-heading">各周期胜率</h2><p class="caption" id="history-span"></p></div>
+   <table class="overview" aria-labelledby="period-heading">
+    <thead><tr>
+     <th scope="col">周期</th><th scope="col"><span class="scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></span><span class="result-label" id="result-heading">胜率</span></th>
+     <th scope="col" id="count-heading">盈利 / 已结束</th><th scope="col">待评估</th><th scope="col" id="time-heading">持有中位</th>
+    </tr></thead><tbody id="overview"></tbody>
+   </table>
+   <p class="reading" id="period-note" hidden></p>
+  </section>
+  <section class="card inset" aria-labelledby="factor-heading">
+   <div class="section-head"><h2 id="factor-heading">共振与九转</h2><p class="caption">数字下方为成功数 / 已评估数</p></div>
+   <table class="matrix" aria-labelledby="factor-heading" aria-describedby="factor-note">
+    <thead>
+     <tr><th rowspan="2" scope="col">周期</th><th colspan="2" scope="colgroup">四指共振</th><th colspan="2" scope="colgroup" class="split">同向九转</th><th scope="colgroup" class="split">组合</th></tr>
+     <tr><th scope="col">单指</th><th scope="col">≥2 指</th><th scope="col" class="split">无 9</th><th scope="col">有 9</th><th scope="col" class="split">共振 + 9</th></tr>
+    </thead><tbody id="matrix"></tbody>
+   </table>
+   <p class="caption" id="factor-note">共振和组合仅统计四指同期行情齐全的样本。已评估少于 20 个时用灰色标注。</p>
+   <p class="reading" id="factor-reading" hidden></p>
+  </section>
+  </div>
+  <details class="card" id="cases">
+   <summary>样本明细</summary>
+   <div class="details-body">
+    <div class="case-controls">
+     <div class="case-selects">
+      <label class="field">周期 <select id="case-period"></select></label>
+      <label class="field">条件 <select id="case-group"></select></label>
+     </div>
+     <p class="caption" id="case-caption"></p>
+    </div>
+    <div class="table-scroll" tabindex="0" aria-label="信号样本明细表">
+     <table class="records">
+      <thead><tr><th scope="col">指数</th><th scope="col">信号时间 / 收盘</th><th scope="col">同向指数</th><th scope="col">同向 9</th><th scope="col" id="exit-heading">退出时间 / 收盘</th><th scope="col" id="move-heading">收益</th></tr></thead>
+      <tbody id="records"></tbody>
+     </table>
+    </div>
+    <div class="case-footer" id="case-footer" hidden><button type="button" id="prev">上一页</button><span id="page-number"></span><button type="button" id="next">下一页</button></div>
+   </div>
+  </details>
+  <details class="card">
+   <summary>样本覆盖与统计口径</summary>
+   <div class="details-body">
+    <dl class="terms">
+     <div><dt>交易胜率</dt><dd>买1的首次结构交易按现有账本退出。指数收盘价收益为正记成功，一笔结构算一个样本。未退出单列，纠错买回另有账本。收益未扣成本，也未做可成交性模拟。</dd></div>
+     <div><dt>方向命中</dt><dd>从信号收盘看到后第 N 根同周期已完成 K 线。买1看涨，卖1看跌，持平计未命中。不同周期的 N 根对应不同实际时长。</dd></div>
+     <div><dt>四指共振</dt><dd>按同周期当根和此前两根已完成 K 线统计同向信号，每个指数最多算一次。买卖后续点与纠错买回可作为共振证据。四指这三根时间一致才进入分组。</dd></div>
+     <div><dt>同向九转</dt><dd>买1配低9，卖1配高9。只认当根或此前两根内首次达到 9，连续显示的 9 不重复计。九转按本指数、本周期观察。</dd></div>
+     <div><dt>范围与时长</dt><dd>同窗筛选以所选范围截止日结算，超过截止日的结果仍计待评估。时间为北京时间，时长含休市。分钟线包含归档起始段，各指数的历史起点不同，同日信号也可能集中出现。</dd></div>
+    </dl>
+    <div class="table-scroll" tabindex="0" aria-label="行情覆盖表">
+     <table class="sources"><thead><tr><th scope="col">周期</th><th scope="col">所选指数历史覆盖</th><th scope="col">每指数 K 线根数</th></tr></thead><tbody id="coverage"></tbody></table>
+    </div>
+    <p class="source-links">东方财富、腾讯公开指数行情。<a href="https://github.com/gavin0710/Test/tree/master/macd-resonance/data">历史归档</a> · <a href="https://github.com/gavin0710/Test/blob/master/macd-resonance/research-success.js">复算脚本</a></p>
+   </div>
+  </details>
+ </div>
+</main>
+<script>
+"use strict";
+
+document.addEventListener("DOMContentLoaded", async () => {
+ const el = id => document.getElementById(id);
+ try {
+  const response = await fetch("./analysis-data.json");
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const data = await response.json();
+  if (data.periods?.length !== 6 || data.coverage?.length !== 24 || !Array.isArray(data.samples)) throw new Error("Invalid sample data");
+  mount(data);
+ } catch (error) {
+  el("status").textContent = "历史样本暂时无法读取，请刷新重试。";
+  console.error(error);
+ }
+
+ function mount(data) {
+  const metrics = SuccessAnalysis;
+  const { groups, day, summarize } = metrics;
+  const columns = ["single", "resonance", "noNine", "nine", "both"];
+  const modeNames = { trade: "交易胜率", buy: "买1后上涨率", sell: "卖1后下跌率" };
+  const pageSize = 10;
+  let mode = "trade", casePage = 0, evaluated = [];
+  const fmt = new Intl.NumberFormat("zh-CN");
+  const escape = val => String(val).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+  const pct = rate => rate === null ? "—" : (100 * rate).toFixed(1) + "%";
+  const move = value => value === null ? "—" : (value > 0 ? "+" : "") + value.toFixed(2) + "%";
+  const duration = minutes => {
+   if (minutes === null) return "—";
+   if (minutes < 60) return minutes.toFixed(0) + " 分钟";
+   if (minutes < 1440) return (minutes / 60).toFixed(minutes % 60 ? 1 : 0) + " 小时";
+   return (minutes / 1440).toFixed(0) + " 天";
+  };
+  const periodTag = id => data.periods.find(period => period.id === id).label;
+  const option = (value, label) => '<option value="' + escape(value) + '">' + escape(label) + '</option>';
+  const selectedIndex = () => el("index").value === "all" ? "all" : Number(el("index").value);
+  const filterOptions = () => ({ mode, index: selectedIndex(), scope: el("scope").value, horizon: Number(el("horizon").value) });
+  const selection = (id, group) => ' data-period="' + id + '" data-group="' + group + '"';
+  const mark = (id, group, text) => " aria-label=\"" + escape(periodTag(id) + " " + groups[group].label + " " + text + "，查看样本") + "\"";
+  el("asof").textContent = "研究快照 " + day(data.asOf);
+  el("index").insertAdjacentHTML("beforeend", data.indices.map((name, i) => option(i, name)).join(""));
+  el("case-period").innerHTML = data.periods.map(({ id, label }) => option(id, label)).join("");
+  el("case-period").value = "D";
+  el("case-group").innerHTML = Object.entries(groups).map(([id, group]) => option(id, group.label)).join("");
+
+  function render() {
+   const options = filterOptions();
+   evaluated = metrics.evaluate(data, options);
+   const trade = mode === "trade", sell = mode === "sell";
+   for (const button of document.querySelectorAll("[data-mode]")) button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+   el("horizon-field").hidden = trade;
+   el("period-heading").textContent = "各周期" + modeNames[mode];
+   el("count-heading").textContent = trade ? "盈利 / 结束" : "命中 / 观察";
+   el("result-heading").textContent = trade ? "胜率" : "命中率";
+   el("time-heading").textContent = trade ? "持有中位" : "观察中位";
+   el("exit-heading").textContent = trade ? "退出时间 / 收盘" : "观察时间 / 收盘";
+   el("move-heading").textContent = trade ? "信号价收益" : "方向幅度";
+   const same = metrics.bounds(data.coverage);
+   const rangeLabel = options.scope === "same" ? same ? same.from + " 至 " + same.to + "。 " : "六周期无共同日期。 " :
+    options.scope === "four" ? "各周期只取四指都有行情的日期范围。 " : "";
+   el("context").textContent = rangeLabel + (trade ? "首次买1入账，退出收盘价高于买入收盘价记成功。"
+    : (sell ? "卖1" : "买1") + "后第 " + options.horizon + " 根 K 线收盘" + (sell ? "下跌" : "上涨") + "记命中。");
+   const byPeriod = new Map(data.periods.map(({ id }) => [id, evaluated.filter(row => row.period === id)]));
+   const allStats = Object.fromEntries(data.periods.map(({ id }) => [id, summarize(byPeriod.get(id))]));
+   const minute = data.coverage.filter(row => row.period === "15" && (options.index === "all" || options.index === row.index));
+   const sessions = Math.min(...minute.map(row => row.sessions));
+   el("history-span").textContent = "分钟归档 " + sessions + " 个交易日";
+   el("overview").innerHTML = data.periods.map(({ id, label }) => {
+    const values = allStats[id];
+    const count = values.evaluated ? '<strong>' + values.wins + '</strong> / ' + values.evaluated : "—";
+    const rate = pct(values.rate), fill = values.rate === null ? "" : '<span class="fill" style="width:' + values.rate * 100 + '%"></span>';
+    const text = values.evaluated ? rate + "，" + values.wins + " / " + values.evaluated : "暂无已评估样本";
+    return '<tr class="' + (id === "D" || id === "W" ? "cut" : "") + '"><th scope="row">' + escape(label) +
+     '</th><td class="metric"><button type="button" class="rate-button ' + (values.evaluated < 20 ? "thin" : "") + '"' +
+     selection(id, "all") + mark(id, "all", text) + (values.total ? "" : " disabled") + '>' +
+     '<span class="track" aria-hidden="true">' + fill + '</span><span class="rate-text">' + rate + '</span></button></td>' +
+     '<td class="count">' + count + '</td><td>' + values.pending + '</td><td>' + duration(values.medianMinutes) + '</td></tr>';
+   }).join("");
+   const periodNote = allStats.W.medianMinutes && allStats.D.medianMinutes && trade
+    ? "周线持有中位时长约为日线的 " + (allStats.W.medianMinutes / allStats.D.medianMinutes).toFixed(1) + " 倍。胜率要和持有时间一起看。"
+    : "";
+   el("period-note").textContent = periodNote;
+   el("period-note").hidden = !periodNote;
+
+   el("matrix").innerHTML = data.periods.map(({ id, label }) =>
+    '<tr class="' + (id === "D" || id === "W" ? "cut" : "") + '"><th scope="row">' + escape(label) + '</th>' +
+    columns.map(group => {
+     const values = summarize(byPeriod.get(id).filter(groups[group].includes));
+     const count = values.evaluated ? values.wins + " / " + values.evaluated : values.pending ? "待 " + values.pending : "无样本";
+     return '<td' + (group === "noNine" || group === "both" ? ' class="split"' : "") +
+      '><button type="button" class="cell' + (values.evaluated < 20 ? " small" : "") + '"' + selection(id, group) +
+      mark(id, group, pct(values.rate) + "，" + count) + (values.total ? "" : " disabled") +
+      '><strong>' + pct(values.rate) + '</strong><span>' + count + '</span></button></td>';
+    }).join("") + '</tr>'
+   ).join("");
+   renderReading(byPeriod, options);
+   renderCoverage(options);
+   renderCases();
+  }
+
+  function renderReading(byPeriod, options) {
+   let reading = "";
+   if (options.index === "all" && options.scope === "all" && mode === "trade") {
+    const daily = byPeriod.get("D");
+    const ten = metrics.evaluate(data, { ...options, mode: "buy", horizon: 10 }).filter(row => row.period === "D");
+    const higher = (rows, a, b) => {
+     const left = summarize(rows.filter(groups[a].includes)).rate;
+     const right = summarize(rows.filter(groups[b].includes)).rate;
+     return left !== null && right !== null && left > right;
+    };
+    const flips = [["resonance", "single"], ["nine", "noNine"]].every(([a, b]) => higher(daily, a, b) && higher(ten, b, a));
+    if (flips) reading = "日线共振和有9组的交易胜率较高。改看买1后10根，两组上涨率均低于各自对照组。";
+   }
+   if (options.index === "all" && options.scope === "all" && mode === "buy") {
+    const rows = byPeriod.get("15"), single = summarize(rows.filter(groups.single.includes));
+    const matched = summarize(rows.filter(groups.resonance.includes));
+    if (matched.rate !== null && single.rate !== null && matched.rate > single.rate) {
+     reading = "15分钟共振组命中 " + matched.wins + " / " + matched.evaluated + "，触发分布在 " +
+      matched.signalDays + " 个交易日。同期多个指数可能反映同一段行情。";
+    }
+   }
+   el("factor-reading").textContent = reading;
+   el("factor-reading").hidden = !reading;
+  }
+
+  function renderCoverage(options) {
+   el("coverage").innerHTML = data.periods.map(({ id, label }) => {
+    const rows = data.coverage.filter(row => row.period === id && (options.index === "all" || options.index === row.index));
+    const from = rows.map(row => day(row.from)).sort()[0], to = rows.map(row => day(row.to)).sort().at(-1);
+    const min = Math.min(...rows.map(row => row.bars)), max = Math.max(...rows.map(row => row.bars));
+    return '<tr><th scope="row">' + escape(label) + '</th><td>' + escape(from) + ' 至 ' + escape(to) +
+     '</td><td>' + fmt.format(min) + (min === max ? "" : "–" + fmt.format(max)) + '</td></tr>';
+   }).join("");
+  }
+
+  function renderCases() {
+   const group = groups[el("case-group").value], period = el("case-period").value;
+   const rows = evaluated.filter(row => row.period === period && group.includes(row))
+    .sort((a,b) => b.time.localeCompare(a.time) || a.index - b.index);
+   const values = summarize(rows);
+   el("case-caption").textContent = values.total + " 个信号 · 已评估 " + values.evaluated +
+    " · 信号分布 " + values.signalDays + " 日 · 中位幅度 " + move(values.medianMove);
+   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+   casePage = Math.min(casePage, pages - 1);
+   el("records").innerHTML = rows.slice(casePage * pageSize, (casePage + 1) * pageSize).map(row => {
+    const picked = row.outcome, time = row.time.replace("T", " "), isTrade = mode === "trade";
+    const exitLabel = isTrade ? picked?.[2] === "topSell" ? "顶部卖点" : "结构止损" : "";
+    const exit = picked ? escape(picked[0].replace("T", " ")) + '<span class="sub">' +
+     picked[1].toFixed(2) + (exitLabel ? " · " + exitLabel : "") + '</span>' : "待评估";
+    const peers = row.covered < 4 ? "同期缺档" : row.matched + " / 4";
+    const nine = row.nineAge === null ? "—" : (row.signal === "buy" ? "低9" : "高9") + " · " + (row.nineAge === 0 ? "当根" : row.nineAge + " 根前");
+    return '<tr><td>' + escape(data.indices[row.index]) + '</td><td>' + escape(time) + '<span class="sub">' + row.close.toFixed(2) +
+     '</span></td><td>' + peers + '</td><td>' + nine + '</td><td>' + exit + '</td><td class="' +
+     (row.result > 0 ? "win" : row.result < 0 ? "loss" : "") + '">' + move(row.result) + '</td></tr>';
+   }).join("") || '<tr><td class="empty" colspan="6">当前筛选没有符合条件的信号</td></tr>';
+   el("case-footer").hidden = pages < 2;
+   el("prev").disabled = casePage === 0;
+   el("next").disabled = casePage + 1 >= pages;
+   el("page-number").textContent = (casePage + 1) + " / " + pages;
+  }
+
+  function showCases(event) {
+   const button = event.target.closest("button[data-period]");
+   if (!button || button.disabled) return;
+   el("case-period").value = button.dataset.period;
+   el("case-group").value = button.dataset.group;
+   el("cases").open = true;
+   casePage = 0;
+   renderCases();
+   const summary = el("cases").querySelector("summary");
+   summary.focus({ preventScroll: true });
+   summary.scrollIntoView({ block: "start" });
+  }
+
+  for (const button of document.querySelectorAll("[data-mode]")) button.addEventListener("click", () => {
+   mode = button.dataset.mode;
+   casePage = 0;
+   render();
+  });
+  for (const id of ["index", "scope", "horizon"]) el(id).addEventListener("change", () => { casePage = 0; render(); });
+  for (const id of ["case-period", "case-group"]) el(id).addEventListener("change", () => { casePage = 0; renderCases(); });
+  el("overview").addEventListener("click", showCases);
+  el("matrix").addEventListener("click", showCases);
+  el("prev").addEventListener("click", () => { if (casePage > 0) casePage--; renderCases(); });
+  el("next").addEventListener("click", () => { casePage++; renderCases(); });
+  render();
+  el("status").hidden = true;
+  el("dashboard").hidden = false;
+ }
+});
+</script>
+</body>
+</html>
