@@ -190,7 +190,7 @@ async function verifySuccessAnalysis(page, viewport){
  assert.equal(await rate("D"),expected("D"));
  assert.equal(await rate("W"),expected("W"));
  const combo=page.locator('#matrix button[data-period="D"][data-group="both"]');
- assert.equal(await combo.locator("strong").textContent(),expected("D","trade","all",10,"all","both"));
+ assert.equal(await combo.locator("strong").textContent(),expected("D","trade","all",10,"all","both").replace(/^(0|100)\.0%$/,"$1%"));
  await press(combo);
  assert(await page.locator("#cases").evaluate(el=>el.open));
  assert.equal(await page.locator("#case-period").inputValue(),"D");
@@ -212,6 +212,14 @@ async function verifySuccessAnalysis(page, viewport){
  await press(page.getByRole("button",{name:"卖1后下跌",exact:true}));
  assert.equal(await rate("D"),expected("D","sell","all",20,0));
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Drill-down table scrolls inside its panel");
+ if(viewport.width<600){
+  await page.locator("#index").selectOption("all");
+  await press(page.getByRole("button",{name:"交易胜率",exact:true}));
+  await page.setViewportSize({width:320,height:730});
+  assert(await page.evaluate(()=>[...document.querySelectorAll("#matrix button")].every(el=>el.scrollWidth<=el.clientWidth+1)),
+   "Rates and denominators fit on a 320px display");
+  await page.setViewportSize(viewport);
+ }
  await press(page.getByRole("link",{name:"四指共振",exact:true}));
  await page.waitForURL(url=>url.pathname==="/");
  assert.equal(await page.locator(".chart-card:visible").count(),4);

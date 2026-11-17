@@ -284,7 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
      return '<td' + (group === "noNine" || group === "both" ? ' class="split"' : "") +
       '><button type="button" class="cell' + (values.evaluated < 20 ? " small" : "") + '"' + selection(id, group) +
       mark(id, group, pct(values.rate) + "，" + count) + (values.total ? "" : " disabled") +
-      '><strong>' + pct(values.rate) + '</strong><span>' + count + '</span></button></td>';
+      '><strong>' + pct(values.rate).replace(/^(0|100)\.0%$/, '$1%') + '</strong><span>' + count + '</span></button></td>';
     }).join("") + '</tr>'
    ).join("");
    renderReading(byPeriod, options);
