@@ -80,6 +80,31 @@ async function verifyNavigation(page,viewport){
  assert.equal(await input.inputValue(),"500");
  await input.fill("14");await input.press("Enter");
  assert.equal(await input.inputValue(),"15");
+ const reduce=page.locator("#density-minus"),increase=page.locator("#density-plus");
+ const press=button=>touch?button.tap():button.click();
+ for(const period of ["15","60","90","120"]){
+  await page.locator(`#periodbar [data-p="${period}"]`).click();
+  const max=Number(await input.getAttribute("max"));
+  assert(max>15&&max<=500);
+  await input.fill("500");await input.press("Enter");
+  assert.equal(await input.inputValue(),String(max));
+  assert(await increase.isDisabled(),"No more candles beyond the available history or the 500-bar limit");
+
+  const full=await chartState(page);
+  assert.equal(full.times.length,max);
+  await press(reduce);
+  const smaller=await chartState(page);
+  assert(smaller.times.length<full.times.length,`${period}: the first minus changes the rendered window`);
+  assert.equal(smaller.end,full.end);
+  assert(smaller.charts.every((chart,i)=>chart.bars.length<full.charts[i].bars.length));
+  assert.equal(await input.inputValue(),String(smaller.times.length));
+  await press(increase);
+  const larger=await chartState(page);
+  assert(larger.times.length>smaller.times.length,`${period}: plus expands the rendered window`);
+  assert.equal(larger.end,full.end);
+  assertAligned(larger);
+ }
+ await page.locator('#periodbar [data-p="D"]').click();
  await input.fill("100");await input.press("Enter");
 
  const cdp=touch?await page.context().newCDPSession(page):null;
