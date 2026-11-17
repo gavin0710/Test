@@ -11,6 +11,13 @@
 **源码**：GitHub `gavin0710/Test`，目录 `macd-resonance/`；主文件 `index.html`，说明 `README.md`。  
 **使用方法**：接手新任务时先读本文件及 `README.md`，再检查正式站点、源码、最近 CI 结果；不要从旧聊天或固定统计值猜测现状。
 
+## 2026-11-17 分钟线缩放修复
+
+- 缩放以当前周期实际显示的 K 线根数为起点，输入框与加减按钮使用同一上限（可用历史根数与 500 取小）。短历史周期首次点「−」即可改变四图窗口，已显示全部可用历史时「＋」禁用。共用时间轴、历史定位与复盘沿用现有行为。
+- 将「− / 根数 / ＋」整合为一组线条控件，手机端扩大触控目标。交易引擎与取数代码沿用发布前版本。
+- 已合并并发布 [97819f5](https://github.com/gavin0710/Test/commit/97819f59cbac8baf2f34bd53608eaf84b5839faf)，Vercel 部署 `dpl_G5JP4vXCwNTYCNk31tSiop3C6TT7` 为 READY。正式域名 HTML 与该提交逐字节相同，首页与 latest、15／101／102 历史接口均返回 HTTP 200。
+- [交易规则和 24 组真实历史回归](https://github.com/gavin0710/Test/actions/runs/43986850419)与[正式站桌面及手机触控验收](https://github.com/gavin0710/Test/actions/runs/43986850399)通过。归档分钟行情验收截至北京时间 2026-11-16 15:00。浏览器新增四种分钟周期的实际窗口变化、右端时间锚点与可用根数上限断言。后续工作见第 5 节。
+
 ## 2026-11-16 交易日巡检与分钟行情修复
 
 - 沪深两市 11 月 16 日正常交易。巡检时四指数日线已更新，科创 50 的分钟行情仍停在 11 月 13 日 15:00。11 月 16 日 15:24:21（北京时间）采集工作流实际由 `schedule` 触发，东方财富连接失败，原腾讯分钟地址未能解析。当天仅查到这一条常规采集的定时运行记录，仍需观察每 15 分钟的触发覆盖。周度长历史任务也由 `schedule` 触发，08:59:35 开始，沿用上周五的长历史。[上交所休市安排](https://www.sse.com.cn/disclosure/dealinstruc/closed/) · [深交所休市安排](https://www.szse.cn/disclosure/notice/t20251222_618087.html) · [采集记录](https://github.com/gavin0710/Test/actions/runs/43823617409) · [周度归档](https://github.com/gavin0710/Test/actions/runs/43783594267)
