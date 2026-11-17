@@ -1282,7 +1282,7 @@ function paintReadout(i,data){
  change.textContent=delta===null?"":(delta>=0?"+":"")+valstr(delta)+"  "+(pct>=0?"+":"")+pct.toFixed(2)+"%";
  time.dateTime=bar.t;time.textContent=timestampLabel(bar.t);
  ohlc.textContent="开 "+valstr(bar.o)+"　高 "+valstr(bar.h)+"　低 "+valstr(bar.l);
- dif.innerHTML='DIF <b>'+valstr(v.dif[index],4)+'</b>　DEA <span class="dea">'+valstr(v.dea[index],4)+'</span>　柱 <span class="hist">'+valstr(v.hist[index],4)+'</span>';
+ dif.innerHTML='DIF <b>'+valstr(v.dif[index],4)+'</b>　DEA <span class="dea">'+valstr(v.dea[index],4)+'</span>　MACD <span class="hist">'+valstr(v.hist[index],4)+'</span>';
  const n=v.nine[index];
  if(n){
   nine.hidden=false;nine.className="signpill nine "+(n>0?"pos":"neg");nine.textContent=nLabel(n);
