@@ -111,12 +111,18 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 
 .wave-tag{white-space:nowrap;font-size:11px;padding:4px 7px;border-radius:5px;background:#f3f5f7;color:#748494}.wave-tag.up{background:#fff0f0;color:#c26268}.wave-tag.down{background:#eaf8f1;color:#178967}.wave-note{font-size:11px;color:#798b9d;line-height:1.7;margin:12px 3px} 
 .history-reset,.history-pages button{font-size:11px;min-height:32px;border:1px solid #d9e1e7;background:#fff;color:#456781;padding:5px 9px;border-radius:7px;white-space:nowrap}
-.density{display:inline-flex;align-items:center;gap:3px;padding:2px 3px 2px 8px;border:1px solid #dbe4eb;background:#fff;border-radius:8px;white-space:nowrap}
-.density-btn{height:29px;width:29px;border:none;border-radius:5px;background:#eaf1f7;color:#486986;font-weight:700;font-size:17px;line-height:1}
-.density-btn:hover{background:#dce9f4;color:#274b6a}
-#density-count{width:40px;padding:4px 1px;border:0;background:transparent;font-size:12px;font-weight:750;color:#34536f;text-align:center;appearance:textfield}
+.density{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.density-stepper{display:inline-grid;grid-template-columns:32px 38px 32px;align-items:stretch;overflow:hidden;border:1px solid #dbe4eb;border-radius:8px;background:#fff}
+.density-btn{display:grid;place-items:center;min-height:32px;padding:0;border:0;background:transparent;color:#536c85}
+.density-btn::before,.density-btn::after{content:"";grid-area:1/1;width:12px;height:2px;border-radius:2px;background:currentColor}
+.density-btn::after{display:none;transform:rotate(90deg)}
+#density-plus::after{display:block}
+@media(hover:hover){.density-btn:hover:not(:disabled){background:#eef3f8;color:#25445f}}
+.density-btn:active:not(:disabled){background:#e4edf5}
+.density-stepper :focus-visible{outline:2px solid #52789e;outline-offset:-2px}
+#density-count{width:100%;min-width:0;padding:0;border:0;border-inline:1px solid #e7edf2;background:transparent;font-size:12px;font-weight:650;color:#34536f;text-align:center;font-variant-numeric:tabular-nums;appearance:textfield}
 #density-count::-webkit-inner-spin-button,#density-count::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-@media(max-width:560px){.density-btn{width:33px;height:33px}.history-reset,.history-pages button{min-height:36px}#density-count{font-size:16px}.resblock{gap:3px}.resnum{padding:4px}}
+@media(max-width:560px){.density-stepper{grid-template-columns:40px 40px 40px}.density-btn{min-height:40px}.history-reset,.history-pages button{min-height:36px}#density-count{font-size:16px}.resblock{gap:3px}.resnum{padding:4px}}
 
 .wave-pending{padding:9px 11px;margin:10px 0 7px;border-left:2px solid #bdcbd8;background:#f6f8fa;color:#5c7186;font-size:11px;font-weight:680}
 .wave-pending span{display:inline;color:#9aa7b4;font-weight:400;margin-left:10px}
@@ -215,7 +221,11 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
  <nav class="toolbar" aria-label="看盘工具栏">
   <div class="periodbar" id="periodbar" aria-label="K线周期"></div>
   <div class="controls">
-   <div class="density"><span class="faint">每屏</span><button id="density-minus" class="density-btn" type="button" aria-label="减少每屏K线根数">−</button><input type="number" id="density-count" min="15" max="500" step="1" value="100" inputmode="numeric" aria-label="每屏K线根数"><button id="density-plus" class="density-btn" type="button" aria-label="增加每屏K线根数">+</button></div>
+   <div class="density"><span class="faint">每屏</span><div class="density-stepper" role="group" aria-label="K线缩放">
+    <button id="density-minus" class="density-btn" type="button" aria-label="减少每屏K线根数" title="减少每屏K线根数"></button>
+    <input type="number" id="density-count" min="15" max="500" step="1" value="100" inputmode="numeric" aria-label="每屏K线根数">
+    <button id="density-plus" class="density-btn" type="button" aria-label="增加每屏K线根数" title="增加每屏K线根数"></button>
+   </div></div>
    <button class="history-reset" id="history-reset" type="button" disabled>回最新</button>
   </div>
   <div class="resblock" id="resonance" hidden></div>
@@ -680,12 +690,28 @@ function paintState(s){return ({buy:"↑ DIF上拐",sell:"↓ DIF下拐",watchBu
 function valstr(n,d=2){return Number.isFinite(n)?n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}):"—"}
 function signclass(s){return s==="neutral"||!s?"":s==="buy"?"buy":s==="sell"||s==="stop"?"sell":s==="watchBuy"?"watchbuy":"watchsell"}
 function stateHTML(i,p){const v=getSignal(i,p);return v?'<span class="mstatus '+signclass(v.state)+'">'+paintState(v.state)+'</span><span class="faint"> · '+nLabel(v.nine.at(-1))+'</span>':"—"}
+function maxDensity(){
+ return Math.min(500,historyTimeline().length);
+}
+function currentDensity(limit=maxDensity()){
+ return Math.min(visibleBars,limit);
+}
 function changeDensity(next){
- const number=Math.round(Number(next));
- if(next!==""&&Number.isFinite(number))visibleBars=Math.max(15,Math.min(500,number));
- clearHover();
- paintWindow();
+ const limit=maxDensity(),number=Math.round(Number(next));
+ if(limit>15&&next!==""&&Number.isFinite(number)){
+  const count=Math.max(15,Math.min(limit,number));
+  if(count!==currentDensity(limit)){
+   visibleBars=count;
+   clearHover();
+   paintWindow();
+  }
+ }
  syncToolbar();
+}
+function stepDensity(direction){
+ const count=currentDensity();
+ const step=direction<0?(count<=60?5:count<=180?10:20):(count<60?5:count<180?10:20);
+ changeDensity(count+direction*step);
 }
 function syncToolbar(){
  for(const button of byId("periodbar").children){
@@ -693,10 +719,13 @@ function syncToolbar(){
   button.classList.toggle("active",active);
   button.setAttribute("aria-pressed",String(active));
  }
- const input=byId("density-count");
- if(document.activeElement!==input)input.value=String(visibleBars);
- byId("density-minus").disabled=visibleBars<=15;
- byId("density-plus").disabled=visibleBars>=500;
+ const input=byId("density-count"),limit=maxDensity(),count=currentDensity(limit);
+ input.max=String(limit);
+ input.min=String(Math.min(15,limit));
+ input.disabled=limit<=15;
+ if(document.activeElement!==input)input.value=limit?String(count):"";
+ byId("density-minus").disabled=count<=15;
+ byId("density-plus").disabled=count>=limit;
  byId("history-reset").hidden=replayMode;
 }
 
@@ -740,12 +769,13 @@ function chartWindow(){
  const times=historyTimeline(),node=replayMode?replayCurrent()?.nodes[replayNodeIndex]:null;
  const event=replayMode?node:historyEvent;
  const savedEnd=marketEndByPeriod.get(selectedP);
- const minEnd=Math.min(times.length,visibleBars)-1;
+ const count=currentDensity(Math.min(500,times.length));
+ const minEnd=count-1;
  let end=times.length-1;
- if(event)end=findEndAtOrBefore(times,event.t)-1+Math.floor(visibleBars/2);
+ if(event)end=findEndAtOrBefore(times,event.t)-1+Math.floor(count/2);
  else if(savedEnd)end=Math.max(0,findEndAtOrBefore(times,savedEnd)-1);
  end=Math.min(times.length-1,Math.max(minEnd,end));
- const windowTimes=times.slice(Math.max(0,end-visibleBars+1),end+1);
+ const windowTimes=times.slice(Math.max(0,end-count+1),end+1);
  return {times:windowTimes,startT:windowTimes[0],endT:windowTimes.at(-1),end,min:minEnd,max:times.length-1,node,event,
   isLatest:!replayMode&&!event&&!savedEnd};
 }
@@ -1468,9 +1498,9 @@ function bindDashboard(){
   if(!period||period===selectedP||replayMode)return;
   selectedP=marketPeriod=period;historyPage=0;historyEvent=null;clearHover();render();
  });
- byId("density-minus").onclick=()=>changeDensity(visibleBars-(visibleBars<=60?5:visibleBars<=180?10:20));
- byId("density-plus").onclick=()=>changeDensity(visibleBars+(visibleBars<60?5:visibleBars<180?10:20));
- input.onchange=()=>{changeDensity(input.value);input.value=String(visibleBars)};
+ byId("density-minus").onclick=()=>stepDensity(-1);
+ byId("density-plus").onclick=()=>stepDensity(1);
+ input.onchange=()=>{changeDensity(input.value);input.value=String(currentDensity())};
  input.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();input.blur()}};
  byId("history-reset").onclick=()=>setHistoryEnd(historyTimeline().length-1);
  byId("view-market").onclick=()=>replaySetMode(false);
