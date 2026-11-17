@@ -11,6 +11,13 @@
 **源码**：GitHub `gavin0710/Test`，目录 `macd-resonance/`；主文件 `index.html`，说明 `README.md`。  
 **使用方法**：接手新任务时先读本文件及 `README.md`，再检查正式站点、源码、最近 CI 结果；不要从旧聊天或固定统计值猜测现状。
 
+## 2026-11-17 MACD 成功率分析首版
+
+- 主页新增「MACD 成功率」，打开 [独立分析页](https://macd-resonance-monitor.vercel.app/analysis.html)。按六周期和四指数对比首次买1交易胜率、买1后上涨率及卖1后下跌率，观察窗口可选5/10/20根。共振使用同周期四指的当根和前两根，同向9仅记录本指数首次达到低9或高9。各组可查看成功数、已评估数、待评估和原始信号。主页面交易逻辑及行情接口沿用现有实现。
+- 首版研究快照覆盖24组真实行情，包含355个买1/卖1信号。日线和分钟行情截至2026-11-17收盘，周线至2026-11-13。首次买1日线 73/129，周线 27/31，持有中位分别为226和1183日。分钟覆盖33个交易日，15分钟 2/8、60分钟 0/1，90和120分钟暂无已结束交易。日线共振和有9组完整交易胜率较高，买1后第10根上涨率排序反转。共振叠加9在日线只有3个已结束样本，在周线仅2个且同周触发。以上为指数信号价的描述性统计。
+- [发布源码 `d16bc7c`](https://github.com/gavin0710/Test/commit/d16bc7ccb2fb67ada125f5256b06381df619b246) 已部署至原 Vercel 项目，`dpl_5aKLiLYfjxXkfddD87e4kiybm63i` READY。正式主页、分析页及两个分析资源与 GitHub 一致，四个行情请求均 HTTP 200。通过 [规则和真实历史回归](https://github.com/gavin0710/Test/actions/runs/44095538634)、[归档浏览器验收](https://github.com/gavin0710/Test/actions/runs/44095538560)和[正式站桌面/手机验收](https://github.com/gavin0710/Test/actions/runs/44095538724/attempts/2)。正式验收首轮未定位到新入口，重新运行后完整通过，包含320px窄屏数值检查。
+- 研究数据按固定快照复算，`analysis-data.json` 保存行情输入摘要。更新方法见 README。后续直接发布时保留 `analysis.html`、`analysis-metrics.js`、`analysis-data.json` 以及主页面、两条行情 API，并核对独立分析页。
+
 ## 2026-11-17 MACD 指标读数名称
 
 - 四图指标读数统一显示 `DIF / DEA / MACD`，MACD 读取既有 `hist` 数值（2×(DIF−DEA)）。正式源码 [07894fe](https://github.com/gavin0710/Test/commit/07894fe5f291a776c93756a6a17c05f428be8b89)，Vercel 部署 `dpl_mDKy4mGu3czTjZbdJL9aMWFYb9uP` 为 READY。核对正式页 HTML 与源码一致，首页和四个行情请求均返回 HTTP 200。已通过 [24 组真实历史回归](https://github.com/gavin0710/Test/actions/runs/43988643232)及[桌面与手机归档验收](https://github.com/gavin0710/Test/actions/runs/43988643256)，[正式站验收](https://github.com/gavin0710/Test/actions/runs/43988738295)。
