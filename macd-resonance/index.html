@@ -131,6 +131,7 @@ td{padding:12px 10px;border-bottom:1px solid #f0f2f5;color:#516477}tr:last-child
 .replay-switch{display:flex;gap:5px;align-items:center;margin-bottom:9px}
 .replay-tab{padding:8px 13px;background:#eef2f6;border:1px solid transparent;border-radius:8px;color:#52677c;font-size:12px;font-weight:700}
 .replay-tab.active{background:#244968;color:white}
+.analysis-link{text-decoration:none;white-space:nowrap}.analysis-link:hover{background:#e3edf4;color:#244968}.analysis-link:focus-visible{outline:2px solid #52789e;outline-offset:2px}
 .replay-panel{padding:15px;border-radius:12px;border:1px solid #dee6ed;background:#fff;margin-bottom:13px;box-shadow:0 3px 12px #23394e09}
 .replay-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .replay-controls label{display:flex;gap:7px;flex-direction:column;font-size:10px;color:#8594a2}
@@ -188,9 +189,10 @@ body.reviewing .chartgrid .kplot{height:255px}body.reviewing .chartgrid .mplot{h
   <div class="brand"><div class="brandmark">↗</div><h1>四指共振 · K线看板</h1></div>
   <div class="headright"><div class="syncmeta"><i class="dot" id="statusdot"></i><span id="status">读取行情中</span><span class="faint" id="updated"></span></div><button class="refresh" id="refresh">↻ 刷新</button></div>
  </header>
- <section class="replay-switch" aria-label="看盘与逐笔复盘">
+ <section class="replay-switch" aria-label="看盘功能">
   <button class="replay-tab active" id="view-market" type="button">四指数看盘</button>
   <button class="replay-tab" id="view-replay" type="button">逐笔交易复盘</button>
+  <a class="replay-tab analysis-link" href="./analysis.html">MACD 成功率</a>
  </section>
  <section id="replay-panel" class="replay-panel" hidden aria-label="逐笔交易复盘">
   <div class="replay-controls">

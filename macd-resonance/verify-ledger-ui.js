@@ -2,17 +2,21 @@
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path"),assert=require("node:assert/strict");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"/tmp/macd-ledger-v2/node_modules/playwright");
+const analysis=require("./analysis-data.json");
+const {evaluate,summarize,groups,bounds}=require("./analysis-metrics");
 const viewports=[{width:1500,height:960},{width:390,height:844}];
 const root=__dirname,files={
  "/":path.join(root,"index.html"),"/api/latest":path.join(root,"data","latest.json"),
  "/api/history?period=15":path.join(root,"data","history-15.json"),
  "/api/history?period=101":path.join(root,"data","history-101.json"),
- "/api/history?period=102":path.join(root,"data","history-102.json")
+ "/api/history?period=102":path.join(root,"data","history-102.json"),
+ ...Object.fromEntries(["analysis.html","analysis-metrics.js","analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
 };
 const server=http.createServer((req,res)=>{
  const item=files[req.url?.split("&ts=")[0]]||files[req.url?.split("?ts=")[0]];
  if(!item){res.writeHead(404);res.end("not found");return}
- res.setHeader("Content-Type",item.endsWith(".html")?"text/html;charset=utf-8":"application/json;charset=utf-8");
+ const types={".html":"text/html",".js":"text/javascript",".json":"application/json"};
+ res.setHeader("Content-Type",types[path.extname(item)]+";charset=utf-8");
  fs.createReadStream(item).pipe(res);
 });
 
@@ -166,6 +170,61 @@ async function verifyNavigation(page,viewport){
  if(cdp)await cdp.detach();
 }
 
+async function verifySuccessAnalysis(page, viewport){
+ const press=locator=>viewport.width<600?locator.tap():locator.click();
+ const link=page.getByRole("link",{name:"MACD 成功率",exact:true});
+ assert.equal(await link.count(),1);
+ await press(link);
+ await page.waitForURL("**/analysis.html");
+ await page.locator("#dashboard").waitFor();
+ assert.equal(await page.locator("#overview tr").count(),6);
+ assert.equal(await page.locator("#matrix tr").count(),6);
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Analysis fits both viewports");
+
+ function expected(period, mode="trade", scope="all", horizon=10, index="all", group="all"){
+  const stats=summarize(evaluate(analysis,{mode,scope,horizon,index}).filter(row=>
+   row.period===period&&groups[group].includes(row)));
+  return stats.rate===null?"—":(stats.rate*100).toFixed(1)+"%";
+ }
+ const rate=period=>page.locator('#overview button[data-period="'+period+'"] .rate-text').textContent();
+ assert.equal(await rate("D"),expected("D"));
+ assert.equal(await rate("W"),expected("W"));
+ const combo=page.locator('#matrix button[data-period="D"][data-group="both"]');
+ assert.equal(await combo.locator("strong").textContent(),expected("D","trade","all",10,"all","both").replace(/^(0|100)\.0%$/,"$1%"));
+ await press(combo);
+ assert(await page.locator("#cases").evaluate(el=>el.open));
+ assert.equal(await page.locator("#case-period").inputValue(),"D");
+ assert.equal(await page.locator("#case-group").inputValue(),"both");
+ assert((await page.locator("#records").textContent()).includes("低9"));
+ await page.locator("#case-group").selectOption("all");
+ await press(page.locator("#next"));
+ assert((await page.locator("#page-number").textContent()).startsWith("2 / "));
+ await press(page.getByRole("button",{name:"买1后上涨",exact:true}));
+ assert(await page.locator("#horizon").isVisible());
+ assert.equal(await rate("15"),expected("15","buy"));
+ await page.locator("#horizon").selectOption("20");
+ assert.equal(await rate("15"),expected("15","buy","all",20));
+ await page.locator("#scope").selectOption("same");
+ assert((await page.locator("#context").textContent()).includes(bounds(analysis.coverage).from));
+ assert.equal(await rate("D"),expected("D","buy","same",20));
+ await page.locator("#scope").selectOption("all");
+ await page.locator("#index").selectOption("0");
+ await press(page.getByRole("button",{name:"卖1后下跌",exact:true}));
+ assert.equal(await rate("D"),expected("D","sell","all",20,0));
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Drill-down table scrolls inside its panel");
+ if(viewport.width<600){
+  await page.locator("#index").selectOption("all");
+  await press(page.getByRole("button",{name:"交易胜率",exact:true}));
+  await page.setViewportSize({width:320,height:730});
+  assert(await page.evaluate(()=>[...document.querySelectorAll("#matrix button")].every(el=>el.scrollWidth<=el.clientWidth+1)),
+   "Rates and denominators fit on a 320px display");
+  await page.setViewportSize(viewport);
+ }
+ await press(page.getByRole("link",{name:"四指共振",exact:true}));
+ await page.waitForURL(url=>url.pathname==="/");
+ assert.equal(await page.locator(".chart-card:visible").count(),4);
+}
+
 (async()=>{
  let base=process.env.MACD_BASE_URL;
  const usingArchive=!base;
@@ -297,6 +356,7 @@ async function verifyNavigation(page,viewport){
     assert.equal(await page.locator(".chart-card:visible").count(),4);
     assert(await page.evaluate(()=>[0,1,2,3].every(i=>getSignal(i,selectedP)?.bars.length>=60)));
    }
+   await verifySuccessAnalysis(page,viewport);
    assert.deepEqual(errors,[],"Browser script errors");
    console.log("LEDGER_UI_PASS",JSON.stringify({viewport,...report,projectionPanels}));
    }finally{await browser.close()}

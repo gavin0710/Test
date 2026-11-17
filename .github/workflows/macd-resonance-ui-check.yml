@@ -7,12 +7,18 @@ on:
       - ".github/workflows/macd-resonance-ui-check.yml"
       - "macd-resonance/index.html"
       - "macd-resonance/verify-ledger-ui.js"
+      - "macd-resonance/analysis*"
+      - "macd-resonance/research-success.js"
+      - "macd-resonance/verify-success-analysis.js"
   pull_request:
     branches: [master]
     paths:
       - ".github/workflows/macd-resonance-ui-check.yml"
       - "macd-resonance/index.html"
       - "macd-resonance/verify-ledger-ui.js"
+      - "macd-resonance/analysis*"
+      - "macd-resonance/research-success.js"
+      - "macd-resonance/verify-success-analysis.js"
 permissions:
   contents: read
 jobs:
@@ -28,6 +34,7 @@ jobs:
         run: |
           node macd-resonance/verify.js
           node macd-resonance/verify-ledger-history.js
+          node macd-resonance/verify-success-analysis.js
       - name: Install headless Chromium
         run: |
           npm install --prefix /tmp/macd-ledger-v2 --no-save playwright

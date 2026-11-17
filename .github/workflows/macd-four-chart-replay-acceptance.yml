@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/macd-four-chart-replay-acceptance.yml"
       - "macd-resonance/index.html"
+      - "macd-resonance/analysis*"
 permissions: {contents: read}
 jobs:
   verify:
@@ -27,6 +28,10 @@ jobs:
           for attempt in {1..12}; do
             if curl --silent --show-error --fail --max-time 10 "$MACD_BASE_URL/?verify=$GITHUB_SHA-$attempt" -o /tmp/macd-production.html \
                && cmp -s /tmp/macd-production.html macd-resonance/index.html; then
+              for file in analysis.html analysis-metrics.js analysis-data.json; do
+                curl --silent --show-error --fail --max-time 20 "$MACD_BASE_URL/$file?verify=$GITHUB_SHA" -o "/tmp/$file"
+                cmp "/tmp/$file" "macd-resonance/$file"
+              done
               exit 0
             fi
             sleep 5
