@@ -11,6 +11,10 @@
 **源码**：GitHub `gavin0710/Test`，目录 `macd-resonance/`；主文件 `index.html`，说明 `README.md`。  
 **使用方法**：接手新任务时先读本文件及 `README.md`，再检查正式站点、源码、最近 CI 结果；不要从旧聊天或固定统计值猜测现状。
 
+## 2026-11-17 MACD 指标读数名称
+
+- 四图指标读数统一显示 `DIF / DEA / MACD`，MACD 读取既有 `hist` 数值（2×(DIF−DEA)）。正式源码 [07894fe](https://github.com/gavin0710/Test/commit/07894fe5f291a776c93756a6a17c05f428be8b89)，Vercel 部署 `dpl_mDKy4mGu3czTjZbdJL9aMWFYb9uP` 为 READY。核对正式页 HTML 与源码一致，首页和四个行情请求均返回 HTTP 200。已通过 [24 组真实历史回归](https://github.com/gavin0710/Test/actions/runs/43988643232)及[桌面与手机归档验收](https://github.com/gavin0710/Test/actions/runs/43988643256)，[正式站验收](https://github.com/gavin0710/Test/actions/runs/43988738295)。
+
 ## 2026-11-17 分钟线缩放修复
 
 - 缩放以当前周期实际显示的 K 线根数为起点，输入框与加减按钮使用同一上限（可用历史根数与 500 取小）。短历史周期首次点「−」即可改变四图窗口，已显示全部可用历史时「＋」禁用。共用时间轴、历史定位与复盘沿用现有行为。
