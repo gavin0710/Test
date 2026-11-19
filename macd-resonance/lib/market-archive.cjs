@@ -2,7 +2,7 @@
 const repo="https://api.github.com/repos/gavin0710/Test/contents/macd-resonance/data/";
 const allowed=new Set(["latest.json","history-15.json","history-101.json","history-102.json"]);
 
-export async function readMarketArchive(file,validate,timeoutMs){
+async function readMarketArchive(file,validate,timeoutMs){
  if(!allowed.has(file))throw new Error("Unsupported archive");
  const token=process.env.MACD_GITHUB_TOKEN?.trim();
  if(process.env.MACD_REPOSITORY_PRIVATE==="true"&&!token)throw new Error("Private archive access is not configured");
@@ -35,8 +35,10 @@ export async function readMarketArchive(file,validate,timeoutMs){
  throw new Error(failures.join("; "));
 }
 
-export function privateDataHeaders(res){
+function privateDataHeaders(res){
  res.setHeader("Cache-Control","private, no-store, max-age=0");
  res.setHeader("Vercel-CDN-Cache-Control","no-store");
  res.setHeader("X-Content-Type-Options","nosniff");
 }
+
+module.exports={readMarketArchive,privateDataHeaders};

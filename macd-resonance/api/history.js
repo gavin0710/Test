@@ -1,4 +1,5 @@
-import {readMarketArchive,privateDataHeaders} from "../lib/market-archive.mjs";
+import archive from "../lib/market-archive.cjs";
+const {readMarketArchive,privateDataHeaders}=archive;
 
 export default async function handler(req,res){
  privateDataHeaders(res);
