@@ -240,6 +240,13 @@ async function verifySuccessAnalysis(page, viewport){
    try{
    const page=await browser.newPage({viewport,hasTouch:viewport.width<600,isMobile:viewport.width<600,
     deviceScaleFactor:viewport.width<600?2:1});
+   if(!usingArchive&&process.env.VERCEL_AUTOMATION_BYPASS_SECRET){
+    const gate=await page.request.get(base,{maxRedirects:0,headers:{
+     "x-vercel-protection-bypass":process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+     "x-vercel-set-bypass-cookie":"true"
+    }});
+    assert([200,302,303,307,308].includes(gate.status()),"Protected production access must succeed before browser verification");
+   }
    const errors=[];page.on("pageerror",err=>errors.push(err.message));
    if(usingArchive)await page.route(/eastmoney\.com/,route=>route.abort());
    const resp=await page.goto(base,{waitUntil:"domcontentloaded",timeout:45000});
@@ -362,4 +369,8 @@ async function verifySuccessAnalysis(page, viewport){
    }finally{await browser.close()}
   }
  }finally{if(server.listening)await new Promise(resolve=>server.close(resolve))}
-})().catch(e=>{console.error(e);if(server.listening)server.close();process.exitCode=1});
+})().catch(e=>{
+ const secret=process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+ console.error(secret?String(e?.stack||e).replaceAll(secret,"[redacted]"):e);
+ if(server.listening)server.close();process.exitCode=1;
+});

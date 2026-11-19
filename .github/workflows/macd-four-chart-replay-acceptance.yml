@@ -14,6 +14,7 @@ jobs:
     timeout-minutes: 10
     env:
       MACD_BASE_URL: https://macd-resonance-monitor.vercel.app
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,11 +26,15 @@ jobs:
           /tmp/macd-ledger-v2/node_modules/.bin/playwright install chromium
       - name: Wait for the published HTML to match the tested revision
         run: |
+          if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
+            echo "Configure the production verification secret for the protected site."
+            exit 1
+          fi
           for attempt in {1..12}; do
-            if curl --silent --show-error --fail --max-time 10 "$MACD_BASE_URL/?verify=$GITHUB_SHA-$attempt" -o /tmp/macd-production.html \
+            if curl --silent --show-error --fail --max-time 10 -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$MACD_BASE_URL/?verify=$GITHUB_SHA-$attempt" -o /tmp/macd-production.html \
                && cmp -s /tmp/macd-production.html macd-resonance/index.html; then
               for file in analysis.html analysis-metrics.js analysis-data.json; do
-                curl --silent --show-error --fail --max-time 20 "$MACD_BASE_URL/$file?verify=$GITHUB_SHA" -o "/tmp/$file"
+                curl --silent --show-error --fail --max-time 20 -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$MACD_BASE_URL/$file?verify=$GITHUB_SHA" -o "/tmp/$file"
                 cmp "/tmp/$file" "macd-resonance/$file"
               done
               exit 0

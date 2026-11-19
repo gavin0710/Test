@@ -11,6 +11,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,7 +32,10 @@ jobs:
            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
            try{
             for(const viewport of [{width:1440,height:950},{width:390,height:844}]){
+             assert(process.env.VERCEL_AUTOMATION_BYPASS_SECRET,'Configure the protected production verification secret');
              const page=await browser.newPage({viewport});
+             const gate=await page.request.get(base,{maxRedirects:0,headers:{'x-vercel-protection-bypass':process.env.VERCEL_AUTOMATION_BYPASS_SECRET,'x-vercel-set-bypass-cookie':'true'}});
+             assert([200,302,303,307,308].includes(gate.status()));
              const errs=[];page.on('pageerror',e=>errs.push(e.message));
              const resp=await page.goto(base,{waitUntil:'domcontentloaded',timeout:45000});
              assert.equal(resp.status(),200);
@@ -61,5 +66,9 @@ jobs:
              await page.close();
             }
            }finally{await browser.close()}
-          })().catch(e=>{console.error(e);process.exit(1)});
+          })().catch(e=>{
+           const secret=process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+           console.error(secret?String(e?.stack||e).replaceAll(secret,'[redacted]'):e);
+           process.exit(1);
+          });
           NODE

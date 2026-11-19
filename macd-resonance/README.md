@@ -79,6 +79,18 @@
 
 长历史由 api/history.js 提供，近期行情由 api/latest.js 提供。日线长历史由周度工作流补齐，前端合并近期归档后再计算。页面显示已完成 15 分钟线的最新时点，并标出落后的指数。前端仅用已完成K线形成正式信号。
 
+### 白名单与私有仓库
+
+访问权限由原 Vercel 项目的 Vercel Authentication 管理，范围必须为 `all`（包括生产域名及旧预览部署）。默认只允许项目所有者；给他人授权使用账户访问审批，不发送免登录分享链接。该方案限制访客及源码仓库的访问；得到网页访问权限的用户仍能查看发送到浏览器的计算代码。
+
+仓库不能直接改私有：原行情接口依赖公开 Raw 地址。新接口支持在 Vercel 服务器环境设置 `MACD_GITHUB_TOKEN`，通过 GitHub Contents API 的 raw 媒体类型读取相同四个行情归档，包含超过 1 MB 的日线文件。凭据仅授予 `gavin0710/Test` 的 Contents 读取权限，存为 Sensitive 环境变量，覆盖 Production / Preview；不要写进前端、仓库、URL、日志或聊天。私有读取模式不向公开镜像发送凭据，也不降级到公开镜像。
+
+切换顺序：先配置并验证私有读取凭据，再设置 `MACD_REPOSITORY_PRIVATE=true`，部署并确认四个 API 均返回 200 / `X-Market-Data-Source: github-authenticated`，之后才将仓库设为 Private。未配置凭据时保留原公开读取路径；启用私有标记却缺凭据时明确返回 503，不把故障伪装成过期行情。
+
+自动采集与历史回补仍使用现有 GitHub Actions 和仓库内置的 `GITHUB_TOKEN`，不依赖公开仓库。正式站验收另需将 Vercel Automation Bypass Secret 保存到 GitHub Actions 的 `VERCEL_AUTOMATION_BYPASS_SECRET`；此凭据只用于自动验收。浏览器验收通过同域 Cookie 取得访问权限，不把鉴权头发往行情供应商，错误输出会遮蔽该凭据。私有仓库的 Actions 配额需要在 GitHub 账单中查看；不自动开启付费额度。
+
+本地接口兼容与凭据隔离回归：`node macd-resonance/verify-private-access.mjs`。完整切换后还必须复验受保护站点的桌面 / 手机界面和一次实际自动采集；本地模拟私有上游通过不能替代真实私有仓库验收。旧 GitHub Pages 发布工作流已退役，避免意外发布公开副本。
+
 60/90/120分钟的15分钟派生K线使用北京时间固定交易时段。有缺柱时跳过所在组，保留同日其余完整组。60分钟直采与派生合并，同一收盘时点优先取直采。90分钟为90、90和尾段60分钟，120分钟按上午和下午各自完整的两小时聚合。
 
 ## 上证日线 ETF 执行试验
