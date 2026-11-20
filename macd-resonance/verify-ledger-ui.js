@@ -242,6 +242,13 @@ async function verifySuccessAnalysis(page, viewport){
     deviceScaleFactor:viewport.width<600?2:1});
    const errors=[];page.on("pageerror",err=>errors.push(err.message));
    if(usingArchive)await page.route(/eastmoney\.com/,route=>route.abort());
+   if(!usingArchive&&process.env.MACD_SITE_PASSWORD){
+    const login=await page.request.post(new URL("/_access/login",base).href,{
+     form:{password:process.env.MACD_SITE_PASSWORD,next:"/"},
+     headers:{Origin:new URL(base).origin},maxRedirects:0
+    }).catch(()=>{throw Error("Production password login request failed")});
+    assert.equal(login.status(),303,"Production password login must succeed");
+   }
    const resp=await page.goto(base,{waitUntil:"domcontentloaded",timeout:45000});
    assert.equal(resp.status(),200);
    await page.waitForFunction(()=>!load.busy&&getSignal(0,"D")?.bars?.length>=8763&&

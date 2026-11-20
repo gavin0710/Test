@@ -1,5 +1,7 @@
 // Vercel serverless market snapshot proxy. Shares one verified source of truth with the GitHub data collector.
+import access from '../lib/site-access.cjs';
 export default async function handler(req,res){
+ if(!access.authorize(req,res))return;
  res.setHeader("Access-Control-Allow-Origin","*");
  res.setHeader("Cache-Control","no-store, max-age=0");
  const list=[
