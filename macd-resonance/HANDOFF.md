@@ -7,6 +7,15 @@
 
 **更新：2026-11-17（北京时间）｜项目：技术分析｜状态：正式看板已上线，持续优化与验证中**
 
+## 2026-11-19 密码访问正式上线（美国太平洋时间）
+
+- 用户取消仓库私有化后，仓库继续 Public；原私有化草稿 [PR #14](https://github.com/gavin0710/Test/pull/14) 已关闭，未合并。最新要求是访问网页输入指定共享密码，不再要求 Vercel 账号。不要恢复私有化迁移或合并旧草稿。
+- [PR #15](https://github.com/gavin0710/Test/pull/15) 已合并为 [`4b00854`](https://github.com/gavin0710/Test/commit/4b00854c663fd1306c9ef106d7e99c3792790014)，原 Vercel 正式部署 `dpl_47A15TVDdbGgKkFw6pGWRs44oEXH` READY。正式地址保持 https://macd-resonance-monitor.vercel.app/ 。生产页面、分析页、分析脚本和研究 JSON 经密码验证后与仓库原文件逐字节一致，交易算法未改；研究快照仍截至 2026-11-17。
+- 新增 `api/access.js`、`lib/site-access.cjs` 与 `vercel.json`。完整路由拦截静态访问，首页/分析页先显示密码表单，脚本、研究数据与 latest、15/101/102 历史 API 未验证时返回 401；API 自身再次验证签名 Cookie。密码派生哈希与随机签名密钥以原项目敏感环境变量保存，未向仓库或前端写入密码、哈希或密钥。Cookie 使用 HttpOnly、Secure、SameSite=Strict，7 天有效，改密码哈希或签名密钥会使旧会话失效。失败尝试仅做单实例 IP 节流，不宣称全局持久限流。
+- 发布后将 Vercel Authentication 改为 Standard Protection，API 值 `prod_deployment_urls_and_all_previews`。两个正式别名均显示应用密码入口，旧生产 URL、此次预览 URL 及当前生产生成 URL 匿名访问仍重定向 Vercel 验证，没有将旧版本暴露。平台付费 Password Protection 未启用，未变更套餐。临时 QA 自动化绕过密钥已撤销，剩余 0 个。
+- 新认证集成回归、6227 条规则断言、24 组真实历史账本、355 个研究信号及 3 个采集回归通过。[GitHub 规则/认证检查](https://github.com/gavin0710/Test/actions/runs/44696076644/job/136153010643)及[归档桌面/手机检查](https://github.com/gavin0710/Test/actions/runs/44696076670/job/136153011004)通过。正式域名错误密码被拒、正确密码返回安全 Cookie，首页和全部 7 个资源/API 请求返回 200。另用生产实际响应经本地 TLS 验证代理完成 1500×960、390×844 界面回归，覆盖四图六周期、分钟缩放、历史滑动、逐笔复盘和分析页；两种视窗点击刷新都实际请求生产 API 并返回 200、24/24 周期有数据，无前端脚本错误。测试代理跨网延迟使原有 3 秒快照窗口超时，页面用历史归档完成数据合并；本轮没有更改该既有取数时限，不能据此承诺毫秒级行情更新。
+- `verify-site-access.mjs` 使用随机密码做 CI，无需生产密码；`verify-ledger-ui.js` 的生产模式支持从进程环境读取 `MACD_SITE_PASSWORD`。既有需要读取正式 HTML 的工作流也必须先获得合法会话，不能把登录页 HTTP 200 当成看板验收通过。后续发布须保留全部 9 个运行时文件，详见 README 密码访问一节。
+
 **入口**：https://macd-resonance-monitor.vercel.app/  
 **源码**：GitHub `gavin0710/Test`，目录 `macd-resonance/`；主文件 `index.html`，说明 `README.md`。  
 **使用方法**：接手新任务时先读本文件及 `README.md`，再检查正式站点、源码、最近 CI 结果；不要从旧聊天或固定统计值猜测现状。
