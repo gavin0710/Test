@@ -110,6 +110,21 @@ node research-etf-execution.js /tmp/macd-510210.json > /tmp/macd-510210-executio
 - [2021年份额拆分](https://www.sse.com.cn/disclosure/fund/announcement/c/2021-01-25/510210_20210125_1.pdf)
 - 2023年现金分红公告：[6月](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2023-06-15/510210_20230615_FMT6.pdf)、[8月](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2023-08-18/510210_20230818_9JSP.pdf)、[12月](https://www.sse.com.cn/disclosure/fund/announcement/c/new/2023-12-15/510210_20231215_KIPN.pdf)
 
+### 四指数真实执行研究（2026-11-20）
+
+日线研究扩展为隔离框架 `research-execution-core.cjs` 与 `research-four-index-execution.js`，复用原 `index.html` 的 MACD 与结构账本。旧的 `research-etf-execution.js` 保留，固定至 2026-11-13 的结果可原样复算。新增三个标的为 159903、159915、588000，均从实际上市交易日起才允许执行；四只 ETF 的冻结输入、公告资料、完整成交/未成交记录和研究结果由私人复算包保存，避免在公开仓库散发研究明细。
+
+协议及输入 SHA-256 见 `research/execution-20261120/protocol.json`、`freeze.json`；来源目录见同文件夹 `SOURCES.md`，交接和已知边界见 `HANDOFF.md`。将复算包中的 `inputs/`、`sources/` 与该协议放在同一研究目录，然后运行：
+
+```sh
+node macd-resonance/verify-execution-research.js
+node macd-resonance/verify-execution-legacy.js /absolute/path/to/study
+node macd-resonance/research-four-index-execution.js /absolute/path/to/study /absolute/path/to/results
+python3 macd-resonance/verify-execution-ledgers.py /absolute/path/to/study /absolute/path/to/results
+```
+
+CI 仅运行会计边界样例及既有信号/历史回归，不代表在公开 runner 中复算了私人研究输入。本轮未修改页面、正式引擎、生产 API 或部署。
+
 ## 验收
 
 规则回归：`node macd-resonance/verify.js`；真实历史结构账本：`node macd-resonance/verify-ledger-history.js`；桌面和手机四图界面验收：`node macd-resonance/verify-ledger-ui.js`（需 Playwright + Chromium）。

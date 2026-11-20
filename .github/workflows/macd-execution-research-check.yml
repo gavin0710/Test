@@ -1,0 +1,36 @@
+name: Verify isolated MACD execution research
+on:
+  push:
+    branches: [master]
+    paths:
+      - "macd-resonance/research-execution-core.cjs"
+      - "macd-resonance/research-four-index-execution.js"
+      - "macd-resonance/verify-execution*"
+      - "macd-resonance/research/execution-20261120/protocol.json"
+      - ".github/workflows/macd-execution-research-check.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "macd-resonance/research-execution-core.cjs"
+      - "macd-resonance/research-four-index-execution.js"
+      - "macd-resonance/verify-execution*"
+      - "macd-resonance/research/execution-20261120/protocol.json"
+      - ".github/workflows/macd-execution-research-check.yml"
+permissions: {contents: read}
+jobs:
+  accounting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Verify execution accounting edge cases with synthetic unit fixtures
+        run: node macd-resonance/verify-execution-research.js
+      - name: Verify existing signal rules
+        run: node macd-resonance/verify.js
+      - name: Verify existing ledger over the 24 archived real series
+        run: node macd-resonance/verify-ledger-history.js
+      - name: Check isolated research entrypoints
+        run: |
+          node --check macd-resonance/research-four-index-execution.js
+          python3 -m py_compile macd-resonance/verify-execution-ledgers.py macd-resonance/fetch-execution-inputs.py

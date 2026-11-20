@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "cutoff": "2026-11-20",
+  "initialCash": 100000,
+  "unitFraction": 0.1,
+  "entryExposureCap": 0.5,
+  "boardLot": 100,
+  "tick": 0.001,
+  "cashYield": 0,
+  "baseCosts": {"fee": 0.0003, "minimumFee": 5, "slippage": 0.0005},
+  "costScenarios": [
+    {"name": "zero_cost", "fee": 0, "minimumFee": 0, "slippage": 0},
+    {"name": "base", "fee": 0.0003, "minimumFee": 5, "slippage": 0.0005},
+    {"name": "higher_cost", "fee": 0.0005, "minimumFee": 5, "slippage": 0.002},
+    {"name": "severe_cost", "fee": 0.001, "minimumFee": 5, "slippage": 0.005}
+  ],
+  "execution": {
+    "signal": "Original index.html engine, daily completed close; no parameter or rule changes",
+    "timing": "First ETF trade of a later index session; never signal-day execution",
+    "buyMissingOrLimit": "Defer until tradable, cancel at close if its own exit is signalled first",
+    "sellMissingOrLimit": "Defer; keep its first exit reason and do not replace it using future signals",
+    "cashOrAllocationFailure": "Cancel unfilled buy; never borrow",
+    "priority": "Sell first, then initial/correction entries in stable original entry order",
+    "minimumCommission": "Per separately submitted risk-unit order, same as legacy model",
+    "limits": "10%; 159915 20% from 2020-08-24; 588000 20% since listing",
+    "price": "Observed first trade plus adverse slippage, rounded against trader to tick; modelled impact is not a verified historical fill",
+    "capacity": "Primary model has no claim to auction depth. Sensitivity caps fills by 1% of lagged 20-session average volume; no future volume in sizing",
+    "exposureCap": "Applies to purchases after costs, not forced rebalancing; drift may exceed 50%",
+    "terminal": "Mark open positions to last raw close and accrued ex-date dividend; no forced terminal sale"
+  },
+  "validation": {
+    "commonStart": "2020-11-16",
+    "historicalHoldoutStart": "2024-01-01",
+    "historicalHoldoutLabel": "Retrospective temporal holdout; NOT genuine unseen data because these rules were developed after these dates",
+    "legacyCutoff": "2026-11-13",
+    "postLegacyExtension": "2026-11-16",
+    "rollingYears": 5,
+    "rollingStepYears": 1,
+    "freeze": "Protocol saved before inspecting new four-market account returns. No optimization or best-parameter selection."
+  },
+  "benchmarks": {
+    "passive": "Same ETF, same sessions, fees, slippage, dividend/split treatment; dividends kept in cash",
+    "weights": [0.1, 0.5, 1],
+    "exposureMatch": "Solve initial passive weight to match full-sample average exposure; ex-post diagnostic only",
+    "riskMatch": "Solve initial passive weight to match full-sample realized daily volatility, without leverage; ex-post diagnostic only",
+    "holdout": "Weights fitted on data ending 2023-12-31 only and carried unchanged into a fresh 2024+ account"
+  },
+  "markets": [
+    {"id": "sse", "index": 0, "indexCode": "000001", "name": "上证指数", "etf": "510210", "etfName": "富国上证综指ETF", "listing": "2011-03-25", "splits": [{"date": "2021-01-22", "ratio": 5}], "dividends": [{"record": "2023-06-19", "ex": "2023-06-20", "pay": "2023-06-27", "perShare": 0.076}, {"record": "2023-08-22", "ex": "2023-08-23", "pay": "2023-08-28", "perShare": 0.036}, {"record": "2023-12-19", "ex": "2023-12-20", "pay": "2023-12-25", "perShare": 0.063}]},
+    {"id": "sz", "index": 1, "indexCode": "399001", "name": "深证成指", "etf": "159903", "etfName": "南方深证成份ETF", "listing": "2010-02-02", "splits": [], "dividends": [], "preListingConversion": {"date": "2010-01-13", "ratio": 0.73786718}},
+    {"id": "chinext", "index": 2, "indexCode": "399006", "name": "创业板指", "etf": "159915", "etfName": "易方达创业板ETF", "listing": "2011-12-09", "splits": [], "dividends": [], "preListingConversion": {"date": "2011-11-30", "ratioRounded": 1.1456}, "knownNoQuoteDates": ["2021-02-08"], "resumption": {"date": "2021-02-09", "time": "10:30"}},
+    {"id": "star50", "index": 3, "indexCode": "000688", "name": "科创50", "etf": "588000", "etfName": "华夏上证科创板50成份ETF", "listing": "2020-11-16", "splits": [], "dividends": [], "preListingConversion": {"date": "2020-11-09", "ratioRounded": 0.6945}}
+  ]
+}
