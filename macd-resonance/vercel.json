@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/access.js": {
+      "includeFiles": "{index.html,analysis.html,analysis-metrics.js,analysis-data.json}"
+    }
+  },
+  "routes": [
+    { "src": "/api/latest", "dest": "/api/latest" },
+    { "src": "/api/history", "dest": "/api/history" },
+    { "src": "/(.*)", "dest": "/api/access?__path=$1" }
+  ]
+}

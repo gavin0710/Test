@@ -5,6 +5,18 @@
 
 正式站点：https://macd-resonance-monitor.vercel.app/
 
+## 密码访问（2026-11-19）
+
+正式域名使用服务端密码验证。未验证只显示密码入口，分析页、脚本、研究数据及行情 API 均受保护。验证后用 `HttpOnly / Secure / SameSite=Strict` 的签名 Cookie 保持 7 天；更改密码哈希或会话签名密钥会使已有验证失效。仓库继续公开，这项改动只限制网页访问。
+
+服务端环境变量 `MACD_ACCESS_PASSWORD_HASH`（`scrypt-v1$盐$派生哈希`）与 `MACD_ACCESS_SESSION_SECRET`（随机 32 字节 base64url）在原 Vercel 项目中以敏感变量保存，不提交密码、哈希或密钥。缺少配置时拒绝访问。失败尝试有单实例 IP 节流，不是跨实例的全局限流。不要移除 `vercel.json` 的完整路由拦截；不要在生产部署中增加未受保护的静态文件回退。
+
+Vercel Authentication 在正式密码入口发布、验证成功后设为 Standard Protection（`prod_deployment_urls_and_all_previews`），保护旧部署与预览链接，正式域名由本应用校验密码。没有开通付费密码保护。
+
+验证：`node macd-resonance/verify-site-access.mjs` 使用随机测试密码覆盖登录、错误密码、受限资源、行情 API、Cookie 篡改与过期、密码变更、来源检查、节流与缺少配置。正式浏览器回归可从进程环境读取 `MACD_SITE_PASSWORD`，不要把密码写进命令、仓库或日志；归档回归无需密码。
+
+手动发布在原运行时文件之外，必须包含 `api/access.js`、`lib/site-access.cjs`、`vercel.json`，并保留 `analysis.html`、`analysis-metrics.js`、`analysis-data.json` 及两个行情 API。更新研究快照后应一并重新发布，四个文件原样读出，不重新计算引擎。
+
 ## 当前产品口径（2026-11-14）
 
 主图是上证指数、深证成指、创业板指、科创50四张同期K线，周期为15/60/90/120分钟、日线和周线。四图上方的工具栏可全局调节每屏15～500根，并一键「回最新」。拖动任一图中间的滑条或横拖K线，四图按同一组行情时间移动。缺少行情的位置留空，周期切换后记住各自的窗口。滑条支持方向键、Home 和 End，桌面悬停可看该指数历史范围与当前窗口。

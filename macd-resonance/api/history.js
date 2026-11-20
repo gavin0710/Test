@@ -1,6 +1,8 @@
 // Public, read-only history proxy. Historical bars are committed to GitHub,
 // not generated in the request, and are kept separate from the fast snapshot.
+import access from '../lib/site-access.cjs';
 export default async function handler(req,res){
+ if(!access.authorize(req,res))return;
  const period=String(req.query?.period||"");
  if(!["15","101","102"].includes(period))return res.status(400).json({error:"Unsupported history period"});
  res.setHeader("Access-Control-Allow-Origin","*");
