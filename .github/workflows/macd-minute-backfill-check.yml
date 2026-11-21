@@ -1,0 +1,35 @@
+name: Verify MACD minute history backfill
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - macd-resonance/backfill-minute-history.py
+      - macd-resonance/data/history-15.json
+      - macd-resonance/data/minute-sources-20261121.json.gz
+      - macd-resonance/data/minute-backfill-20261121.json
+      - .github/workflows/macd-minute-backfill-check.yml
+  push:
+    branches: [master]
+    paths:
+      - macd-resonance/backfill-minute-history.py
+      - macd-resonance/data/history-15.json
+      - macd-resonance/data/minute-sources-20261121.json.gz
+      - macd-resonance/data/minute-backfill-20261121.json
+      - .github/workflows/macd-minute-backfill-check.yml
+permissions: {contents: read}
+jobs:
+  real-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify frozen primary responses, independent closes and preserved backfill
+        run: python3 macd-resonance/backfill-minute-history.py --check
+      - name: Verify unchanged trading rules and all 24 real histories
+        run: |
+          node macd-resonance/verify.js
+          node macd-resonance/verify-ledger-history.js

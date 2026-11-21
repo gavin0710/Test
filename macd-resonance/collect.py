@@ -146,9 +146,10 @@ def archive_intraday(destination, archive, old_data, updated_data):
         result.append({"15":[combined[t] for t in sorted(combined)]})
     if archive.get("data")==result:return
     destination.parent.mkdir(parents=True,exist_ok=True)
-    payload={"source":"Accumulated verified intraday OHLC, Eastmoney/Tencent",
+    payload={"source":"Accumulated verified intraday OHLC; Eastmoney/Tencent updates and source-audited historical backfills",
             "period":"15",
             "generated_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
+            "backfills":archive.get("backfills",[]),
             "data":result}
     tmp=destination.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
