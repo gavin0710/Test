@@ -13,6 +13,31 @@ import backfill
 
 
 class CollectorTests(unittest.TestCase):
+    def test_primary_source_cannot_rewrite_verified_minute_prices(self):
+        root = collect.DEST.parent
+        archive = json.loads((root / "history-15.json").read_text())
+        conflicts = json.loads((root / "minute-source-conflicts-20261123.json").read_text())["conflicts"]
+        previous = [{"15": series["15"][-512:]} for series in archive["data"]]
+        incoming = {}
+        for i, (_, ticker, _) in enumerate(collect.INDICES):
+            received = {c["t"]: c["received"] for c in conflicts if c["index"] == i}
+            incoming[ticker] = [received.get(b["t"], b) for b in previous[i]["15"]]
+        snapshot = {"data": previous, "providers": [{"15": "东方财富"} for _ in previous], "failed_sources": []}
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "latest.json"
+            archived = destination.with_name("history-15.json")
+            destination.write_text(json.dumps(snapshot))
+            archived.write_text(json.dumps(archive))
+            with (
+                patch.object(collect, "DEST", destination),
+                patch.object(collect, "PERIODS", {"15": 1800}),
+                patch.object(collect, "get", side_effect=lambda _, ticker, *_args: (incoming[ticker], "东方财富")),
+                patch.object(collect.time, "sleep"),
+            ):
+                collect.main()
+            self.assertEqual(json.loads(destination.read_text())["data"], previous)
+            self.assertEqual(json.loads(archived.read_text())["data"], archive["data"])
+
     def check_daily_archive_at(self, hour, minute, expected_day):
         # Actual Monday-morning long archive and the same day's actual close snapshot.
         root = collect.DEST.parent

@@ -97,7 +97,7 @@ Vercel Authentication 在正式密码入口发布、验证成功后设为 Standa
 
 长历史归档只持久保存按北京时间已完成的日线和周线，沿用页面15:08及周五完成界线；周中尚未结束的周线不入库。收盘后使用实际最新快照补齐日线，不把早盘日期相同的截面当作收盘行情。
 
-JSONP超时后忽略晚到响应，等script实际完成再释放回调，防止慢网下的未定义回调异常。`verify.js`与归档浏览器回归覆盖真实OHLC晚到9秒的情况。腾讯15/60分钟备用源统一使用已核验的`ifzq.gtimg.cn`分钟接口，同时间戳保留原已归档价格、仅补缺口；冻结小时响应与哈希见`data/hourly-source-check-20261123.json.gz`及`data/maintenance-20261123.json`。
+JSONP超时后忽略晚到响应，等script实际完成再释放回调，防止慢网下的未定义回调异常。`verify.js`与归档浏览器回归覆盖真实OHLC晚到9秒的情况。腾讯15/60分钟备用源统一使用已核验的`ifzq.gtimg.cn`分钟接口；15/60分钟不论主源或备用源，均在同时间戳保留原已归档价格、仅补缺口。实际采集发现并恢复的8处主源冲突见`data/minute-source-conflicts-20261123.json`；冻结小时响应与哈希见`data/hourly-source-check-20261123.json.gz`及`data/maintenance-20261123.json`。
 
 正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留全部9个运行时文件，不能照搬早期仅3文件的发布方式。
 

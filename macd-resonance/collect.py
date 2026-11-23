@@ -165,7 +165,7 @@ def main():
         for i,(secid,ticker,name) in enumerate(INDICES):
             try:
                 rows,provider=get(secid,ticker,klt,count)
-                if klt in ("15", "60") and provider == "腾讯备用源":
+                if klt in ("15", "60"):
                     rows = merge_minute_fallback(data[i].get(klt, []), archived_data[i].get(klt, []), rows, count)
                 data[i][klt]=rows
                 sources[i][klt]=provider
