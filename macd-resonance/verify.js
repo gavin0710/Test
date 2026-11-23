@@ -379,4 +379,39 @@ for(const mode of ["watch","campaign"]){
 ok(!script.includes("历史浏览中 · 下一根条件推演")&&!script.includes("历史共振对照 · 同周期同时间窗"),
  "Historical/replay projection placeholders have been removed");
 
-console.log("PASS:",assertions,"assertions: close-price divergence, 3 opposite bars, linked buy-sell trade, enabled correction stop, four-chart replay");
+async function verifyJsonp(){
+ const jsonpCode=script.slice(script.indexOf("function jsonp("),script.indexOf("function tradingMinute("));
+ const real=JSON.parse(fs.readFileSync(path.join(root,"data/latest.json"),"utf8")).data[0]["15"].slice(-80);
+ const payload={data:{klines:real.map(b=>[b.t,b.o,b.c,b.h,b.l].join(","))}};
+ function request(){
+  const timers=new Map(),elements=[];
+  const scope={setTimeout(fn){const id=timers.size+1;timers.set(id,fn);return id},clearTimeout(id){timers.delete(id)},
+   document:{createElement(){return {remove(){elements.splice(elements.indexOf(this),1)}}},head:{appendChild(el){elements.push(el)}}}};
+  scope.window=scope;vm.createContext(scope);vm.runInContext(jsonpCode,scope);
+  const pending=vm.runInContext('jsonp("https://quotes.example.test/?klt=15")',scope);
+  const element=elements[0],callback=new URL(element.src).searchParams.get("cb");
+  return {scope,pending,element,callback,timers,elements,deliver(){vm.runInContext(callback+"("+JSON.stringify(payload)+")",scope)}};
+ }
+ const slow=request(),timedOut=assert.rejects(slow.pending,/超时/);
+ [...slow.timers.values()][0]();await timedOut;
+ // A fetched script may still execute after timeout; reproduce its actual JS call.
+ assert.doesNotThrow(()=>slow.deliver(),"Late JSONP must not throw ReferenceError after the request times out");assertions++;
+ slow.element.onload();
+ equal(slow.elements.length,0,"Late script is removed after load");
+ equal(typeof slow.scope[slow.callback],"undefined","Late callback is removed after load");
+ const normal=request();normal.deliver();
+ assert.deepEqual(JSON.parse(JSON.stringify(await normal.pending)),payload);assertions++;
+ normal.element.onload();
+ equal(normal.elements.length,0,"Successful script is removed after load");
+ equal(typeof normal.scope[normal.callback],"undefined","Successful callback is removed");
+ equal(normal.timers.size,0,"Successful request cancels its timeout");
+ const failed=request(),rejected=assert.rejects(failed.pending,/访问受限/);
+ failed.element.onerror();await rejected;
+ equal(failed.elements.length,0,"Failed script is removed");
+ equal(typeof failed.scope[failed.callback],"undefined","Failed callback is removed");
+ const empty=request(),missing=assert.rejects(empty.pending,/无K线数据/);
+ empty.element.onload();await missing;
+ equal(empty.elements.length,0,"A loaded response without a callback is cleaned up");
+}
+verifyJsonp().then(()=>console.log("PASS:",assertions,"assertions: close-price divergence, 3 opposite bars, linked buy-sell trade, enabled correction stop, four-chart replay, late JSONP lifecycle"))
+ .catch(error=>{console.error(error);process.exitCode=1});

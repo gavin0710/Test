@@ -7,6 +7,7 @@ on:
       - ".github/workflows/macd-four-chart-replay-acceptance.yml"
       - "macd-resonance/index.html"
       - "macd-resonance/analysis*"
+      - "macd-resonance/verify-production.mjs"
 permissions: {contents: read}
 jobs:
   verify:
@@ -14,6 +15,7 @@ jobs:
     timeout-minutes: 10
     env:
       MACD_BASE_URL: https://macd-resonance-monitor.vercel.app
+      MACD_SITE_PASSWORD: ${{ secrets.MACD_SITE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,19 +26,6 @@ jobs:
           npm install --prefix /tmp/macd-ledger-v2 --no-save playwright
           /tmp/macd-ledger-v2/node_modules/.bin/playwright install chromium
       - name: Wait for the published HTML to match the tested revision
-        run: |
-          for attempt in {1..12}; do
-            if curl --silent --show-error --fail --max-time 10 "$MACD_BASE_URL/?verify=$GITHUB_SHA-$attempt" -o /tmp/macd-production.html \
-               && cmp -s /tmp/macd-production.html macd-resonance/index.html; then
-              for file in analysis.html analysis-metrics.js analysis-data.json; do
-                curl --silent --show-error --fail --max-time 20 "$MACD_BASE_URL/$file?verify=$GITHUB_SHA" -o "/tmp/$file"
-                cmp "/tmp/$file" "macd-resonance/$file"
-              done
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "The production alias does not serve this revision."
-          exit 1
+        run: node macd-resonance/verify-production.mjs
       - name: Verify production navigation, ledger and replay on desktop and mobile
         run: node macd-resonance/verify-ledger-ui.js

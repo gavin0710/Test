@@ -1,0 +1,508 @@
+{
+  "checkedDateUtc": "2026-11-23",
+  "baselineCommit": "db3de3045b00054e3d77ebd36539da4f6eedc2e7",
+  "referenceTimezone": "Asia/Shanghai",
+  "lastCompletedTradingDay": "2026-11-23",
+  "lastCompletedWeek": "2026-11-20",
+  "calendarSources": [
+    "https://www.sse.com.cn/disclosure/dealinstruc/closed/",
+    "https://www.szse.cn/disclosure/notice/t20251222_618087.html"
+  ],
+  "scheduledCollectorRun": "https://github.com/gavin0710/Test/actions/runs/45137942955",
+  "scheduledBackfillRun": "https://github.com/gavin0710/Test/actions/runs/45095855097",
+  "productionBaseline": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "sha256": "053b51ad7d3730fe3be3e4d0745e068f9bf3677ff49675f5fa90ba9972b0b8c1",
+      "bytes": 109970,
+      "matches_master": false
+    },
+    {
+      "file": "latest.json",
+      "status": 200,
+      "sha256": "4031f8ecb246c4666e1e012030044b9f91a8e23147c4d988f0ca35b419ac61be",
+      "bytes": 419336,
+      "series": [
+        {
+          "15": {
+            "count": 512,
+            "first": "2026-10-09T09:45",
+            "last": "2026-11-23T15:00"
+          },
+          "60": {
+            "count": 128,
+            "first": "2026-10-08T10:30",
+            "last": "2026-11-20T15:00"
+          },
+          "101": {
+            "count": 501,
+            "first": "2024-10-31",
+            "last": "2026-11-23"
+          },
+          "102": {
+            "count": 351,
+            "first": "2020-01-23",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "15": {
+            "count": 512,
+            "first": "2026-10-09T09:45",
+            "last": "2026-11-23T15:00"
+          },
+          "60": {
+            "count": 128,
+            "first": "2026-10-08T10:30",
+            "last": "2026-11-20T15:00"
+          },
+          "101": {
+            "count": 501,
+            "first": "2024-10-31",
+            "last": "2026-11-23"
+          },
+          "102": {
+            "count": 351,
+            "first": "2020-01-23",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "15": {
+            "count": 512,
+            "first": "2026-10-09T09:45",
+            "last": "2026-11-23T15:00"
+          },
+          "60": {
+            "count": 128,
+            "first": "2026-10-08T10:30",
+            "last": "2026-11-20T15:00"
+          },
+          "101": {
+            "count": 501,
+            "first": "2024-10-31",
+            "last": "2026-11-23"
+          },
+          "102": {
+            "count": 351,
+            "first": "2020-01-23",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "15": {
+            "count": 512,
+            "first": "2026-10-09T09:45",
+            "last": "2026-11-23T15:00"
+          },
+          "60": {
+            "count": 128,
+            "first": "2026-10-08T10:30",
+            "last": "2026-11-20T15:00"
+          },
+          "101": {
+            "count": 501,
+            "first": "2024-10-31",
+            "last": "2026-11-23"
+          },
+          "102": {
+            "count": 351,
+            "first": "2020-01-23",
+            "last": "2026-11-23"
+          }
+        }
+      ],
+      "matches_master": true
+    },
+    {
+      "file": "history-15.json",
+      "status": 200,
+      "sha256": "198aa2fe88e0454a9844e273178c435908ee4badad29258478f9d1962cbc324d",
+      "bytes": 606335,
+      "series": [
+        {
+          "15": {
+            "count": 1984,
+            "first": "2026-05-25T09:45",
+            "last": "2026-11-23T15:00"
+          }
+        },
+        {
+          "15": {
+            "count": 1984,
+            "first": "2026-05-25T09:45",
+            "last": "2026-11-23T15:00"
+          }
+        },
+        {
+          "15": {
+            "count": 1984,
+            "first": "2026-05-25T09:45",
+            "last": "2026-11-23T15:00"
+          }
+        },
+        {
+          "15": {
+            "count": 1984,
+            "first": "2026-05-25T09:45",
+            "last": "2026-11-23T15:00"
+          }
+        }
+      ],
+      "matches_master": true
+    },
+    {
+      "file": "history-101.json",
+      "status": 200,
+      "sha256": "4ced041ad63979a6e483cff1d510eb1b9d34abf5c234ec430e737d03c3c8883e",
+      "bytes": 1542574,
+      "series": [
+        {
+          "101": {
+            "count": 8769,
+            "first": "1990-12-19",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "101": {
+            "count": 8722,
+            "first": "1991-04-03",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "101": {
+            "count": 4000,
+            "first": "2010-06-01",
+            "last": "2026-11-20"
+          }
+        },
+        {
+          "101": {
+            "count": 1670,
+            "first": "2019-12-31",
+            "last": "2026-11-23"
+          }
+        }
+      ],
+      "matches_master": true
+    },
+    {
+      "file": "history-102.json",
+      "status": 200,
+      "sha256": "a119ccc495f5cd2c528bfa8ed601a2e963c2c33322a5e31d2acf96fdb74b1f9b",
+      "bytes": 321952,
+      "series": [
+        {
+          "102": {
+            "count": 1825,
+            "first": "1990-12-21",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "102": {
+            "count": 1807,
+            "first": "1991-04-06",
+            "last": "2026-11-23"
+          }
+        },
+        {
+          "102": {
+            "count": 844,
+            "first": "2010-06-04",
+            "last": "2026-11-20"
+          }
+        },
+        {
+          "102": {
+            "count": 354,
+            "first": "2020-01-03",
+            "last": "2026-11-23"
+          }
+        }
+      ],
+      "matches_master": true
+    },
+    {
+      "file": "analysis.html",
+      "status": 200,
+      "sha256": "e7afb006ace4da34da4d149d1d5c84460568a5877bf931fc13c092c9683860cb",
+      "bytes": 26248
+    },
+    {
+      "file": "analysis-metrics.js",
+      "status": 200,
+      "sha256": "7ffa9610f9eaa03b189d32f97675ec42abf21524888271dc197ed611a9ae5590",
+      "bytes": 3608
+    },
+    {
+      "file": "analysis-data.json",
+      "status": 200,
+      "sha256": "4c14b85f44598179a0060e1b17d7233468d45048e12542bd8a92a8cfb75c940a",
+      "bytes": 91835
+    }
+  ],
+  "completedEngineSeries": [
+    {
+      "index": 0,
+      "period": "15",
+      "count": 1984,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 0,
+      "period": "60",
+      "count": 496,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 0,
+      "period": "90",
+      "count": 372,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 0,
+      "period": "120",
+      "count": 248,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 0,
+      "period": "D",
+      "count": 8769,
+      "last": "2026-11-23",
+      "baselineIdentical": true
+    },
+    {
+      "index": 0,
+      "period": "W",
+      "count": 1824,
+      "last": "2026-11-20",
+      "baselineIdentical": true
+    },
+    {
+      "index": 1,
+      "period": "15",
+      "count": 1984,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 1,
+      "period": "60",
+      "count": 496,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 1,
+      "period": "90",
+      "count": 372,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 1,
+      "period": "120",
+      "count": 248,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 1,
+      "period": "D",
+      "count": 8722,
+      "last": "2026-11-23",
+      "baselineIdentical": true
+    },
+    {
+      "index": 1,
+      "period": "W",
+      "count": 1806,
+      "last": "2026-11-20",
+      "baselineIdentical": true
+    },
+    {
+      "index": 2,
+      "period": "15",
+      "count": 1984,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 2,
+      "period": "60",
+      "count": 496,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 2,
+      "period": "90",
+      "count": 372,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 2,
+      "period": "120",
+      "count": 248,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 2,
+      "period": "D",
+      "count": 4001,
+      "last": "2026-11-23",
+      "baselineIdentical": true
+    },
+    {
+      "index": 2,
+      "period": "W",
+      "count": 844,
+      "last": "2026-11-20",
+      "baselineIdentical": true
+    },
+    {
+      "index": 3,
+      "period": "15",
+      "count": 1984,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 3,
+      "period": "60",
+      "count": 496,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 3,
+      "period": "90",
+      "count": 372,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 3,
+      "period": "120",
+      "count": 248,
+      "last": "2026-11-23T15:00",
+      "baselineIdentical": true
+    },
+    {
+      "index": 3,
+      "period": "D",
+      "count": 1670,
+      "last": "2026-11-23",
+      "baselineIdentical": true
+    },
+    {
+      "index": 3,
+      "period": "W",
+      "count": 353,
+      "last": "2026-11-20",
+      "baselineIdentical": true
+    }
+  ],
+  "hourlySourceChecks": [
+    {
+      "ticker": "sh000001",
+      "url": "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000001%2Cm60%2C%2C640",
+      "count": 640,
+      "first": [
+        "202603301030",
+        "3884.28",
+        "3889.92",
+        "3905.31",
+        "3872.78"
+      ],
+      "last": [
+        "202611231500",
+        "3538.20",
+        "3538.95",
+        "3541.06",
+        "3523.32"
+      ],
+      "sha256": "39b5f2f438e8d7651f5b333ddbd0efc9f407d9870b6377087a6f57890bb75e70"
+    },
+    {
+      "ticker": "sz399001",
+      "url": "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sz399001%2Cm60%2C%2C640",
+      "count": 640,
+      "first": [
+        "202603301030",
+        "13618.79",
+        "13574.43",
+        "13709.25",
+        "13536.56"
+      ],
+      "last": [
+        "202611231500",
+        "10487.64",
+        "10454.37",
+        "10510.18",
+        "10416.92"
+      ],
+      "sha256": "fd3d074daf953095a8f09c92251578627e7116fffc4250afb223bf7f31d4b789"
+    },
+    {
+      "ticker": "sz399006",
+      "url": "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sz399006%2Cm60%2C%2C640",
+      "count": 640,
+      "first": [
+        "202603301030",
+        "3254.43",
+        "3233.44",
+        "3280.64",
+        "3224.60"
+      ],
+      "last": [
+        "202611231500",
+        "2292.96",
+        "2280.20",
+        "2297.73",
+        "2269.39"
+      ],
+      "sha256": "3d26863cdd93edf692576e2ad081053bddd95955724b645b18d317da72bd8361"
+    },
+    {
+      "ticker": "sh000688",
+      "url": "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=sh000688%2Cm60%2C%2C640",
+      "count": 640,
+      "first": [
+        "202603301030",
+        "1278.99",
+        "1271.43",
+        "1290.11",
+        "1269.32"
+      ],
+      "last": [
+        "202611231500",
+        "1237.55",
+        "1227.89",
+        "1238.60",
+        "1220.82"
+      ],
+      "sha256": "d8b52592a792d9504956dc3b2127d028e6f3c23e1fe55e635b84dc4a78c62ba2"
+    }
+  ],
+  "hourlyFrozenInputs": "hourly-source-check-20261123.json.gz",
+  "hourlyPolicy": "Preserve recorded OHLC and existing first timestamp; append missing genuine bars only. The fixed fallback adds four 2026-11-23 hours per index to the 128 previously recorded hours.",
+  "limits": [
+    "GitHub schedule is best effort; one daily scheduled run observed, not proof of all 15-minute triggers.",
+    "history-101 contains morning partial bars for three indices; latest snapshot overrides them with actual closing daily OHLC. No claim that a raw long-history endpoint is independently end-of-day current.",
+    "Current week is incomplete; 2026-11-23 weekly rows are excluded from formal signals.",
+    "MACD success analysis retains its separate 2026-11-17 research snapshot."
+  ]
+}
