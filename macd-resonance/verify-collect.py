@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Exercise snapshot publication with real archived bars and isolated files."""
 import json
+import gzip
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,6 +12,34 @@ import collect
 
 
 class CollectorTests(unittest.TestCase):
+    def test_hourly_fallback_uses_verified_endpoint_and_preserves_recorded_ohlc(self):
+        root = collect.DEST.parent
+        frozen = json.loads(gzip.decompress((root / "hourly-source-check-20261123.json.gz").read_bytes()))
+        latest = json.loads((root / "latest.json").read_text())
+        for i, (_, ticker, _) in enumerate(collect.INDICES):
+            source = frozen[ticker]
+            self.assertEqual(hashlib.sha256(source["body"].encode()).hexdigest(), source["sha256"])
+            with patch.object(collect, "retrieve_json", return_value=json.loads(source["body"])) as request:
+                rows = collect.tencent(ticker, "60", 900)
+            self.assertEqual(request.call_args.args[0], source["url"])
+            self.assertEqual(len(rows), 640)
+            self.assertEqual(rows[-1]["t"], "2026-11-23T15:00")
+            # A fallback first seen at the exact close cannot freeze an unfinished hour.
+            with (
+                patch.object(collect.dt, "datetime", wraps=collect.dt.datetime) as clock,
+                patch.object(collect, "eastmoney", return_value=rows),
+            ):
+                clock.now.return_value = collect.dt.datetime.fromisoformat(rows[-1]["t"])
+                closed, _ = collect.get(collect.INDICES[i][0], ticker, "60", 900)
+                self.assertEqual(closed, rows[:-1])
+            previous = [b for b in latest["data"][i].get("60", []) if b["t"] <= "2026-11-20T15:00"]
+            merged = collect.merge_minute_fallback(previous, [], rows, 900)
+            by_time = {b["t"]: b for b in merged}
+            self.assertTrue(all(by_time[b["t"]] == b for b in previous))
+            self.assertEqual(merged[-1], rows[-1])
+            if previous:
+                self.assertEqual(merged[0], previous[0])
+
     def test_new_bars_publish_with_the_same_provider_and_errors(self):
         root = collect.DEST.parent
         archived = json.loads((root / "history-15.json").read_text(encoding="utf-8"))

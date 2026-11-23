@@ -35,6 +35,22 @@ async function chartState(page){
    })};
  });
 }
+async function verifyLateJsonp(page){
+ const bars=JSON.parse(fs.readFileSync(files["/api/latest"],"utf8")).data[0]["15"].slice(-80);
+ const payload={data:{klines:bars.map(b=>[b.t,b.o,b.c,b.h,b.l].join(","))}};
+ let callback;
+ await page.route("**/__verify_jsonp?*",async route=>{
+  callback=new URL(route.request().url()).searchParams.get("cb");
+  // Deliver a genuine archived OHLC response after the production 8.5s timeout.
+  await new Promise(resolve=>setTimeout(resolve,9000));
+  await route.fulfill({contentType:"text/javascript",body:callback+"("+JSON.stringify(payload)+");"});
+ });
+ const outcome=await page.evaluate(()=>jsonp(location.origin+"/__verify_jsonp?klt=15").then(()=>"resolved",err=>err.message));
+ assert.equal(outcome,"行情接口超时");
+ await page.waitForFunction(cb=>typeof window[cb]==="undefined",callback);
+ assert.equal(await page.locator('script[src*="/__verify_jsonp?"]').count(),0);
+ await page.unroute("**/__verify_jsonp?*");
+}
 function assertAligned(state){
  assert(state.sliders.every(s=>JSON.stringify(s)===JSON.stringify(state.sliders[0])),"The four history sliders must agree");
  assert.equal(state.times.length,state.density,"Available history fills the requested shared slots");
@@ -257,6 +273,11 @@ async function verifySuccessAnalysis(page, viewport){
    assert.equal(await page.locator(".kplot").count(),4);
    assert.equal(await page.locator(".mplot").count(),4);
    assert.equal(await page.locator("#statsbody tr").count(),24);
+   if(usingArchive)await verifyLateJsonp(page);
+   if(process.env.MACD_SCREENSHOT_DIR){
+    fs.mkdirSync(process.env.MACD_SCREENSHOT_DIR,{recursive:true});
+    await page.screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`market-${viewport.width}.png`),fullPage:true});
+   }
    const projectionPanels=await page.evaluate(()=>[0,1,2,3].map(i=>{
     const v=getSignal(i,selectedP),at=visible(i);
     const latest=at?.window.isLatest&&v?.bars?.at(-1)?.t===at?.window.endT;

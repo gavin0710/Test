@@ -283,7 +283,23 @@ function timestampLabel(t){return t.replace("T"," ")}
 function safeN(v){let n=Number(v);return Number.isFinite(n)?n:null}
 function parseBars(res){if(!res||!res.data||!Array.isArray(res.data.klines))throw Error("接口无K线数据");let out=[];for(const line of res.data.klines){const r=line.split(",");if(r.length<5)continue;const b={t:barTime(r[0]),o:safeN(r[1]),c:safeN(r[2]),h:safeN(r[3]),l:safeN(r[4])};if([b.o,b.c,b.h,b.l].every(Number.isFinite)&&b.o>0&&b.c>0&&b.h>=b.l)out.push(b)}if(out.length<55)throw Error("有效K线不足");out.sort((a,b)=>a.t.localeCompare(b.t));return out.filter((b,i)=>i===0||b.t!==out[i-1].t)}
 function endpoint(secid,klt,lmt){return "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid="+encodeURIComponent(secid)+"&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt="+klt+"&fqt=0&beg=0&end=20500101&lmt="+lmt}
-function jsonp(url){return new Promise((resolve,reject)=>{let done=false;const cb="emData_"+Date.now()+"_"+Math.random().toString(36).slice(2);const script=document.createElement("script");function finish(err,data){if(done)return;done=true;clearTimeout(timer);delete window[cb];script.remove();err?reject(err):resolve(data)}const timer=setTimeout(()=>finish(Error("行情接口超时")),8500);window[cb]=data=>finish(null,data);script.onerror=()=>finish(Error("行情接口访问受限"));script.src=url+"&cb="+cb+"&_="+Date.now();document.head.appendChild(script)})}
+function jsonp(url){return new Promise((resolve,reject)=>{
+ let done=false;
+ const cb="emData_"+Date.now()+"_"+Math.random().toString(36).slice(2),script=document.createElement("script");
+ function cleanup(){clearTimeout(timer);script.onload=script.onerror=null;script.remove();delete window[cb]}
+ function finish(err,data){
+  if(done)return;done=true;clearTimeout(timer);
+  // Removing a timed-out script cannot reliably cancel an already fetched response.
+  // Ignore late data until load/error settles, then release both script and callback.
+  window[cb]=()=>{};
+  err?reject(err):resolve(data);
+ }
+ const timer=setTimeout(()=>finish(Error("行情接口超时")),8500);
+ window[cb]=data=>finish(null,data);
+ script.onload=()=>{finish(Error("接口无K线数据"));cleanup()};
+ script.onerror=()=>{finish(Error("行情接口访问受限"));cleanup()};
+ script.src=url+"&cb="+cb+"&_="+Date.now();document.head.appendChild(script);
+})}
 function tradingMinute(t){
  const [hour,minute]=t.slice(11,16).split(":").map(Number);
  if(minute<0||minute>=60)return 0;

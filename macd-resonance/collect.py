@@ -64,14 +64,10 @@ def shift_tencent_minute(t, minute_length, start_times):
     return date.strftime("%Y-%m-%dT%H:%M")
 
 def tencent(ticker, klt, count):
-    if klt == "15":
-        typ = "m15"
+    if klt in ("15", "60"):
+        typ = "m" + klt
         param = f"{ticker},{typ},,{min(640, count)}"
         url = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?" + urllib.parse.urlencode({"param": param})
-    elif klt == "60":
-        typ = "m60"
-        param = f"{ticker},{typ},,,{min(640, count)}"
-        url = "https://web.ifzq.gtimg.cn/appstock/app/kline/mkline?" + urllib.parse.urlencode({"param": param})
     else:
         typ="day" if klt=="101" else "week"
         param=f"{ticker},{typ},,,{min(640,count)}"
@@ -94,7 +90,7 @@ def get(secid,ticker,klt,count):
             try:
                 requested_at = dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).strftime("%Y-%m-%dT%H:%M")
                 rows=fn()
-                if klt == "15":
+                if klt in ("15", "60"):
                     rows = [bar for bar in rows if bar["t"] < requested_at]
                 if len(rows)<65:raise ValueError(f"Only {len(rows)} usable bars")
                 return rows,source
@@ -169,7 +165,7 @@ def main():
         for i,(secid,ticker,name) in enumerate(INDICES):
             try:
                 rows,provider=get(secid,ticker,klt,count)
-                if klt == "15" and provider == "腾讯备用源":
+                if klt in ("15", "60") and provider == "腾讯备用源":
                     rows = merge_minute_fallback(data[i].get(klt, []), archived_data[i].get(klt, []), rows, count)
                 data[i][klt]=rows
                 sources[i][klt]=provider
