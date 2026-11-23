@@ -775,6 +775,548 @@
       "Observe actual schedule coverage: a scheduled daily run is verified, not every 15-minute opportunity.",
       "Configure the existing MACD_SITE_PASSWORD repository Actions secret to enable the production workflow. No workflow permissions changed.",
       "Holiday-shortened current-week early confirmation retains the existing Friday rule and remains a separate boundary to verify."
-    ]
+    ],
+    "hourlyCollector": {
+      "run": "https://github.com/gavin0710/Test/actions/runs/45214139919",
+      "commit": "3697663de1a390b76658c4ce3c60ac528af343d7",
+      "event": "push",
+      "hourlyRowsPerIndex": 132,
+      "retainedHourlyRowsPerIndex": 128,
+      "appendedHourlyRowsPerIndex": 4,
+      "availableSourceSeries": 16,
+      "failedSources": 0
+    },
+    "archivePreservationFollowup": {
+      "pullRequest": "https://github.com/gavin0710/Test/pull/20",
+      "mergedCommit": "6bfae2fac9dcbc19c6f59c5708877f0b070b31dd",
+      "restoredMinuteRows": 8,
+      "conflictFile": "minute-source-conflicts-20261123.json",
+      "allProvidersPreserveRecordedIntraday": true,
+      "githubRegression": "https://github.com/gavin0710/Test/actions/runs/45215864796",
+      "githubFrozenBackfillAnd24Series": "https://github.com/gavin0710/Test/actions/runs/45215864834",
+      "currentInputEngineAssertions": 6121,
+      "collectorRegressions": 7,
+      "ledger": {
+        "groups": 24,
+        "buy1": 286,
+        "closed": 244,
+        "open": 72
+      },
+      "noRuntimeRedeploymentRequired": true
+    },
+    "finalProductionResponses": [
+      {
+        "file": "index.html",
+        "status": 200,
+        "sha256": "0678ba91a20b056c918f0a2fd627a8204175ad3551207f1ed5dbc550421afffc",
+        "bytes": 110338,
+        "date": "Mon, 23 Nov 2026 16:27:20 GMT",
+        "cache_control": "private, no-store, max-age=0",
+        "source": null,
+        "matches_master": true
+      },
+      {
+        "file": "latest.json",
+        "status": 200,
+        "sha256": "4370526af1a7ff2fd1e5dfd8fa3b5fe0207df2bc969ecb95c0f563f1bacf353e",
+        "bytes": 413890,
+        "date": "Mon, 23 Nov 2026 16:27:20 GMT",
+        "cache_control": "no-store, max-age=0",
+        "source": "github-raw",
+        "series": [
+          {
+            "15": {
+              "count": 496,
+              "first": "2026-10-12T09:45",
+              "last": "2026-11-23T15:00"
+            },
+            "60": {
+              "count": 132,
+              "first": "2026-10-08T10:30",
+              "last": "2026-11-23T15:00"
+            },
+            "101": {
+              "count": 500,
+              "first": "2024-11-01",
+              "last": "2026-11-23"
+            },
+            "102": {
+              "count": 350,
+              "first": "2020-02-07",
+              "last": "2026-11-23"
+            }
+          },
+          {
+            "15": {
+              "count": 496,
+              "first": "2026-10-12T09:45",
+              "last": "2026-11-23T15:00"
+            },
+            "60": {
+              "count": 132,
+              "first": "2026-10-08T10:30",
+              "last": "2026-11-23T15:00"
+            },
+            "101": {
+              "count": 500,
+              "first": "2024-11-01",
+              "last": "2026-11-23"
+            },
+            "102": {
+              "count": 350,
+              "first": "2020-02-07",
+              "last": "2026-11-23"
+            }
+          },
+          {
+            "15": {
+              "count": 496,
+              "first": "2026-10-12T09:45",
+              "last": "2026-11-23T15:00"
+            },
+            "60": {
+              "count": 132,
+              "first": "2026-10-08T10:30",
+              "last": "2026-11-23T15:00"
+            },
+            "101": {
+              "count": 500,
+              "first": "2024-11-01",
+              "last": "2026-11-23"
+            },
+            "102": {
+              "count": 350,
+              "first": "2020-02-07",
+              "last": "2026-11-23"
+            }
+          },
+          {
+            "15": {
+              "count": 496,
+              "first": "2026-10-12T09:45",
+              "last": "2026-11-23T15:00"
+            },
+            "60": {
+              "count": 132,
+              "first": "2026-10-08T10:30",
+              "last": "2026-11-23T15:00"
+            },
+            "101": {
+              "count": 500,
+              "first": "2024-11-01",
+              "last": "2026-11-23"
+            },
+            "102": {
+              "count": 350,
+              "first": "2020-02-07",
+              "last": "2026-11-23"
+            }
+          }
+        ],
+        "matches_master": true,
+        "matches_master_ohlc": true
+      },
+      {
+        "file": "history-15.json",
+        "status": 200,
+        "sha256": "198aa2fe88e0454a9844e273178c435908ee4badad29258478f9d1962cbc324d",
+        "bytes": 606335,
+        "date": "Mon, 23 Nov 2026 16:27:20 GMT",
+        "cache_control": "no-store, max-age=0",
+        "source": null,
+        "series": [
+          {
+            "15": {
+              "count": 1984,
+              "first": "2026-05-25T09:45",
+              "last": "2026-11-23T15:00"
+            }
+          },
+          {
+            "15": {
+              "count": 1984,
+              "first": "2026-05-25T09:45",
+              "last": "2026-11-23T15:00"
+            }
+          },
+          {
+            "15": {
+              "count": 1984,
+              "first": "2026-05-25T09:45",
+              "last": "2026-11-23T15:00"
+            }
+          },
+          {
+            "15": {
+              "count": 1984,
+              "first": "2026-05-25T09:45",
+              "last": "2026-11-23T15:00"
+            }
+          }
+        ],
+        "matches_master": true,
+        "matches_master_ohlc": true
+      },
+      {
+        "file": "history-101.json",
+        "status": 200,
+        "sha256": "eb74ab301f4b49dbc05d93c3eca78efc88bc17675a511f802d11e0a943293733",
+        "bytes": 1542641,
+        "date": "Mon, 23 Nov 2026 16:27:20 GMT",
+        "cache_control": "no-store, max-age=0",
+        "source": null,
+        "series": [
+          {
+            "101": {
+              "count": 8769,
+              "first": "1990-12-19",
+              "last": "2026-11-23"
+            }
+          },
+          {
+            "101": {
+              "count": 8722,
+              "first": "1991-04-03",
+              "last": "2026-11-23"
+            }
+          },
+          {
+            "101": {
+              "count": 4001,
+              "first": "2010-06-01",
+              "last": "2026-11-23"
+            }
+          },
+          {
+            "101": {
+              "count": 1670,
+              "first": "2019-12-31",
+              "last": "2026-11-23"
+            }
+          }
+        ],
+        "matches_master": true,
+        "matches_master_ohlc": true
+      },
+      {
+        "file": "history-102.json",
+        "status": 200,
+        "sha256": "063b190525cd054c33e3d17cf24facedd755f12023339c2eebcfdcaeb8d36c99",
+        "bytes": 321750,
+        "date": "Mon, 23 Nov 2026 16:27:20 GMT",
+        "cache_control": "no-store, max-age=0",
+        "source": null,
+        "series": [
+          {
+            "102": {
+              "count": 1824,
+              "first": "1990-12-21",
+              "last": "2026-11-20"
+            }
+          },
+          {
+            "102": {
+              "count": 1806,
+              "first": "1991-04-06",
+              "last": "2026-11-20"
+            }
+          },
+          {
+            "102": {
+              "count": 844,
+              "first": "2010-06-04",
+              "last": "2026-11-20"
+            }
+          },
+          {
+            "102": {
+              "count": 353,
+              "first": "2020-01-03",
+              "last": "2026-11-20"
+            }
+          }
+        ],
+        "matches_master": true,
+        "matches_master_ohlc": true
+      },
+      {
+        "file": "analysis.html",
+        "status": 200,
+        "sha256": "e7afb006ace4da34da4d149d1d5c84460568a5877bf931fc13c092c9683860cb",
+        "bytes": 26248,
+        "date": "Mon, 23 Nov 2026 16:27:23 GMT",
+        "cache_control": "private, no-store, max-age=0",
+        "source": null
+      },
+      {
+        "file": "analysis-metrics.js",
+        "status": 200,
+        "sha256": "7ffa9610f9eaa03b189d32f97675ec42abf21524888271dc197ed611a9ae5590",
+        "bytes": 3608,
+        "date": "Mon, 23 Nov 2026 16:27:23 GMT",
+        "cache_control": "private, no-store, max-age=0",
+        "source": null
+      },
+      {
+        "file": "analysis-data.json",
+        "status": 200,
+        "sha256": "4c14b85f44598179a0060e1b17d7233468d45048e12542bd8a92a8cfb75c940a",
+        "bytes": 91835,
+        "date": "Mon, 23 Nov 2026 16:27:23 GMT",
+        "cache_control": "private, no-store, max-age=0",
+        "source": null
+      }
+    ],
+    "finalLiveSeries": [
+      {
+        "index": 0,
+        "period": "15",
+        "bars": 1984,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 20,
+        "closed": 24,
+        "open": 2
+      },
+      {
+        "index": 0,
+        "period": "60",
+        "bars": 496,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 3,
+        "closed": 2,
+        "open": 1
+      },
+      {
+        "index": 0,
+        "period": "90",
+        "bars": 372,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 3,
+        "closed": 1,
+        "open": 2
+      },
+      {
+        "index": 0,
+        "period": "120",
+        "bars": 248,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 1,
+        "closed": 0,
+        "open": 1
+      },
+      {
+        "index": 0,
+        "period": "D",
+        "bars": 8769,
+        "lastCompleted": "2026-11-23",
+        "buy1": 46,
+        "closed": 56,
+        "open": 0
+      },
+      {
+        "index": 0,
+        "period": "W",
+        "bars": 1824,
+        "lastCompleted": "2026-11-20",
+        "buy1": 9,
+        "closed": 9,
+        "open": 0
+      },
+      {
+        "index": 1,
+        "period": "15",
+        "bars": 1984,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 16,
+        "closed": 5,
+        "open": 11
+      },
+      {
+        "index": 1,
+        "period": "60",
+        "bars": 496,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 6,
+        "closed": 2,
+        "open": 4
+      },
+      {
+        "index": 1,
+        "period": "90",
+        "bars": 372,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 5,
+        "closed": 2,
+        "open": 3
+      },
+      {
+        "index": 1,
+        "period": "120",
+        "bars": 248,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 3,
+        "closed": 0,
+        "open": 3
+      },
+      {
+        "index": 1,
+        "period": "D",
+        "bars": 8722,
+        "lastCompleted": "2026-11-23",
+        "buy1": 54,
+        "closed": 60,
+        "open": 1
+      },
+      {
+        "index": 1,
+        "period": "W",
+        "bars": 1806,
+        "lastCompleted": "2026-11-20",
+        "buy1": 11,
+        "closed": 11,
+        "open": 0
+      },
+      {
+        "index": 2,
+        "period": "15",
+        "bars": 1984,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 19,
+        "closed": 7,
+        "open": 12
+      },
+      {
+        "index": 2,
+        "period": "60",
+        "bars": 496,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 7,
+        "closed": 4,
+        "open": 5
+      },
+      {
+        "index": 2,
+        "period": "90",
+        "bars": 372,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 7,
+        "closed": 1,
+        "open": 6
+      },
+      {
+        "index": 2,
+        "period": "120",
+        "bars": 248,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 5,
+        "closed": 0,
+        "open": 5
+      },
+      {
+        "index": 2,
+        "period": "D",
+        "bars": 4001,
+        "lastCompleted": "2026-11-23",
+        "buy1": 22,
+        "closed": 24,
+        "open": 1
+      },
+      {
+        "index": 2,
+        "period": "W",
+        "bars": 844,
+        "lastCompleted": "2026-11-20",
+        "buy1": 7,
+        "closed": 7,
+        "open": 0
+      },
+      {
+        "index": 3,
+        "period": "15",
+        "bars": 1984,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 16,
+        "closed": 10,
+        "open": 6
+      },
+      {
+        "index": 3,
+        "period": "60",
+        "bars": 496,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 8,
+        "closed": 4,
+        "open": 4
+      },
+      {
+        "index": 3,
+        "period": "90",
+        "bars": 372,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 3,
+        "closed": 0,
+        "open": 3
+      },
+      {
+        "index": 3,
+        "period": "120",
+        "bars": 248,
+        "lastCompleted": "2026-11-23T15:00",
+        "buy1": 2,
+        "closed": 0,
+        "open": 2
+      },
+      {
+        "index": 3,
+        "period": "D",
+        "bars": 1670,
+        "lastCompleted": "2026-11-23",
+        "buy1": 9,
+        "closed": 11,
+        "open": 0
+      },
+      {
+        "index": 3,
+        "period": "W",
+        "bars": 353,
+        "lastCompleted": "2026-11-20",
+        "buy1": 4,
+        "closed": 4,
+        "open": 0
+      }
+    ],
+    "finalVerifiedDataCommit": "e6edc2fc0855e10ce6acbaf40f27bc526f4b08ff",
+    "finalLiveCollection": {
+      "run": "https://github.com/gavin0710/Test/actions/runs/45215864773",
+      "event": "push",
+      "result": "success",
+      "generatedAtUtc": "2026-11-23T16:27:27.510627+00:00",
+      "failedSources": 0,
+      "archivedMinuteBarsPerIndex": 1984,
+      "archivedBarsAcrossIndices": 7936,
+      "allPreviouslyVerifiedArchivedOhlcUnchanged": true,
+      "productionOhlcEqualsCurrentMaster": true,
+      "note": "The API capture at 16:27:20 UTC exactly matched then-current master 6bfae2f. The subsequent e6edc2f collection updated provider/generated-at metadata only; its OHLC was compared with the capture and is identical. Desktop and mobile acceptance completed using actual production responses after the canonical restoration."
+    },
+    "finalProductionAcceptance": {
+      "result": "PASS",
+      "resourcesHttp200": 8,
+      "marketApiOhlcMatch": 4,
+      "completedSeriesVerified": 24,
+      "desktop": {
+        "width": 1500,
+        "height": 960,
+        "result": "PASS"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "result": "PASS"
+      },
+      "scriptErrors": 0,
+      "marketSnapshotDate": "2026-11-23",
+      "completedMinuteCloseBeijing": "2026-11-23T15:00",
+      "completedWeeklyDate": "2026-11-20"
+    }
   }
 }
