@@ -9,9 +9,52 @@ import unittest
 from unittest.mock import patch
 
 import collect
+import backfill
 
 
 class CollectorTests(unittest.TestCase):
+    def check_daily_archive_at(self, hour, minute, expected_day):
+        # Actual Monday-morning long archive and the same day's actual close snapshot.
+        root = collect.DEST.parent
+        inputs = {name: json.loads((root / (name + ".json")).read_text())
+                  for name in ("latest", "history-101", "history-102")}
+        for obj in inputs.values():
+            obj["data"] = [{period: [b for b in bars if b["t"][:10] <= "2026-11-23"]
+                            for period, bars in series.items()} for series in obj["data"]]
+        # Retained full history keeps this real historical regression reproducible
+        # even after the rolling latest snapshot no longer contains November 2026.
+        inputs["latest"]["data"] = [{period: backfill.merge(
+            inputs["history-" + period]["data"][i][period],
+            inputs["latest"]["data"][i].get(period, []))[-501:]
+            for period in ("101", "102")} for i in range(4)]
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            for name, obj in inputs.items():
+                (directory / (name + ".json")).write_text(json.dumps(obj))
+            with (
+                patch.object(backfill, "DIR", directory),
+                patch.object(backfill, "LATEST", directory / "latest.json"),
+                patch.object(backfill.dt, "datetime", wraps=collect.dt.datetime) as clock,
+                patch.object(backfill.time, "sleep"),
+                patch.object(backfill, "fetch_all", side_effect=AssertionError("Existing verified history suffices")),
+            ):
+                clock.now.return_value = collect.dt.datetime(2026, 11, 23, hour, minute)
+                backfill.run()
+            daily = json.loads((directory / "history-101.json").read_text())["data"]
+            weekly = json.loads((directory / "history-102.json").read_text())["data"]
+            for i in range(4):
+                self.assertEqual(daily[i]["101"][-1]["t"], expected_day)
+                self.assertEqual(daily[i]["101"][0], inputs["history-101"]["data"][i]["101"][0])
+                self.assertEqual(weekly[i]["102"][-1]["t"], "2026-11-20")
+                if expected_day == "2026-11-23":
+                    self.assertEqual(daily[i]["101"][-1], inputs["latest"]["data"][i]["101"][-1])
+
+    def test_morning_backfill_excludes_incomplete_daily_and_weekly(self):
+        self.check_daily_archive_at(9, 42, "2026-11-20")
+
+    def test_after_close_backfill_uses_actual_close_without_publishing_open_week(self):
+        self.check_daily_archive_at(15, 8, "2026-11-23")
+
     def test_hourly_fallback_uses_verified_endpoint_and_preserves_recorded_ohlc(self):
         root = collect.DEST.parent
         frozen = json.loads(gzip.decompress((root / "hourly-source-check-20261123.json.gz").read_bytes()))

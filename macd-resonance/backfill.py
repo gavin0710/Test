@@ -18,6 +18,17 @@ DIR=Path(__file__).resolve().parent/"data"
 LATEST=DIR/"latest.json"
 BASE="https://push2his.eastmoney.com/api/qt/stock/kline/get"
 
+def completed_archive(rows, period, now):
+    """Persist completed periods only, using the dashboard's Beijing cutoff."""
+    today = now.date()
+    if period == "101":
+        cutoff = today if now.time() >= dt.time(15, 8) else today - dt.timedelta(days=1)
+    else:
+        monday = today - dt.timedelta(days=today.weekday())
+        closed = today.weekday() >= 5 or (today.weekday() == 4 and now.time() >= dt.time(15, 8))
+        cutoff = today if closed else monday - dt.timedelta(days=1)
+    return [b for b in rows if b["t"][:10] <= cutoff.isoformat()]
+
 def merge(*series):
     rows={}
     for batch in series:
@@ -69,6 +80,7 @@ def weekly_from_daily(daily):
     return result
 
 def run():
+    now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
     old=json.loads(LATEST.read_text("utf-8")) if LATEST.exists() else {"data":[{}]*4}
     data=old.get("data") or [{} for _ in INDICES]
     successes=0
@@ -86,7 +98,7 @@ def run():
                 dailyArchive=json.loads((DIR/"history-101.json").read_text("utf-8"))
                 dailyRows=dailyArchive["data"][i]["101"]
                 derived=weekly_from_daily(dailyRows)
-                if len(derived)>=65 and derived[0]["t"]<=baseline[0]["t"]:
+                if len(derived)>=65 and (not baseline or derived[0]["t"]<=baseline[0]["t"]):
                     best=derived
                     success=True
                     successes+=1
@@ -110,6 +122,7 @@ def run():
                     time.sleep(4+attempt*4+random.random()*2)
             if not success:
                 print("PRESERVE_EXISTING",name,period,len(best),best[0]["t"] if best else "-",flush=True)
+            best = completed_archive(best, period, now)
             result.append({period:best})
             time.sleep(5+random.random()*2)
         payload={"source":("Weekly OHLC derived from verified full-history daily bars" if period=="102" else "Eastmoney public index daily K-lines; fallback prior verified archive"),
