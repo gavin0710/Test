@@ -15,6 +15,10 @@
 - 常规行情与周度长历史工作流取数后均执行`research-success.js --refresh`和严格逐笔核验，将源档与统计一起提交；共用归档写入队列，变基后再次重算，cron和权限维持原值。截止时刻来自归档生成时间，不用runner当前时间伪装行情时效。
 - 密码验证后的`/analysis-data.json`改读master最新统计档，刷新页面可取得后续采集结果，无需每次重新部署。认证前不请求上游；两源失败或结构无效时503，不静默返回旧部署快照。保持原9个运行时文件、正式引擎与私人执行研究。
 - 本地验证：472个信号逐笔核对、全部历史截断信号/同期共振/首次9/5/10/20根终点与分组对账；6201条引擎断言；24组真实历史账本；7项采集/归档回归；冻结分钟补录核对；随机密码认证与统计上游切换/失效回归；自动重算的时间边界、真实OHLC截断恢复和失败保留上个有效文件回归均通过。1500×960桌面与390×844触屏完整四图、六周期、历史复盘、成功率筛选和320px窄屏断言通过。合并、正式发布与真实采集联动证据完成后补记。
+- [PR #21](https://github.com/gavin0710/Test/pull/21)已合并为`c1e07675dbc858a41768f9fdf1d7524c450f613b`。PR的[规则/认证回归](https://github.com/gavin0710/Test/actions/runs/45380247525)和[桌面/手机浏览器](https://github.com/gavin0710/Test/actions/runs/45380247556)通过，合并后的[规则回归](https://github.com/gavin0710/Test/actions/runs/45380526900)与[浏览器回归](https://github.com/gavin0710/Test/actions/runs/45380526954)再次通过。原项目部署`dpl_5dptY9jL3h9FGTjDfctDzYVQgsWQ` READY，原正式域名已切换；保留原Vercel Standard Protection。合法登录后全部3个前端文件逐字节一致，行情4个接口与成功率资源200，匿名成功率资源401。
+- [真实周度归档任务](https://github.com/gavin0710/Test/actions/runs/45380526872)成功取数、重算并提交`a106254`，统计截止随之变为北京时间19:04、472个信号。保持同一个Vercel部署，正式统计JSON随后与该最新master逐字节一致，SHA-256 `e2bf19d94e714b11ae1d6b4e7525cad197285ad14e94e1881ad505f692d1e2f8`，证明后续更新不依赖重新发布。上游raw的缓存可能使新归档稍后才可见，不承诺秒级同步。
+- 自动联动验收发现[常规采集首次运行](https://github.com/gavin0710/Test/actions/runs/45380527051)取数/重算成功、提交失败：排队工作流仍默认检出触发时的旧SHA，周度任务先提交后，统计JSON在变基时冲突。本次修复两任务显式检出当前master，并共用`commit-market-update.sh`：先只将源数据暂存为本地提交、合并上游，随后重算/严格核验，把统计合入尚未推送的源提交，一次推送。上游已有提交绝不amend。新`verify-market-publish.py`用真实归档与本地bare远端复现两任务旧检出，验证两份源更新保留、统计匹配以及无变化时不改HEAD；本地通过，真实任务复验后补记。
+- 原正式站Actions仍因缺少`MACD_SITE_PASSWORD` secret在合法登录门槛失败：[该CI](https://github.com/gavin0710/Test/actions/runs/45380527000)不记为通过；独立的正式HTTP验收已使用既有密码完成。环境内首次直接Node代理验收未完成，改用校验证书的HTTPS传输桥后`verify-production.mjs`对三份前端及master最新统计的检查通过；没有关闭证书或应用认证。浏览器传输桥需在关闭页面时排空路由，避免测试自身遗留请求引发context disposed；不改产品代码解决测试运输问题。
 
 ## 2026-11-23 周度实际巡检与最小修复（北京时间跨至11月24日）
 
