@@ -7,8 +7,7 @@ const files = {
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/analysis': ['analysis.html', 'text/html; charset=utf-8'],
   '/analysis.html': ['analysis.html', 'text/html; charset=utf-8'],
-  '/analysis-metrics.js': ['analysis-metrics.js', 'application/javascript; charset=utf-8'],
-  '/analysis-data.json': ['analysis-data.json', 'application/json; charset=utf-8']
+  '/analysis-metrics.js': ['analysis-metrics.js', 'application/javascript; charset=utf-8']
 };
 const fileCache = new Map();
 
@@ -64,6 +63,26 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: '请先输入访问密码', login: '/' });
   }
   if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).setHeader('Allow', 'GET, HEAD').end();
+  if (path === '/analysis-data.json') {
+    // Read the collector's current, atomically committed analysis archive.
+    // A bundled snapshot would freeze statistics at the last site deployment.
+    for (const host of ['raw.githubusercontent.com', 'raw.githack.com']) {
+      try {
+        const upstream = await fetch(`https://${host}/gavin0710/Test/master/macd-resonance/analysis-data.json?ts=${Date.now()}`, {
+          cache: 'no-store', signal: AbortSignal.timeout(9500)
+        });
+        if (!upstream.ok) throw new Error('Unavailable analysis archive');
+        const body = await upstream.text(), payload = JSON.parse(body);
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(payload.asOf) || payload.periods?.length !== 6 ||
+            payload.indices?.length !== 4 || payload.coverage?.length !== 24 ||
+            payload.sources?.length !== 4 || !Array.isArray(payload.samples)) throw new Error('Invalid analysis archive');
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('X-Analysis-As-Of', payload.asOf);
+        return req.method === 'HEAD' ? res.status(200).end() : res.status(200).send(body);
+      } catch { /* Try the other archive host; never disguise old bundled data as current. */ }
+    }
+    return res.status(503).json({ error: '成功率归档暂不可用，请稍后刷新' });
+  }
   const entry = files[path];
   if (!entry) return res.status(404).end();
   if (!fileCache.has(entry[0])) fileCache.set(entry[0], readFileSync(join(process.cwd(), entry[0])));

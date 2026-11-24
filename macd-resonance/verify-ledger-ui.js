@@ -2,7 +2,6 @@
 "use strict";
 const http=require("http"),fs=require("fs"),path=require("path"),assert=require("node:assert/strict");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"/tmp/macd-ledger-v2/node_modules/playwright");
-const analysis=require("./analysis-data.json");
 const {evaluate,summarize,groups,bounds}=require("./analysis-metrics");
 const viewports=[{width:1500,height:960},{width:390,height:844}];
 const root=__dirname,files={
@@ -190,9 +189,14 @@ async function verifySuccessAnalysis(page, viewport){
  const press=locator=>viewport.width<600?locator.tap():locator.click();
  const link=page.getByRole("link",{name:"MACD 成功率",exact:true});
  assert.equal(await link.count(),1);
+ const sampleResponse=page.waitForResponse(response=>new URL(response.url()).pathname==="/analysis-data.json");
  await press(link);
  await page.waitForURL("**/analysis.html");
  await page.locator("#dashboard").waitFor();
+ const response=await sampleResponse;
+ assert.equal(response.status(),200);
+ const analysis=await response.json();
+ assert.equal(await page.locator("#asof").textContent(),"统计截至 "+analysis.asOf.slice(0,10));
  assert.equal(await page.locator("#overview tr").count(),6);
  assert.equal(await page.locator("#matrix tr").count(),6);
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Analysis fits both viewports");
@@ -203,6 +207,7 @@ async function verifySuccessAnalysis(page, viewport){
   return stats.rate===null?"—":(stats.rate*100).toFixed(1)+"%";
  }
  const rate=period=>page.locator('#overview button[data-period="'+period+'"] .rate-text').textContent();
+ for(const {id} of analysis.periods)assert.equal(await rate(id),expected(id));
  assert.equal(await rate("D"),expected("D"));
  assert.equal(await rate("W"),expected("W"));
  const combo=page.locator('#matrix button[data-period="D"][data-group="both"]');

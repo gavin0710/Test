@@ -18,11 +18,18 @@ const history = (await import('./api/history.js')).default;
 const routes = JSON.parse(readFileSync('vercel.json')).routes;
 const realFetch = globalThis.fetch;
 let upstreamCalls = 0;
+let analysisUpstream = 'ok';
+let analysisBody = readFileSync('analysis-data.json', 'utf8');
 globalThis.fetch = async (url, ...args) => {
   if (String(url).startsWith('https://raw.')) {
     upstreamCalls++;
     const name = new URL(url).pathname.split('/').pop();
-    return new Response(readFileSync(resolve('data', name)), { headers: { 'Content-Type': 'application/json' } });
+    if (name === 'analysis-data.json') {
+      if (analysisUpstream === 'unavailable' || (analysisUpstream === 'fallback' && String(url).includes('githubusercontent'))) return new Response('', { status: 503 });
+      if (analysisUpstream === 'invalid') return new Response('{}');
+      return new Response(analysisBody, { headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response(readFileSync(resolve(name === 'analysis-data.json' ? '.' : 'data', name)), { headers: { 'Content-Type': 'application/json' } });
   }
   return realFetch(url, ...args);
 };
@@ -82,7 +89,23 @@ try {
     assert.equal(response.status, 200, path);
     assert.equal((await response.json()).data.length, 4, path);
   }
-  assert.equal(upstreamCalls, 4);
+  assert.equal(upstreamCalls, 5);
+  // A new collector snapshot must become visible without reloading the handler.
+  const nextArchive = JSON.parse(analysisBody);
+  nextArchive.asOf = '2026-11-25T15:30';
+  analysisBody = JSON.stringify(nextArchive);
+  assert.deepEqual(await (await get('/analysis-data.json', cookie)).json(), nextArchive);
+  analysisUpstream = 'fallback';
+  assert.equal((await get('/analysis-data.json', cookie)).status, 200);
+  const analysisHead = await get('/analysis-data.json', cookie, { method: 'HEAD' });
+  assert.equal(analysisHead.status, 200);
+  assert.equal(await analysisHead.text(), '');
+  assert.equal(analysisHead.headers.get('X-Analysis-As-Of'), nextArchive.asOf);
+  for (const state of ['invalid', 'unavailable']) {
+    analysisUpstream = state;
+    assert.equal((await get('/analysis-data.json', cookie)).status, 503, 'Do not silently serve stale bundled analysis');
+  }
+  analysisUpstream = 'ok';
   assert.equal((await get('/api/history?period=invalid', cookie)).status, 400);
   const head = await get('/', cookie, { method: 'HEAD' });
   assert.equal(head.status, 200);
