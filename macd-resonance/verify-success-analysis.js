@@ -8,9 +8,8 @@ const published = require("./analysis-data.json");
 
 const actual = buildSnapshot(__dirname, published.asOf);
 const { series, engine } = readSeries(__dirname, published.asOf);
-if (published.sources.every((source, i) => source.sha256 === actual.sources[i].sha256)) {
-  assert.deepEqual(actual, published, "Pinned inputs must reproduce the deployed snapshot");
-}
+assert.deepEqual(actual.sources, published.sources, "Analysis must be refreshed with the current market archives");
+assert.deepEqual(actual, published, "Current inputs must reproduce the published snapshot");
 assert.equal(actual.coverage.length, 24);
 assert.equal(actual.indices.length, 4);
 assert.equal(actual.samples.length, new Set(actual.samples.map(row => [row.index, row.period, row.signal, row.time].join("/"))).size);

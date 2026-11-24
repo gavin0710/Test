@@ -10,13 +10,16 @@ on:
     branches: [master]
     paths:
       - "macd-resonance/collect.py"
+      - "macd-resonance/research-success.js"
+      - "macd-resonance/analysis-metrics.js"
+      - "macd-resonance/index.html"
       - ".github/workflows/macd-resonance-data.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: macd-resonance-data
+  group: macd-market-archives
   cancel-in-progress: false
 
 jobs:
@@ -30,18 +33,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Fetch and validate the sixteen source K-lines
         run: python macd-resonance/collect.py
+      - name: Recalculate success analysis from the same source archives
+        run: |
+          node macd-resonance/research-success.js --refresh
+          node macd-resonance/verify-success-analysis.js
       - name: Commit source snapshot only when bars changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add macd-resonance/data/latest.json macd-resonance/data/history-15.json
+          git add macd-resonance/data/latest.json macd-resonance/data/history-15.json macd-resonance/analysis-data.json
           if git diff --cached --quiet; then
             echo "No market updates"
           else
             git commit -m "data: refresh MACD resonance index bars"
             git fetch origin master
             git rebase origin/master
+            # Rebase may bring a newer engine or daily/weekly archive.
+            node macd-resonance/research-success.js --refresh
+            node macd-resonance/verify-success-analysis.js
+            git add macd-resonance/analysis-data.json
+            if ! git diff --cached --quiet; then git commit -m "data: recalculate MACD analysis after rebase"; fi
             git push origin HEAD:master
           fi

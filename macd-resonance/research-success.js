@@ -123,16 +123,40 @@ function buildSnapshot(root, asOf) {
   return { asOf, periods, indices, coverage, sources, samples };
 }
 
-if (require.main === module) {
-  const date = process.argv[2];
-  if (!date) throw new Error("Usage: node research-success.js YYYY-MM-DD[THH:mm]");
-  const asOf = date.length === 10 ? date + "T23:59" : date;
-  const snapshot = buildSnapshot(__dirname, asOf);
+function serializeSnapshot(snapshot) {
   // One observation per line keeps archive changes easy to inspect in a diff.
   const { samples, ...metadata } = snapshot;
   const head = JSON.stringify(metadata, null, 2).slice(0, -2);
-  process.stdout.write(head + ',\n  "samples": [\n' +
-    samples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ]\n}\n");
+  return head + ',\n  "samples": [\n' +
+    samples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ]\n}\n";
 }
 
-module.exports = { buildSnapshot, readSeries, nineAge, resonance };
+function refreshSnapshot(root) {
+  const archive = loadArchive(root);
+  const timestamps = Object.values(archive).map(source => Date.parse(source.generated_at_utc));
+  if (!timestamps.every(Number.isFinite)) throw new Error("Missing archive generation timestamp");
+  // Archive time, rather than the runner's clock, defines what was observable.
+  const asOf = new Date(Math.max(...timestamps) + 8 * 3600000).toISOString().slice(0, 16);
+  const snapshot = buildSnapshot(root, asOf);
+  const output = path.join(root, "analysis-data.json"), body = serializeSnapshot(snapshot);
+  if (!fs.existsSync(output) || fs.readFileSync(output, "utf8") !== body) {
+    const temporary = output + ".tmp";
+    fs.writeFileSync(temporary, body);
+    fs.renameSync(temporary, output);
+  }
+  return snapshot;
+}
+
+if (require.main === module) {
+  const date = process.argv[2];
+  if (date === "--refresh") {
+    const snapshot = refreshSnapshot(__dirname);
+    console.log("SUCCESS_SNAPSHOT_REFRESHED", snapshot.asOf, snapshot.samples.length);
+  } else {
+    if (!date) throw new Error("Usage: node research-success.js YYYY-MM-DD[THH:mm] | --refresh");
+    const asOf = date.length === 10 ? date + "T23:59" : date;
+    process.stdout.write(serializeSnapshot(buildSnapshot(__dirname, asOf)));
+  }
+}
+
+module.exports = { buildSnapshot, readSeries, nineAge, resonance, refreshSnapshot };

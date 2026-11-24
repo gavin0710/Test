@@ -11,7 +11,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: macd-history-backfill
+  group: macd-market-archives
   cancel-in-progress: false
 jobs:
   backfill:
@@ -24,18 +24,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Download historical daily and weekly K lines
         run: python macd-resonance/backfill.py
+      - name: Recalculate success analysis from the same source archives
+        run: |
+          node macd-resonance/research-success.js --refresh
+          node macd-resonance/verify-success-analysis.js
       - name: Commit verified historical archives
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add macd-resonance/data/history-101.json macd-resonance/data/history-102.json
+          git add macd-resonance/data/history-101.json macd-resonance/data/history-102.json macd-resonance/analysis-data.json
           if git diff --cached --quiet; then
             echo "No new historical OHLC"
           else
             git commit -m "data: extend market index daily weekly backfill"
             git fetch origin master
             git rebase origin/master
+            node macd-resonance/research-success.js --refresh
+            node macd-resonance/verify-success-analysis.js
+            git add macd-resonance/analysis-data.json
+            if ! git diff --cached --quiet; then git commit -m "data: recalculate MACD analysis after rebase"; fi
             git push origin HEAD:master
           fi

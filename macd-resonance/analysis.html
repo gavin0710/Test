@@ -198,7 +198,7 @@ details[open]>summary{border-bottom:1px solid var(--line)}
 document.addEventListener("DOMContentLoaded", async () => {
  const el = id => document.getElementById(id);
  try {
-  const response = await fetch("./analysis-data.json");
+  const response = await fetch("./analysis-data.json", { cache: "no-store" });
   if (!response.ok) throw new Error("HTTP " + response.status);
   const data = await response.json();
   if (data.periods?.length !== 6 || data.coverage?.length !== 24 || !Array.isArray(data.samples)) throw new Error("Invalid sample data");
@@ -231,7 +231,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const filterOptions = () => ({ mode, index: selectedIndex(), scope: el("scope").value, horizon: Number(el("horizon").value) });
   const selection = (id, group) => ' data-period="' + id + '" data-group="' + group + '"';
   const mark = (id, group, text) => " aria-label=\"" + escape(periodTag(id) + " " + groups[group].label + " " + text + "，查看样本") + "\"";
-  el("asof").textContent = "研究快照 " + day(data.asOf);
+  el("asof").textContent = "统计截至 " + day(data.asOf);
   el("index").insertAdjacentHTML("beforeend", data.indices.map((name, i) => option(i, name)).join(""));
   el("case-period").innerHTML = data.periods.map(({ id, label }) => option(id, label)).join("");
   el("case-period").value = "D";
