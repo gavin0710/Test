@@ -10,6 +10,8 @@ on:
       - "macd-resonance/collect.py"
       - "macd-resonance/backfill.py"
       - "macd-resonance/verify-collect.py"
+      - "macd-resonance/commit-market-update.sh"
+      - "macd-resonance/verify-market-publish.py"
       - "macd-resonance/api/*"
       - "macd-resonance/lib/*"
       - "macd-resonance/vercel.json"
@@ -24,6 +26,8 @@ on:
       - "macd-resonance/collect.py"
       - "macd-resonance/backfill.py"
       - "macd-resonance/verify-collect.py"
+      - "macd-resonance/commit-market-update.sh"
+      - "macd-resonance/verify-market-publish.py"
       - "macd-resonance/api/*"
       - "macd-resonance/lib/*"
       - "macd-resonance/vercel.json"
@@ -48,3 +52,5 @@ jobs:
         run: node macd-resonance/verify-ledger-history.js
       - name: Verify snapshot publication and archive fallback
         run: python3 macd-resonance/verify-collect.py
+      - name: Verify queued archive writers publish matching statistics
+        run: python3 macd-resonance/verify-market-publish.py
