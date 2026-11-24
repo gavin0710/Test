@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-24T19:04",
+  "asOf": "2026-11-24T19:16",
   "periods": [
     {
       "id": "15",
@@ -229,8 +229,8 @@
   "sources": [
     {
       "file": "data/latest.json",
-      "generatedAt": "2026-11-24T10:33:12.986950+00:00",
-      "sha256": "92ba96331196d0e4c6d5f011a742a91c980f550c600467cc04c8679d112d36a6"
+      "generatedAt": "2026-11-24T11:16:02.820378+00:00",
+      "sha256": "3c8ac790bd6f1518257fd1ae15b080a0fbb045bf702ccef1acc4a198b9858160"
     },
     {
       "file": "data/history-15.json",
