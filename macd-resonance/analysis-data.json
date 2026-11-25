@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-25T17:22",
+  "asOf": "2026-11-25T18:08",
   "patternSchema": 1,
   "periods": [
     {
@@ -230,8 +230,8 @@
   "sources": [
     {
       "file": "data/latest.json",
-      "generatedAt": "2026-11-25T09:22:14.972373+00:00",
-      "sha256": "3d140472a7a738855ff234f317da2a3d0b2e14792af86cbd7d83cfea8e9189c3"
+      "generatedAt": "2026-11-25T10:08:44.260165+00:00",
+      "sha256": "9ac00dc5798697a62e064f7d7218380fe54274f51fb22f59349e96e49be156ce"
     },
     {
       "file": "data/history-15.json",
