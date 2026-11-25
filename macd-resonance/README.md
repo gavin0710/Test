@@ -15,7 +15,7 @@ Vercel Authentication 在正式密码入口发布、验证成功后设为 Standa
 
 验证：`node macd-resonance/verify-site-access.mjs` 使用随机测试密码覆盖登录、错误密码、受限资源、行情 API、Cookie 篡改与过期、密码变更、来源检查、节流与缺少配置。正式浏览器回归可从进程环境读取 `MACD_SITE_PASSWORD`，不要把密码写进命令、仓库或日志；归档回归无需密码。
 
-手动发布在原运行时文件之外，必须包含 `api/access.js`、`lib/site-access.cjs`、`vercel.json`，并保留 `analysis.html`、`analysis-metrics.js`、`analysis-data.json` 及两个行情 API。首页、分析页和分析脚本读取部署中的文件；受密码保护的 `analysis-data.json` 从 master 读取最新可复算归档，纯行情/统计更新无需重新部署网页。两处上游均不可用时返回503，不悄悄展示旧部署快照。
+手动发布在原运行时文件之外，必须包含 `api/access.js`、`lib/site-access.cjs`、`vercel.json`，并保留 `analysis.html`、`analysis-metrics.js`、`analysis-patterns.js`、`analysis-data.json` 及两个行情 API。首页、分析页和分析脚本读取部署中的文件；受密码保护的 `analysis-data.json` 从 master 读取最新可复算归档，纯行情/统计更新无需重新部署网页。两处上游均不可用时返回503，不悄悄展示旧部署快照。
 
 ## 当前产品口径（2026-11-14）
 
@@ -99,7 +99,7 @@ Vercel Authentication 在正式密码入口发布、验证成功后设为 Standa
 
 JSONP超时后忽略晚到响应，等script实际完成再释放回调，防止慢网下的未定义回调异常。`verify.js`与归档浏览器回归覆盖真实OHLC晚到9秒的情况。腾讯15/60分钟备用源统一使用已核验的`ifzq.gtimg.cn`分钟接口；15/60分钟不论主源或备用源，均在同时间戳保留原已归档价格、仅补缺口。实际采集发现并恢复的8处主源冲突见`data/minute-source-conflicts-20261123.json`；冻结小时响应与哈希见`data/hourly-source-check-20261123.json.gz`及`data/maintenance-20261123.json`。
 
-正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留全部9个运行时文件，不能照搬早期仅3文件的发布方式。
+正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留全部10个运行时文件，不能照搬早期仅3文件的发布方式。
 
 ### 2026-11-21 分钟历史补录
 
@@ -150,6 +150,19 @@ CI 仅运行会计边界样例及既有信号/历史回归，不代表在公开 
 主看板随行情归档动态回算；成功率页读取采集工作流用同批输入生成的统计归档。任何历史个数都必须同时交代数据截止时间及不同周期历史长度差异。
 
 ## MACD 成功率研究
+
+### 买1上涨形态研究分区（2026-11-25）
+
+分析页默认展示四个有编号的区：①买1后上涨基准；②买1当根形态，切换常用形态、双指标组合和其他状态；③等待金叉再买；④各周期全历史与四指共同历史对照。原有交易胜率和卖点方向统计独立折叠。上涨率均展示上涨数/已评估数与待评估数，点击可按当前指数、范围、5/10/20根及预热条件核对逐条样本。
+
+`analysis-patterns.js`由归档生成与浏览器共用，包含20种基准/单项/组合定义。形态只用买1确认时的信息；大周期对应15→60、60→120、90/120→日、日→周，周线无更高数据。大周期按自身完成时间匹配，不能使用尚未完成的当日/当周K线。共振和大周期缺档的信号不进入对应可比基准，避免把缺历史算作条件不成立。九转沿用主图连续计数，只认首次低9，不含TD13。
+
+等待金叉最多5根：当根已满足DIF>DEA则立即按当根收盘，否则在窗口内首次DIF上穿DEA时按实际确认价计算。主要表的终点从实际入场重新计N根；折叠对照另取相同信号与原买1后第N根共同终点，分别用原买1价与确认价计算。5根未确认、仍在等待、已入场未到终点分别计数；窗口截止日会截断未来确认与结算。所有规则只是描述性研究，没有修改正式买卖/风控引擎。
+
+全历史/共同历史对照固定使用这两段范围，并继承所选指数、观察根数和预热，独立于上方范围选择。灰色表示已评估少于20个；保留60/130根预热敏感性。同期指数与重叠观察窗会相关，界面不把高比例标为已确认预测优势，也不做账户收益或成交模拟。
+
+重算仍走同一个`research-success.js --refresh`和同批OHLC自动发布；新字段`patternSchema:1`与每个买1的形态/确认数据随`analysis-data.json`更新。新增验证：`node macd-resonance/verify-buy-patterns.js`，逐笔核对已知信息、确认入场价、共同终点和范围截断，覆盖全部20条件、三种范围、五种指数选择及三个观察窗口。
+
 
 主页「MACD 成功率」进入 [独立分析页](https://macd-resonance-monitor.vercel.app/analysis.html)。可按四指数、六周期日期范围切片，在首次买1交易胜率、买1后上涨率、卖1后下跌率之间切换。方向观察支持后第 5、10、20 根同周期已完成 K 线。点选数值可核对信号、出场/观察、同期共振和九转的原始记录。
 

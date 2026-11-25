@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 const base = new URL(process.env.MACD_BASE_URL || 'https://macd-resonance-monitor.vercel.app');
-const files = ['index.html', 'analysis.html', 'analysis-metrics.js'];
+const files = ['index.html', 'analysis.html', 'analysis-metrics.js', 'analysis-patterns.js'];
 let cookie = '';
 if (process.env.MACD_SITE_PASSWORD) {
   const login = await fetch(new URL('/_access/login', base), {

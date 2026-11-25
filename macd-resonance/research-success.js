@@ -6,6 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { createHash } = require("node:crypto");
 const { horizons } = require("./analysis-metrics.js");
+const { enrich } = require("./analysis-patterns.js");
 
 function loadArchive(root) {
   const names = ["latest", "history-15", "history-101", "history-102"];
@@ -120,7 +121,7 @@ function buildSnapshot(root, asOf) {
       }
     }
   }
-  return { asOf, periods, indices, coverage, sources, samples };
+  return { asOf, patternSchema: 1, periods, indices, coverage, sources, samples: enrich(samples, series) };
 }
 
 function serializeSnapshot(snapshot) {
