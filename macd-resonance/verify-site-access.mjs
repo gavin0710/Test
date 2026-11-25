@@ -62,7 +62,7 @@ try {
     assert.match(await response.text(), /name="password"/);
     assert.match(response.headers.get('Cache-Control'), /no-store/);
   }
-  for (const path of ['/api/latest', '/api/history?period=15', '/api/history?period=101', '/api/history?period=102', '/analysis-metrics.js', '/analysis-data.json', '/index', '/index.html/', '/api/access?__path=index.html', '/lib/site-access.cjs', '/vercel.json']) {
+  for (const path of ['/api/latest', '/api/history?period=15', '/api/history?period=101', '/api/history?period=102', '/analysis-metrics.js', '/analysis-patterns.js', '/analysis-data.json', '/index', '/index.html/', '/api/access?__path=index.html', '/lib/site-access.cjs', '/vercel.json']) {
     const response = await get(path);
     assert.equal(response.status, 401, path);
     assert.doesNotMatch(await response.text(), /buildLedger|MACD_ACCESS_|signalStats/);
@@ -78,7 +78,7 @@ try {
   const cookieHeader = granted.headers.get('Set-Cookie');
   for (const flag of ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/', 'Max-Age=604800']) assert(cookieHeader.includes(flag));
   const cookie = cookieHeader.split(';')[0];
-  for (const path of ['/', '/index.html', '/analysis.html', '/analysis-metrics.js', '/analysis-data.json']) {
+  for (const path of ['/', '/index.html', '/analysis.html', '/analysis-metrics.js', '/analysis-patterns.js', '/analysis-data.json']) {
     const response = await get(path, cookie);
     assert.equal(response.status, 200, path);
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), readFileSync(path === '/' ? 'index.html' : path.slice(1)), path);

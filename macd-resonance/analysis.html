@@ -110,8 +110,53 @@ details[open]>summary{border-bottom:1px solid var(--line)}
  details>summary{padding:12px}.details-body{padding:8px 10px 12px}.section-head{gap:3px 9px}
 }
 @media(max-width:360px){table{font-size:12px}thead th{font-size:11px}.overview :is(th,td){padding-inline:3px}.matrix thead tr:first-child th:first-child{width:18%}.matrix .cell strong{font-size:12px}.matrix .cell span{font-size:10px}}
+
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+.study-intro{margin:-5px 0 14px;font-size:14px;color:var(--muted);line-height:1.7}
+.study-nav{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px}
+.study-nav a{padding:7px 10px;border:1px solid #dce7e9;background:#fff;border-radius:6px;font-size:12px;line-height:1.4}
+.study-controls{display:flex;align-items:center;flex-wrap:wrap;gap:4px 16px;margin:4px 0 10px}
+.study-section{scroll-margin-top:14px}
+.section-number{color:#6b8b91;font-size:12px;margin-right:9px;font-variant-numeric:tabular-nums;vertical-align:2px}
+.study-description{margin:1px 0 12px;max-width:100ch}
+.scope-tag{border:1px solid #d9e7e8;background:#f4f9f9;padding:3px 7px;border-radius:5px;color:#406b70;font-size:11px}
+.study-table th,.study-table td{padding:9px 10px;vertical-align:middle}
+.study-table thead th{background:var(--wash);line-height:1.5}
+.study-table tbody th{font-weight:650;white-space:nowrap}
+.study-table :is(th,td):first-child{position:sticky;left:0;background:#fff;z-index:1}
+.study-table thead th:first-child{background:var(--wash);z-index:2}
+.baseline-table{min-width:650px}
+.pattern-table{table-layout:fixed;min-width:760px}
+.pattern-table th{overflow-wrap:anywhere}
+.pattern-table th:first-child{width:76px}
+.pattern-table :is(td,th){text-align:center;padding:8px 7px}
+.pattern-table :is(td,th):first-child{text-align:left}
+.study-rate{width:100%;border:1px solid transparent;background:transparent;border-radius:6px;padding:6px 4px;text-align:center;font-variant-numeric:tabular-nums;line-height:1.4;color:inherit}
+.study-rate strong{display:block;color:var(--teal);font-size:18px;font-weight:730;white-space:nowrap}
+.study-rate.small strong{color:var(--muted);font-weight:630}
+.study-rate span{display:block;font-size:11px;color:var(--quiet);line-height:1.5}
+.study-rate .reference{margin-top:4px;color:#5b737b;font-size:10px}
+.study-rate:enabled:hover{border-color:#d7e9ea;background:var(--light)}
+.study-rate:disabled{opacity:1}
+.study-footnote{margin-top:10px}
+.rule-explanation{margin-top:9px;border-top:1px solid #edf1f4}
+.rule-explanation>summary{font-size:12px;padding:11px 0 5px;color:#406671;font-weight:600}
+.rule-explanation[open]>summary{border:0}
+.pattern-definitions{font-size:12px;color:var(--muted);line-height:1.7;margin:8px 0}
+.pattern-definitions div{padding:4px 0;display:grid;grid-template-columns:minmax(120px,1fr) 4fr;gap:12px}
+.pattern-definitions dt{font-weight:650;color:#324f60}
+.pattern-definitions dd{margin:0}
+.wait-table{min-width:700px}.wait-table :is(th,td):not(:first-child){text-align:center}
+.history-table{min-width:650px;table-layout:fixed}.history-table th:first-child{width:80px}
+.history-table .history-range{font-size:10px;color:var(--quiet);text-align:center;line-height:1.5}
+.study-records{min-width:1000px}.study-records td{vertical-align:top}.study-records td:nth-child(3){min-width:155px;white-space:normal}
+.legacy-body{padding:0 16px 16px}.legacy-title{font-size:13px;margin:14px 0 2px;color:var(--muted)}
+@media(max-width:600px){.study-intro{margin:0 3px 11px;font-size:12px}.study-nav{gap:5px;margin-inline:3px}.study-nav a{padding:7px 8px;font-size:11px}.study-controls{gap:2px 9px;margin-inline:3px}.study-controls>.caption{flex-basis:100%}.study-section h2{font-size:15px}.section-number{margin-right:6px}.study-table th,.study-table td{padding:8px}.study-description{margin-bottom:9px}.legacy-body{padding:0 8px 12px}.study-section .table-scroll{margin-right:-1px}.pattern-definitions div{grid-template-columns:1fr;gap:0}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
 </style>
 <script src="./analysis-metrics.js" defer></script>
+<script src="./analysis-patterns.js" defer></script>
 </head>
 <body>
 <main class="wrap">
@@ -120,17 +165,87 @@ details[open]>summary{border-bottom:1px solid var(--line)}
  <p class="context" id="status" role="status">正在读取历史样本…</p>
  <div id="dashboard" hidden>
   <div class="filters" aria-label="样本筛选">
+   <label class="field">指数 <select id="index"><option value="all">四指数合计</option></select></label>
+   <label class="field">范围 <select id="scope">
+    <option value="all">各周期全历史</option><option value="four">四指共同历史</option><option value="same">六周期同窗</option>
+   </select></label>
+  </div>
+
+  <p class="study-intro">以买1后上涨为终点，比较买入形态、指标组合与金叉确认时机。</p>
+  <nav class="study-nav" aria-label="分析分区">
+   <a href="#buy-study">01 上涨基准</a><a href="#shape-study">02 形态与组合</a><a href="#wait-study">03 等金叉再买</a><a href="#history-study">04 历史对照</a><a href="#legacy-study">交易与卖点统计</a>
+  </nav>
+  <div class="study-controls">
+   <label class="field">观察终点 <select id="study-horizon"><option value="5">买入后第5根</option><option value="10" selected>买入后第10根</option><option value="20">买入后第20根</option></select></label>
+   <label class="field">起始段 <select id="study-warmup"><option value="0">保留全部信号</option><option value="60">至少60根预热</option><option value="130">至少130根预热</option></select></label>
+   <span class="caption">形态研究看上涨率；持平算未上涨，未到终点单列。</span>
+  </div>
+  <p class="caption" id="pattern-status" role="status"></p>
+  <section class="card inset study-section" id="buy-study" aria-labelledby="buy-heading">
+   <div class="section-head"><h2 id="buy-heading"><span class="section-number">01</span>买1后上涨：各周期基准</h2><span class="scope-tag" id="study-scope"></span></div>
+   <p class="caption study-description" id="buy-description"></p>
+   <div class="table-scroll" tabindex="0" aria-label="买1上涨基准表"><table class="study-table baseline-table">
+    <thead><tr><th scope="col">周期</th><th scope="col">上涨率</th><th scope="col">上涨 / 已评估</th><th scope="col">待评估</th><th scope="col">涨跌幅中位</th><th scope="col">实际观察时长中位</th></tr></thead><tbody id="buy-baseline"></tbody>
+   </table></div>
+   <p class="caption study-footnote">不同周期的10根对应不同时长。每个指数的买1各算一个信号；同日四指触发可能来自同一段行情。</p>
+  </section>
+  <section class="card inset study-section" id="shape-study" aria-labelledby="shape-heading">
+   <div class="section-head"><h2 id="shape-heading"><span class="section-number">02</span>买1当根形态：哪些条件下更常上涨</h2>
+    <label class="field">查看 <select id="pattern-family"><option value="main">常用形态</option><option value="combo">双指标组合</option><option value="other">其他MACD与九转状态</option></select></label>
+   </div>
+   <p class="caption study-description">条件只用买1确认时已知的信息。每格依次为上涨率、上涨数/已评估数、待评估数；“可比基准”只取该条件能够判断的买1。</p>
+   <div class="table-scroll" tabindex="0" aria-label="多周期买1形态比较表"><table class="study-table pattern-table">
+    <thead id="pattern-head"></thead><tbody id="pattern-body"></tbody>
+   </table></div>
+   <details class="rule-explanation"><summary>当前条件怎么判定</summary><dl class="pattern-definitions" id="pattern-definitions"></dl></details>
+   <p class="caption study-footnote">灰色为已评估不足20个。高比例伴随少量样本时仅供观察；这些分组尚未确立稳定的预测优势。手机可左右滑动表格。</p>
+  </section>
+  <section class="card inset study-section" id="wait-study" aria-labelledby="wait-heading">
+   <div class="section-head"><h2 id="wait-heading"><span class="section-number">03</span>等待金叉再买：确认后按新价格计算</h2></div>
+   <p class="caption study-description">买1当根DIF已在DEA上方则当根入场；否则最多等5根，首次金叉时按该根收盘价入场。未确认的信号单列。</p>
+   <div class="table-scroll" tabindex="0" aria-label="等待金叉入场比较表"><table class="study-table wait-table">
+    <thead><tr><th scope="col">周期</th><th scope="col">买1直接买<br><span class="sub">全部买1基准</span></th><th scope="col">确认后买<br><span class="sub" id="delay-end-label"></span></th><th scope="col">已入场 / 买1总数</th><th scope="col">5根未确认</th><th scope="col">仍在等待</th></tr></thead><tbody id="wait-body"></tbody>
+   </table></div>
+   <details class="rule-explanation"><summary>同一批信号、同一个终点：直接买和等金叉谁更好</summary>
+    <p class="caption study-description">仅比较已确认入场且已到原买1观察终点的共同样本。终点固定为原买1后第N根，分别使用原买1价和确认价计算上涨率。</p>
+    <div class="table-scroll" tabindex="0" aria-label="金叉共同样本同终点比较表"><table class="study-table">
+     <thead><tr><th scope="col">周期</th><th scope="col">共同已评估样本</th><th scope="col">买1价 → 同一终点</th><th scope="col">确认价 → 同一终点</th><th scope="col">等待根数中位</th></tr></thead><tbody id="paired-body"></tbody>
+    </table></div>
+   </details>
+  </section>
+  <section class="card inset study-section" id="history-study" aria-labelledby="history-heading">
+   <div class="section-head"><h2 id="history-heading"><span class="section-number">04</span>历史对照：全历史与四指共同历史</h2>
+    <label class="field">条件 <select id="history-rule"></select></label>
+   </div>
+   <p class="caption study-description">检查形态是否依赖某段行情。这里固定对照两种历史范围，使用上方所选指数、观察根数与预热；共同历史的起点由四指行情交集决定。</p>
+   <div class="table-scroll" tabindex="0" aria-label="形态历史范围对照表"><table class="study-table history-table">
+    <thead><tr><th scope="col">周期</th><th scope="col">各周期全历史</th><th scope="col">四指共同历史</th></tr></thead><tbody id="history-body"></tbody>
+   </table></div>
+   <p class="caption study-footnote">同一形态在两段历史中可能表现不同。可比基准、实际日期和不同信号日均随结果展示。</p>
+  </section>
+  <details class="card" id="study-cases">
+   <summary>形态研究 · 逐条样本明细</summary>
+   <div class="details-body">
+    <p class="caption study-description" id="study-case-caption">点击上方上涨率查看对应样本。</p>
+    <div class="table-scroll" tabindex="0" aria-label="形态研究样本明细表"><table class="records study-records">
+     <thead><tr><th scope="col">指数</th><th scope="col">原买1时间 / 价格</th><th scope="col">买1当时指标</th><th scope="col">实际入场 / 价格</th><th scope="col">观察终点 / 价格</th><th scope="col">涨跌幅</th><th scope="col">状态</th></tr></thead><tbody id="study-records"></tbody>
+    </table></div>
+    <div class="case-footer" id="study-pagination" hidden><button type="button" id="study-prev">上一页</button><span id="study-page"></span><button type="button" id="study-next">下一页</button></div>
+   </div>
+  </details>
+
+  <details class="card study-section" id="legacy-study">
+   <summary>交易胜率与卖点统计 · 原有口径</summary>
+   <div class="legacy-body">
+    <p class="caption legacy-title">按现有结构账本看交易结果，或切换买卖点方向命中。</p>
+    <div class="filters">
    <div class="modes" role="group" aria-label="结果口径">
     <button type="button" data-mode="trade" aria-pressed="true">交易胜率</button>
     <button type="button" data-mode="buy" aria-pressed="false">买1后上涨</button>
     <button type="button" data-mode="sell" aria-pressed="false">卖1后下跌</button>
    </div>
-   <label class="field">指数 <select id="index"><option value="all">四指数合计</option></select></label>
-   <label class="field">范围 <select id="scope">
-    <option value="all">各周期全历史</option><option value="four">四指共同历史</option><option value="same">六周期同窗</option>
-   </select></label>
    <label class="field" id="horizon-field" hidden>观察 <select id="horizon"><option value="5">后 5 根</option><option value="10" selected>后 10 根</option><option value="20">后 20 根</option></select></label>
-  </div>
+    </div>
   <p class="context" id="context" aria-live="polite"></p>
   <div class="comparison">
   <section class="card inset" aria-labelledby="period-heading">
@@ -172,6 +287,8 @@ details[open]>summary{border-bottom:1px solid var(--line)}
      </table>
     </div>
     <div class="case-footer" id="case-footer" hidden><button type="button" id="prev">上一页</button><span id="page-number"></span><button type="button" id="next">下一页</button></div>
+   </div>
+  </details>
    </div>
   </details>
   <details class="card">
@@ -378,6 +495,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   el("prev").addEventListener("click", () => { if (casePage > 0) casePage--; renderCases(); });
   el("next").addEventListener("click", () => { casePage++; renderCases(); });
   render();
+  mountBuyPatternStudy(data);
   el("status").hidden = true;
   el("dashboard").hidden = false;
  }

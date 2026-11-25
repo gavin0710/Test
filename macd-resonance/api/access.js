@@ -7,6 +7,7 @@ const files = {
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/analysis': ['analysis.html', 'text/html; charset=utf-8'],
   '/analysis.html': ['analysis.html', 'text/html; charset=utf-8'],
+  '/analysis-patterns.js': ['analysis-patterns.js', 'application/javascript; charset=utf-8'],
   '/analysis-metrics.js': ['analysis-metrics.js', 'application/javascript; charset=utf-8']
 };
 const fileCache = new Map();

@@ -3,13 +3,14 @@
 const http=require("http"),fs=require("fs"),path=require("path"),assert=require("node:assert/strict");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"/tmp/macd-ledger-v2/node_modules/playwright");
 const {evaluate,summarize,groups,bounds}=require("./analysis-metrics");
+const patterns=require("./analysis-patterns");
 const viewports=[{width:1500,height:960},{width:390,height:844}];
 const root=__dirname,files={
  "/":path.join(root,"index.html"),"/api/latest":path.join(root,"data","latest.json"),
  "/api/history?period=15":path.join(root,"data","history-15.json"),
  "/api/history?period=101":path.join(root,"data","history-101.json"),
  "/api/history?period=102":path.join(root,"data","history-102.json"),
- ...Object.fromEntries(["analysis.html","analysis-metrics.js","analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
+ ...Object.fromEntries(["analysis.html","analysis-metrics.js","analysis-patterns.js","analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
 };
 const server=http.createServer((req,res)=>{
  const item=files[req.url?.split("&ts=")[0]]||files[req.url?.split("?ts=")[0]];
@@ -206,6 +207,55 @@ async function verifySuccessAnalysis(page, viewport){
    row.period===period&&groups[group].includes(row)));
   return stats.rate===null?"—":(stats.rate*100).toFixed(1)+"%";
  }
+ assert.equal(analysis.patternSchema,1);
+ assert.equal(await page.locator("#buy-baseline tr").count(),6);
+ assert.equal(await page.locator("#pattern-body tr").count(),6);
+ assert.equal(await page.locator("#wait-body tr").count(),6);
+ assert.equal(await page.locator("#history-body tr").count(),6);
+ assert(!(await page.locator("#legacy-study").evaluate(e=>e.open)),"Original trade statistics start folded");
+ const shapeRate=(period,rule)=>page.locator('#pattern-body button[data-study-period="'+period+'"][data-study-rule="'+rule+'"] strong');
+ const studyExpected=(period,rule,scope="all",horizon=10,index="all",minBars=0)=>{
+  const rows=patterns.evaluate(analysis,{rule,scope,horizon,index,minBars}).filter(r=>r.period===period);
+  const s=summarize(rows);return s.rate===null ? "—" : (s.rate*100).toFixed(1)+"%";
+ };
+ assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now"));
+ await press(page.locator('#pattern-body button[data-study-period="D"][data-study-rule="cross_now"]'));
+ assert(await page.locator("#study-cases").evaluate(e=>e.open));
+ assert((await page.locator("#study-case-caption").textContent()).includes("当根DIF金叉"));
+ assert((await page.locator("#study-records").textContent()).includes("DIF"));
+ await page.locator("#study-horizon").selectOption("20");
+ assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now","all",20));
+ await page.locator("#study-warmup").selectOption("130");
+ assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now","all",20,"all",130));
+ await page.locator("#study-warmup").selectOption("0");
+ await page.locator("#pattern-family").selectOption("combo");
+ assert.equal(await shapeRate("D","resonance_and_low9").textContent(),studyExpected("D","resonance_and_low9","all",20));
+ await page.locator("#pattern-family").selectOption("other");
+ assert.equal(await shapeRate("W","higher_dif_rising").textContent(),"—");
+ await page.locator("#pattern-family").selectOption("main");
+ await page.locator("#scope").selectOption("four");
+ assert.equal(await shapeRate("D","low9_recent3").textContent(),studyExpected("D","low9_recent3","four",20));
+ await page.locator("#index").selectOption("0");
+ assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now","four",20,0));
+ await page.locator("#index").selectOption("all");
+ await page.locator("#scope").selectOption("all");
+ await page.locator("#study-horizon").selectOption("10");
+ const wait=page.locator('#wait-body button[data-study-period="D"][data-study-stage="wait"]');
+ await press(wait);
+ assert((await page.locator("#study-case-caption").textContent()).includes("等金叉确认后买"));
+ await press(page.locator("#wait-study .rule-explanation > summary"));
+ await press(page.locator('#paired-body button[data-study-period="D"][data-study-stage="pairEarly"]'));
+ assert((await page.locator("#study-case-caption").textContent()).includes("共同样本·买1价"));
+ assert(!/等待[1-5]根/.test(await page.locator("#study-records").textContent()),"Original-entry drilldown cannot show the confirmation delay");
+ await page.locator("#history-rule").selectOption("cross_now");
+ assert.equal(await page.locator('#history-body button[data-study-period="D"][data-study-scope="four"] strong').textContent(),studyExpected("D","cross_now","four"));
+ if(viewport.width<600){
+  await page.setViewportSize({width:320,height:730});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Pattern tables scroll within 320px screen");
+  await page.setViewportSize(viewport);
+ }
+ if(process.env.MACD_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`analysis-${viewport.width}.png`),fullPage:true});
+ await press(page.locator("#legacy-study > summary"));
  const rate=period=>page.locator('#overview button[data-period="'+period+'"] .rate-text').textContent();
  for(const {id} of analysis.periods)assert.equal(await rate(id),expected(id));
  assert.equal(await rate("D"),expected("D"));
