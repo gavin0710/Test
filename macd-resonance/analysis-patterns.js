@@ -141,12 +141,12 @@ function mountBuyPatternStudy(data) {
   const c=model.compare(data,opts), rows=c.rows.filter(r=>r.period===period), eligible=c.eligibleRows.filter(r=>r.period===period);
   return {rows,stats:metrics.summarize(rows),baseline:metrics.summarize(eligible)};
  }
- function rateButton(period,stats,{rule="all",stage="signal",scope="selected",reference=null,title=""}={}) {
+ function rateButton(period,stats,{rule="all",stage="signal",scope="selected",reference=null,title="",rateOnly=false}={}) {
   const count=stats.evaluated ? stats.wins+" / "+stats.evaluated : "0 / 0";
   const pending=" · 待"+stats.pending;
   const label=periodLabel(period)+" "+(title||model.ruleMap[rule].label)+" 上涨率 "+pct(stats.rate)+"，上涨 "+count+pending+"，查看样本";
-  return '<button type="button" class="study-rate'+(stats.evaluated<20 ? " small" : "")+'" data-study-period="'+period+'" data-study-rule="'+rule+'" data-study-stage="'+stage+'" data-study-scope="'+scope+'" data-study-title="'+esc(title)+'" aria-label="'+esc(label)+'"'+((stats.signals??stats.total) ? "" : " disabled")+'><strong>'+pct(stats.rate)+'</strong><span>'+count+pending+'</span>'+
-    (reference ? '<span class="reference">可比基准 '+pct(reference.rate)+'<br>'+reference.wins+' / '+reference.evaluated+' · 待'+reference.pending+'</span>' : "")+'</button>';
+  return '<button type="button" class="study-rate'+(stats.evaluated<20 ? " small" : "")+'" data-study-period="'+period+'" data-study-rule="'+rule+'" data-study-stage="'+stage+'" data-study-scope="'+scope+'" data-study-title="'+esc(title)+'" aria-label="'+esc(label)+'"'+((stats.signals??stats.total) ? "" : " disabled")+'><strong>'+pct(stats.rate)+'</strong>'+(rateOnly ? "" : '<span>'+count+pending+'</span>')+
+    (reference ? '<span class="reference">可比基准 '+pct(reference.rate)+' · '+reference.wins+'/'+reference.evaluated+'</span>' : "")+'</button>';
  }
  function render() {
   const o=options(), rows=model.evaluate(data,o), summary=metrics.summarize(rows);
@@ -156,7 +156,7 @@ function mountBuyPatternStudy(data) {
   el("buy-baseline").innerHTML=data.periods.map(({id,label})=>{
    const s=metrics.summarize(rows.filter(r=>r.period===id));
    const duration=s.medianMinutes===null ? "—" : s.medianMinutes<1440 ? (s.medianMinutes/60).toFixed(1)+"小时" : (s.medianMinutes/1440).toFixed(0)+"天";
-   return '<tr><th scope="row">'+esc(label)+'</th><td>'+rateButton(id,s,{title:"上涨基准"})+'</td><td>'+s.wins+' / '+s.evaluated+'</td><td>'+s.pending+'</td><td>'+move(s.medianMove)+'</td><td>'+duration+'</td></tr>';
+   return '<tr><th scope="row">'+esc(label)+'</th><td>'+rateButton(id,s,{title:"上涨基准",rateOnly:true})+'</td><td>'+s.wins+' / '+s.evaluated+'</td><td>'+s.pending+'</td><td>'+move(s.medianMove)+'</td><td>'+duration+'</td></tr>';
   }).join("");
   const rules=model.rules.filter(r=>r.family===el("pattern-family").value);
   el("pattern-head").innerHTML='<tr><th scope="col">周期</th><th scope="col">全部买1<br><span class="sub">上涨基准</span></th>'+rules.map(r=>'<th scope="col">'+esc(r.label)+'</th>').join("")+'</tr>';
