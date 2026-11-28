@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-28T21:46",
+  "asOf": "2026-11-28T21:50",
   "earlySchema": 1,
   "earlyDefinition": {
     "sample": "与主图至少60根行情要求一致，只从第60根起出现的首次底钝化建档，含后来形成结构、钝化失效及仍在等待的样本。低9方案只取有效钝化内、买1之前首次达到的低9；与买1同根或钝化前的低9不算提前。",
@@ -254,13 +254,13 @@
     },
     {
       "file": "data/history-101.json",
-      "generatedAt": "2026-11-24T11:18:39.738672+00:00",
-      "sha256": "e896f8638442170d0b3e382973a24bda4f5cb33a54f582dcd4eba265f3c5c3cf"
+      "generatedAt": "2026-11-28T13:50:20.911332+00:00",
+      "sha256": "79aa78b278b54b4da34f30a0a0548c3087963516f30e2f7b663a377424f88e2b"
     },
     {
       "file": "data/history-102.json",
-      "generatedAt": "2026-11-24T11:19:05.082632+00:00",
-      "sha256": "652f7e076df1b5b56508d7e5ee806234dedd8adf6b4cab9503bb3d1b00adab45"
+      "generatedAt": "2026-11-28T13:50:43.181594+00:00",
+      "sha256": "84246090fcc9e7c85069dee204a45b69ff489d3f2ea459a41e1972b5c201a0e6"
     }
   ],
   "chartSchema": 1,
