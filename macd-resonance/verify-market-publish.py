@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="macd-publish-check-") as folder:
     target = seed / "macd-resonance"
     target.mkdir()
     names = ["index.html", "analysis-data.json", "analysis-metrics.js", "analysis-patterns.js", "analysis-nine.js", "analysis-early.js", "research-success.js",
-             "verify-success-analysis.js", "commit-market-update.sh"]
+             "verify-success-analysis.js", "analysis-research-charts.js", "verify-early-analysis.js", "commit-market-update.sh"]
     for name in names:
         shutil.copyfile(SOURCE / name, target / name)
     (target / "data").mkdir()

@@ -26,6 +26,7 @@ git rebase origin/master
 
 node macd-resonance/research-success.js --refresh
 node macd-resonance/verify-success-analysis.js
+node macd-resonance/verify-early-analysis.js
 git add macd-resonance/analysis-data.json
 if ! git diff --cached --quiet; then
   if [ "$(git rev-list --count origin/master..HEAD)" -gt 0 ]; then

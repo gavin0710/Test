@@ -203,7 +203,7 @@ node macd-resonance/verify-success-refresh.js
 - **条件**：主研究在低9当根冻结最近已完成大周期DIF方向和同周期四指买点共振（含当根及前2根，四指齐全）；全部钝化对照在钝化当根冻结。大周期映射和完成时点沿用原研究。趋势采用钝化之前一根MA60相对5根前的方向。未知不硬算条件成立。
 - **案例**：最近失效未形成、最近提前更便宜且收益更好、最近提前更贵、确认前浮亏最大，另可逐条挑选。图中同批OHLC、原EMA12/26与DEA9、参考DIF低点、钝化/低9/形成、实际开盘入场及退出都可复算，PNG可下载；案例不是额外概率证据。
 
-`analysis-early.js`是归档与浏览器共用模型，`analysis-early-view.js`展示，`analysis-research-charts.js`画K线/MACD。归档增加`earlySchema:1/earlyDefinition/earlySamples`，与原`nineHistory`同一文件原子更新。截止北京时间2026-11-28 16:14共有493段有效起始底钝化、95个首次提前低9，行情仍到11月27日。当前JSON约3.16MB，须持续关注响应体积。复核`verify-early-analysis.js`包含24组真实历史、两类样本的96次历史截断、7056行筛选对照，独立检验下一根开盘、失效退出、空仓、共同终点和MACD图值；`verify-primary-research-ui.js`验证桌面/手机的新主线。
+`analysis-early.js`是归档与浏览器共用模型，`analysis-early-view.js`展示，`analysis-research-charts.js`画K线/MACD。归档增加`earlySchema:1/earlyDefinition/earlySamples`，与原`nineHistory`同一文件原子更新。截止北京时间2026-11-28 16:14共有493段有效起始底钝化、95个首次提前低9，行情仍到11月27日。当前JSON约3.16MB，须持续关注响应体积。常规和周度归档在统一发布脚本中同时严格核验原成功率与新提前研究，失败不推送。复核`verify-early-analysis.js`包含24组真实历史、两类样本的96次历史截断、7056行筛选对照，独立检验下一根开盘、失效退出、空仓、共同终点和MACD图值；`verify-primary-research-ui.js`验证桌面/手机的新主线。
 
 MACD基准页只统计同一批可追踪钝化起点对应的首次买1，保留原信号收盘配对口径、独立退出及待退出。全量旧基准、组合、等金叉、历史对照和共振/卖点统计作为扩展保留。
 
