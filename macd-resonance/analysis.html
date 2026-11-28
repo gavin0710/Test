@@ -154,9 +154,41 @@ html{scroll-behavior:smooth;scroll-padding-top:16px}
 @media(max-width:600px){.study-intro{margin:0 3px 11px;font-size:12px}.study-nav{gap:5px;margin-inline:3px}.study-nav a{padding:7px 8px;font-size:11px}.study-controls{gap:2px 9px;margin-inline:3px}.study-controls>.caption{flex-basis:100%}.study-section h2{font-size:15px}.section-number{margin-right:6px}.study-table th,.study-table td{padding:8px}.study-description{margin-bottom:9px}.legacy-body{padding:0 8px 12px}.study-section .table-scroll{margin-right:-1px}.pattern-definitions div{grid-template-columns:1fr;gap:0}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
+.nine-controls{display:flex;flex-wrap:wrap;gap:3px 13px;margin:5px 0 6px}
+.nine-trend-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 16px}
+.nine-trend-panel{border:1px solid #dfe8ed;border-radius:9px;overflow:hidden}
+.nine-trend-panel h3{font-size:13px;padding:9px 12px;background:var(--wash);margin:0;color:#395768}
+.nine-trend-panel h3 small{font-size:11px;color:var(--quiet);font-weight:400;margin-left:7px}
+.nine-score-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.nine-score{background:#fff;border:0;text-align:left;padding:13px 14px 12px;min-width:0;color:inherit;font-variant-numeric:tabular-nums}
+.nine-score:hover:enabled{background:#f6fbfb}.nine-score:disabled{opacity:1}
+.nine-score .nine-label{display:block;font-size:13px;font-weight:650;margin-bottom:6px}
+.nine-score .nine-direction{display:block;font-size:11px;color:var(--quiet)}
+.nine-score strong{display:block;font-size:28px;font-weight:740;color:var(--teal);line-height:1.4}
+.nine-score.small strong{color:var(--muted);font-weight:620}
+.nine-score .nine-count{display:block;font-size:11px;color:var(--muted);line-height:1.7}
+.nine-score .track{height:4px;margin:9px 0}.nine-score .fill{height:4px}
+.nine-subheading{font-size:14px;color:#29485a;margin:20px 0 9px;font-weight:700}
+.nine-matrix{min-width:650px;table-layout:fixed}.nine-matrix th:first-child{width:80px}
+.nine-matrix :is(td,th):not(:first-child){text-align:center}
+.nine-matrix tr.nine-selected>th{color:var(--teal);font-weight:750}
+.nine-rate{border:1px solid transparent;background:transparent;border-radius:6px;padding:5px 3px;color:inherit;width:100%;text-align:center;line-height:1.45;font-variant-numeric:tabular-nums}
+.nine-rate:hover:enabled{background:var(--light);border-color:#d7e9ea}.nine-rate:disabled{opacity:1}
+.nine-rate strong{display:block;font-size:16px;color:var(--teal);white-space:nowrap}
+.nine-rate.small strong{color:var(--muted);font-weight:600}
+.nine-rate span{display:block;font-size:11px;color:var(--quiet);white-space:nowrap}
+.nine-compare{min-width:760px;table-layout:fixed}.nine-compare th:first-child{width:115px}
+.nine-compare :is(td,th):not(:first-child){text-align:center}
+.nine-compare tbody th span{display:block;font-size:11px;color:var(--quiet);font-weight:400}
+.nine-records{min-width:1100px}.nine-records td{vertical-align:top}
+.nine-reset{padding:5px 9px;min-height:34px;border:1px solid var(--line);background:#fff;border-radius:6px;font-size:12px;color:var(--teal)}
+#nine-cases .case-controls{margin-top:9px;gap:9px}#nine-description{max-width:110ch}
+@media(max-width:600px){.nine-trend-grid{grid-template-columns:1fr;gap:9px}.nine-score{padding:10px 12px}.nine-score strong{font-size:25px}.nine-controls{gap:2px 9px}.nine-trend-panel h3{padding:8px 11px}.nine-subheading{margin-top:17px}}
+
 </style>
 <script src="./analysis-metrics.js" defer></script>
 <script src="./analysis-patterns.js" defer></script>
+<script src="./analysis-nine.js" defer></script>
 </head>
 <body>
 <main class="wrap">
@@ -173,10 +205,11 @@ html{scroll-behavior:smooth;scroll-padding-top:16px}
 
   <p class="study-intro">以买1后上涨为终点，比较买入形态、指标组合与金叉确认时机。</p>
   <nav class="study-nav" aria-label="分析分区">
+   <a href="#nine-study">05 九转9/10跟踪</a>
    <a href="#buy-study">01 上涨基准</a><a href="#shape-study">02 形态与组合</a><a href="#wait-study">03 等金叉再买</a><a href="#history-study">04 历史对照</a><a href="#legacy-study">交易与卖点统计</a>
   </nav>
   <div class="study-controls">
-   <label class="field">观察终点 <select id="study-horizon"><option value="5">买入后第5根</option><option value="10" selected>买入后第10根</option><option value="20">买入后第20根</option></select></label>
+   <label class="field">观察终点 <select id="study-horizon"><option value="5">信号后第5根</option><option value="10" selected>信号后第10根</option><option value="20">信号后第20根</option></select></label>
    <label class="field">起始段 <select id="study-warmup"><option value="0">保留全部信号</option><option value="60">至少60根预热</option><option value="130">至少130根预热</option></select></label>
    <span class="caption">形态研究看上涨率；持平算未上涨，未到终点单列。</span>
   </div>
@@ -233,6 +266,40 @@ html{scroll-behavior:smooth;scroll-padding-top:16px}
     <div class="case-footer" id="study-pagination" hidden><button type="button" id="study-prev">上一页</button><span id="study-page"></span><button type="button" id="study-next">下一页</button></div>
    </div>
   </details>
+
+  <section class="card inset study-section" id="nine-study" aria-labelledby="nine-heading">
+   <div class="section-head"><h2 id="nine-heading"><span class="section-number">05</span>九转跟踪：上升、下降趋势中的9与10</h2><span class="scope-tag" id="nine-scope"></span></div>
+   <div class="nine-controls">
+    <label class="field">重点周期 <select id="nine-period"></select></label>
+    <label class="field">观察 <select id="nine-horizon"><option value="5">后5根</option><option value="10" selected>后10根</option><option value="20">后20根</option></select></label>
+    <label class="field">查看 <select id="nine-stage"><option value="nine">第9根结果</option><option value="ten">第10根结果</option></select></label>
+    <label class="field">成功口径 <select id="nine-goal"><option value="reversal">低看涨／高看跌</option><option value="up">统一看上涨</option><option value="down">统一看下跌</option></select></label>
+   </div>
+   <p class="caption study-description" id="nine-description"></p>
+   <p class="caption" id="nine-status" role="status"></p>
+   <div class="nine-trend-grid" id="nine-scorecards"></div>
+   <h3 class="nine-subheading" id="nine-matrix-heading">六周期对照</h3>
+   <div class="table-scroll" tabindex="0" aria-label="六周期九转趋势对照表"><table class="study-table nine-matrix">
+    <thead><tr><th rowspan="2" scope="col">周期</th><th colspan="2" scope="colgroup">上升趋势</th><th colspan="2" scope="colgroup">下降趋势</th></tr><tr><th scope="col">低序列</th><th scope="col">高序列</th><th scope="col">低序列</th><th scope="col">高序列</th></tr></thead><tbody id="nine-matrix"></tbody>
+   </table></div>
+   <p class="caption study-footnote">数字下方为命中数／已评估数，待评估单列；灰色为已评估不足20个。各周期N根对应不同时长。点击比例查看对应样本。</p>
+   <h3 class="nine-subheading">9与10对照：等到10以后，结果怎样</h3>
+   <p class="caption study-description">“续数到10”只表示下一根仍满足计数条件，不等于价格反转成功。第10根结果使用第10根收盘价，重新观察后N根；“同批9”只取后来续数到10的那些9。</p>
+   <div class="table-scroll" tabindex="0" aria-label="九转与第十根结果对照表"><table class="study-table nine-compare">
+    <thead><tr><th scope="col">分组</th><th scope="col">9全部样本<br><span class="sub">9后N根命中率</span></th><th scope="col">续数到10<br><span class="sub">成立数／已观察下一根</span></th><th scope="col">同批9<br><span class="sub">9后N根命中率</span></th><th scope="col">第10根结果<br><span class="sub">10后N根命中率</span></th></tr></thead><tbody id="nine-compare"></tbody>
+   </table></div>
+   <details class="rule-explanation" id="nine-paired"><summary>同一批序列、同一个终点，再比较9和10</summary>
+    <p class="caption study-description">终点固定为9后第N根。只比较10已成立且已到该终点的共同样本，分别使用9和10的价格，排除换样本与多观察一根的影响。</p>
+    <div class="table-scroll" tabindex="0" aria-label="九转第十根共同终点比较表"><table class="study-table nine-compare"><thead><tr><th scope="col">分组</th><th scope="col">共同样本</th><th scope="col">9价格 → 同一终点</th><th scope="col">10价格 → 同一终点</th><th scope="col">10相对9价格中位变化</th></tr></thead><tbody id="nine-paired-body"></tbody></table></div>
+   </details>
+   <details class="rule-explanation" id="nine-cases" open><summary>九转样本跟踪</summary>
+    <div class="case-controls"><p class="caption" id="nine-case-caption"></p><button class="nine-reset" id="nine-reset" type="button">查看近期全部序列</button></div>
+    <div class="table-scroll" tabindex="0" aria-label="九转逐条样本表"><table class="records nine-records"><thead><tr><th scope="col">指数／周期</th><th scope="col">序列／趋势</th><th scope="col">第9根时间／价格</th><th scope="col">第10根状态／价格</th><th scope="col">计算起点／价格</th><th scope="col">观察终点／价格</th><th scope="col">实际涨跌幅</th><th scope="col">结果</th></tr></thead><tbody id="nine-records"></tbody></table></div>
+    <div class="case-footer" id="nine-pagination" hidden><button type="button" id="nine-prev">上一页</button><span id="nine-page"></span><button type="button" id="nine-next">下一页</button></div>
+   </details>
+   <details class="rule-explanation"><summary>计数、趋势与成功率口径</summary><dl class="pattern-definitions" id="nine-definitions"></dl></details>
+   <p class="caption study-footnote">同一计数段只记录首次9和首次10，10以9的原趋势分组。不同指数同日触发、重叠观察窗口可能相关；历史命中比例不代表已校准的未来概率。</p>
+  </section>
 
   <details class="card study-section" id="legacy-study">
    <summary>交易胜率与卖点统计 · 原有口径</summary>
@@ -496,6 +563,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   el("next").addEventListener("click", () => { casePage++; renderCases(); });
   render();
   mountBuyPatternStudy(data);
+  mountNineAnalysis(data);
   el("status").hidden = true;
   el("dashboard").hidden = false;
  }

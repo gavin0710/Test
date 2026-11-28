@@ -15,7 +15,7 @@ Vercel Authentication 在正式密码入口发布、验证成功后设为 Standa
 
 验证：`node macd-resonance/verify-site-access.mjs` 使用随机测试密码覆盖登录、错误密码、受限资源、行情 API、Cookie 篡改与过期、密码变更、来源检查、节流与缺少配置。正式浏览器回归可从进程环境读取 `MACD_SITE_PASSWORD`，不要把密码写进命令、仓库或日志；归档回归无需密码。
 
-手动发布在原运行时文件之外，必须包含 `api/access.js`、`lib/site-access.cjs`、`vercel.json`，并保留 `analysis.html`、`analysis-metrics.js`、`analysis-patterns.js`、`analysis-data.json` 及两个行情 API。首页、分析页和分析脚本读取部署中的文件；受密码保护的 `analysis-data.json` 从 master 读取最新可复算归档，纯行情/统计更新无需重新部署网页。两处上游均不可用时返回503，不悄悄展示旧部署快照。
+手动发布在原运行时文件之外，必须包含 `api/access.js`、`lib/site-access.cjs`、`vercel.json`，并保留 `analysis.html`、`analysis-metrics.js`、`analysis-patterns.js`、`analysis-nine.js`、`analysis-data.json` 及两个行情 API。首页、分析页和分析脚本读取部署中的文件；受密码保护的 `analysis-data.json` 从 master 读取最新可复算归档，纯行情/统计更新无需重新部署网页。两处上游均不可用时返回503，不悄悄展示旧部署快照。
 
 ## 当前产品口径（2026-11-14）
 
@@ -99,7 +99,7 @@ Vercel Authentication 在正式密码入口发布、验证成功后设为 Standa
 
 JSONP超时后忽略晚到响应，等script实际完成再释放回调，防止慢网下的未定义回调异常。`verify.js`与归档浏览器回归覆盖真实OHLC晚到9秒的情况。腾讯15/60分钟备用源统一使用已核验的`ifzq.gtimg.cn`分钟接口；15/60分钟不论主源或备用源，均在同时间戳保留原已归档价格、仅补缺口。实际采集发现并恢复的8处主源冲突见`data/minute-source-conflicts-20261123.json`；冻结小时响应与哈希见`data/hourly-source-check-20261123.json.gz`及`data/maintenance-20261123.json`。
 
-正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留全部10个运行时文件，不能照搬早期仅3文件的发布方式。
+正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留全部11个运行时文件，不能照搬早期仅3文件的发布方式。
 
 ### 2026-11-21 分钟历史补录
 
@@ -180,3 +180,13 @@ node macd-resonance/verify-success-refresh.js
 ```
 
 `verify-success-analysis.js`要求当前输入哈希与发布统计一致，并对全部信号作截断与逐笔验证；不再跳过过期快照。显式历史截止复算仍可用 `node macd-resonance/research-success.js YYYY-MM-DD[THH:mm]` 输出JSON；要复现旧版本分钟样本，必须使用当时提交中的引擎和输入（首版输入提交 `09b4ad5`），不能用扩展后的EMA预热冒充原快照。
+
+## 九转9／10趋势跟踪
+
+分析页第05区独立统计全部连续序列，不要求伴随MACD买1。支持四指数、六周期、日期范围、5／10／20根终点，并分为上升趋势低9、高9和下降趋势低9、高9四组。默认低序列看上涨、高序列看下跌，也可统一比较上涨或下跌。
+
+`analysis-nine.js`由生成器与浏览器共用。收盘严格低于／高于前4根收盘连续计数，每段首次到9只记录一次；下一根继续同方向条件才是低10／高10。趋势固定取序列第1根之前的MA60相对5根前MA60的方向；历史不足和持平不混入四组。9和10按各自收盘价及各自之后N根收盘计算，尚无终点的样本单列待评估。
+
+界面区分“10续数成立率”和“10入场后方向命中率”，并展示续数成功同批9及同一终点的9／10配对比较。点击比例核对原始时间、价格、趋势均线与结果；小于20个有效样本灰显。统计为历史方向命中率，不含实盘费用与成交约束，同期指数与重叠区间存在相关性。
+
+采集和周度任务随同批OHLC自动生成`nineSchema:1`、`nineDefinition`、`nineSamples`。复核入口：`node macd-resonance/verify-nine-analysis.js`，覆盖全部24组历史的首次9、实际10、冻结趋势、范围截尾、共同终点及筛选对账。
