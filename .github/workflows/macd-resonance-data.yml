@@ -15,6 +15,7 @@ on:
       - "macd-resonance/analysis-metrics.js"
       - "macd-resonance/analysis-patterns.js"
       - "macd-resonance/analysis-nine.js"
+      - "macd-resonance/analysis-early.js"
       - "macd-resonance/index.html"
       - ".github/workflows/macd-resonance-data.yml"
 

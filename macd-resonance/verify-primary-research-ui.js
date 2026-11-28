@@ -1,0 +1,45 @@
+"use strict";
+const assert=require('node:assert/strict'),path=require('node:path'),model=require('./analysis-early'),metrics=require('./analysis-metrics');
+module.exports=async function verifyPrimary(page,viewport,data){
+ const press=l=>viewport.width<600?l.tap():l.click(),base=new URL(page.url()).origin,move=v=>v===null?'—':(v>0?'+':'')+v.toFixed(2)+'%';
+ const ready=()=>page.locator('#dashboard').waitFor();
+ await press(page.locator('.analysis-link[href="./analysis-early.html"]'));await ready();
+ assert.equal(await page.locator('#analysis-nav a').count(),3,'Only three main research paths');
+ assert.equal(await page.locator('#research-period').inputValue(),'D');
+ const delta=()=>page.locator('#early-strategies [data-strategy=nine] td').first().textContent();
+ const expected=extra=>model.summarize(model.evaluate(data,{period:'D',...extra}));
+ assert.equal(await delta(),move(expected().mean));
+ assert.equal(await page.locator('#early-strategies tr').count(),3);
+ assert.equal(await page.locator('#early-periods tr').count(),6);
+ await page.waitForFunction(()=>document.querySelector('#early-chart').dataset.ready==='true');
+ assert.equal(await page.locator('#early-chart img').count(),1);
+ const rows=model.evaluate(data,{period:'D'}),id=await page.locator('#early-chart').getAttribute('data-sample'),sample=rows.find(r=>r.id===id);
+ assert(sample.resolutionInWindow.type!=='buy'&&!sample.plans.standard.entry,'Default example keeps a failed setup instead of selecting only confirmed buys');
+ assert((await page.locator('#early-case-plans [data-case-plan=nine]').textContent()).includes(sample.plans.nine.entry[1].toFixed(2)),'Actual next open is visible');
+ assert((await page.locator('#early-case-plans [data-case-plan=standard]').textContent()).includes('空仓'));
+ await press(page.locator('#early-zoom'));assert(await page.locator('#research-dialog').isVisible());assert((await page.locator('#research-dialog-chart').textContent()).includes('DIF青'));
+ await press(page.locator('#research-dialog-close'));
+ const down=page.waitForEvent('download');await press(page.locator('#early-download'));assert((await down).suggestedFilename().endsWith('.png'));
+ await page.locator('#early-example-type').selectOption('expensive');await page.waitForFunction(()=>document.querySelector('#early-chart').dataset.ready==='true');
+ const expensiveId=await page.locator('#early-chart').getAttribute('data-sample');assert(rows.find(r=>r.id===expensiveId).priceEdge<0);
+ await page.locator('#research-horizon').selectOption('20');assert.equal(await delta(),move(expected({horizon:20}).mean));
+ await page.locator('#research-cohort').selectOption('all');assert.equal(await delta(),move(expected({horizon:20,cohort:'all'}).mean));
+ assert((await page.locator('#early-context').textContent()).includes('空仓0%'));
+ await press(page.locator('.condition-fold>summary'));await page.locator('#research-higher').selectOption('up');
+ assert.equal(await delta(),move(expected({horizon:20,cohort:'all',higher:'up'}).mean));
+ await page.locator('#research-resonance').selectOption('two');assert.equal(await delta(),move(expected({horizon:20,cohort:'all',higher:'up',resonance:'two'}).mean));
+ await page.locator('#scope').selectOption('four');await page.locator('#index').selectOption('0');await page.locator('#research-period').selectOption('120');
+ assert.equal(await delta(),move(model.summarize(model.evaluate(data,{index:0,period:'120',scope:'four',horizon:20,cohort:'all',higher:'up',resonance:'two'})).mean));
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Research tables and controls stay inside viewport');
+ await page.goto(base+'/analysis-early.html');await ready();await page.waitForFunction(()=>document.querySelector('#early-chart').dataset.ready==='true');
+ await press(page.locator('#early-records-panel>summary'));await press(page.locator('#early-next'));assert((await page.locator('#early-page').textContent()).startsWith('2 / '));
+ await press(page.locator('#early-records [data-early-case]').first());assert.equal(await page.locator('#early-example-type').inputValue(),'record');await page.waitForFunction(()=>document.querySelector('#early-chart').dataset.ready==='true');
+ if(viewport.width<600){await page.setViewportSize({width:320,height:730});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Primary research fits 320px');assert(await page.evaluate(()=>[...document.querySelectorAll('.research-metric strong')].every(e=>e.scrollWidth<=e.clientWidth+1)),'Metric values do not clip at 320px');await page.setViewportSize(viewport);}
+ if(process.env.MACD_SCREENSHOT_DIR){await page.screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`early-${viewport.width}.png`),fullPage:true});await page.locator('#early-case').screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`early-case-${viewport.width}.png`)});}
+ await page.goto(base+'/analysis-macd.html');await ready();assert.equal(await page.locator('#macd-periods tr').count(),6);
+ const cohort=model.observations(data),keys=new Set(cohort.filter(r=>r.formed!==null).map(r=>r.period+':'+r.index+':'+r.formed));const baseline=metrics.evaluate(data,{mode:'trade',index:'all',scope:'all',horizon:10}).filter(r=>r.period==='D'&&keys.has(r.period+':'+r.index+':'+r.barIndex));
+ assert.equal(await page.locator('#macd-metrics strong').first().textContent(),(metrics.summarize(baseline).rate*100).toFixed(1)+'%');
+ await press(page.locator('#macd-periods [data-macd-period="60"]'));assert(await page.locator('#macd-records-panel').evaluate(e=>e.open));assert.equal(await page.locator('#research-period').inputValue(),'60');
+ await page.goto(base+'/analysis.html');await ready();
+ console.log('PRIMARY_RESEARCH_UI_PASS',JSON.stringify({viewport,threePaths:true,failedSetups:true,nextOpenPrices:true,cashComparison:true,conditions:true,charts:true}));
+};

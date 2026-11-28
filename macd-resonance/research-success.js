@@ -7,6 +7,7 @@ const vm = require("node:vm");
 const { createHash } = require("node:crypto");
 const { horizons } = require("./analysis-metrics.js");
 const { enrich } = require("./analysis-patterns.js");
+const { buildRows, definition: earlyDefinition } = require("./analysis-early.js");
 const { buildNineRows, definition: nineDefinition } = require("./analysis-nine.js");
 
 function loadArchive(root) {
@@ -122,18 +123,19 @@ function buildSnapshot(root, asOf) {
       }
     }
   }
-  return { asOf, patternSchema: 1, nineSchema: 1, nineDefinition, periods, indices, coverage, sources,
+  return { asOf, earlySchema: 1, earlyDefinition, patternSchema: 1, nineSchema: 1, nineDefinition, periods, indices, coverage, sources,
     chartSchema: 1, nineHistory: series.map(index => Object.fromEntries(periods.map(({id}) => [id, Array.from(index[id].bars, b => [b.t,b.o,b.h,b.l,b.c])]))),
-    samples: enrich(samples, series), nineSamples: buildNineRows(series, periods) };
+    samples: enrich(samples, series), nineSamples: buildNineRows(series, periods), earlySamples: buildRows(series, periods, engine) };
 }
 
 function serializeSnapshot(snapshot) {
   // One observation per line keeps archive changes easy to inspect in a diff.
-  const { samples, nineSamples, nineHistory, ...metadata } = snapshot;
+  const { samples, nineSamples, nineHistory, earlySamples, ...metadata } = snapshot;
   const head = JSON.stringify(metadata, null, 2).slice(0, -2);
   return head + ',\n  "nineHistory": ' + JSON.stringify(nineHistory) + ',\n  "samples": [\n' +
     samples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ],\n  \"nineSamples\": [\n" +
-    nineSamples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ]\n}\n";
+    nineSamples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ],\n  \"earlySamples\": [\n" +
+    earlySamples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ]\n}\n";
 }
 
 function refreshSnapshot(root) {
