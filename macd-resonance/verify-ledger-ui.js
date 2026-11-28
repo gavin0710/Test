@@ -4,13 +4,14 @@ const http=require("http"),fs=require("fs"),path=require("path"),assert=require(
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"/tmp/macd-ledger-v2/node_modules/playwright");
 const {evaluate,summarize,groups,bounds}=require("./analysis-metrics");
 const patterns=require("./analysis-patterns");
+const nine=require("./analysis-nine");
 const viewports=[{width:1500,height:960},{width:390,height:844}];
 const root=__dirname,files={
  "/":path.join(root,"index.html"),"/api/latest":path.join(root,"data","latest.json"),
  "/api/history?period=15":path.join(root,"data","history-15.json"),
  "/api/history?period=101":path.join(root,"data","history-101.json"),
  "/api/history?period=102":path.join(root,"data","history-102.json"),
- ...Object.fromEntries(["analysis.html","analysis-metrics.js","analysis-patterns.js","analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
+ ...Object.fromEntries(["analysis.html","analysis-metrics.js","analysis-patterns.js","analysis-nine.js","analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
 };
 const server=http.createServer((req,res)=>{
  const item=files[req.url?.split("&ts=")[0]]||files[req.url?.split("?ts=")[0]];
@@ -186,6 +187,62 @@ async function verifyNavigation(page,viewport){
  if(cdp)await cdp.detach();
 }
 
+async function verifyNineAnalysis(page,viewport,analysis){
+ const press=locator=>viewport.width<600?locator.tap():locator.click();
+ assert.equal(analysis.nineSchema,1);
+ assert.equal(await page.locator('#nine-matrix tr').count(),6);
+ assert.equal(await page.locator('#nine-scorecards .nine-score').count(),4);
+ const pct=s=>s.rate===null?'—':(s.rate*100).toFixed(1)+'%';
+ const stats=(trend,side,{stage='nine',period='D',horizon=10,index='all',scope='all',goal='reversal',minBars=0}={})=>nine.summarize(nine.evaluate(analysis,{trend,side,stage,period,horizon,index,scope,goal,minBars}));
+ const score=(trend,side)=>page.locator('#nine-scorecards button[data-nine-trend="'+trend+'"][data-nine-side="'+side+'"] strong');
+ for(const trend of ['up','down'])for(const side of ['low','high'])assert.equal(await score(trend,side).textContent(),pct(stats(trend,side)));
+ await press(page.locator('#nine-scorecards button[data-nine-trend="up"][data-nine-side="low"]'));
+ assert(await page.locator('#nine-cases').evaluate(e=>e.open));
+ assert((await page.locator('#nine-case-caption').textContent()).includes('上升趋势'));
+ assert((await page.locator('#nine-records').textContent()).includes('低9'));
+ await page.locator('#nine-stage').selectOption('ten');
+ for(const trend of ['up','down'])for(const side of ['low','high'])assert.equal(await score(trend,side).textContent(),pct(stats(trend,side,{stage:'ten'})));
+ assert((await page.locator('#nine-case-caption').textContent()).includes('第10根'));
+ assert((await page.locator('#nine-records').textContent()).includes('10成立'));
+ await page.locator('#nine-goal').selectOption('up');
+ assert.equal(await score('up','high').textContent(),pct(stats('up','high',{stage:'ten',goal:'up'})));
+ await page.locator('#nine-horizon').selectOption('20');
+ assert.equal(await page.locator('#study-horizon').inputValue(),'20','Nine horizon updates the shared research endpoint');
+ assert.equal(await score('down','low').textContent(),pct(stats('down','low',{stage:'ten',goal:'up',horizon:20})));
+ await page.locator('#scope').selectOption('four');
+ await page.locator('#index').selectOption('0');
+ await page.locator('#study-warmup').selectOption('130');
+ assert.equal(await score('up','low').textContent(),pct(stats('up','low',{stage:'ten',goal:'up',horizon:20,scope:'four',index:0,minBars:130})));
+ await page.locator('#nine-period').selectOption('60');
+ assert.equal(await score('down','high').textContent(),pct(stats('down','high',{stage:'ten',goal:'up',horizon:20,scope:'four',index:0,minBars:130,period:'60'})));
+ await page.locator('#scope').selectOption('all');await page.locator('#index').selectOption('all');
+ await page.locator('#study-warmup').selectOption('0');await page.locator('#nine-period').selectOption('D');
+ await page.locator('#nine-goal').selectOption('reversal');await page.locator('#nine-stage').selectOption('nine');
+ await page.locator('#nine-horizon').selectOption('10');
+ const c=nine.continuation(nine.evaluate(analysis,{period:'D',trend:'up',side:'low'}));
+ assert.equal(await page.locator('#nine-compare tr').first().locator('td').nth(1).locator('strong').textContent(),pct(c));
+ await press(page.locator('#nine-paired > summary'));
+ const paired=page.locator('#nine-paired-body button[data-nine-stage="pairedTen"]:enabled').first();
+ const trend=await paired.getAttribute('data-nine-trend'),side=await paired.getAttribute('data-nine-side');
+ await press(paired);
+ assert((await page.locator('#nine-case-caption').textContent()).includes('同终点·第10根价格'));
+ const expected=nine.evaluate(analysis,{period:'D',stage:'pairedTen',trend,side}).sort((a,b)=>b.time.localeCompare(a.time)||a.index-b.index)[0];
+ const cells=page.locator('#nine-records tr').first().locator('td');
+ assert((await cells.nth(4).textContent()).includes(expected.entry[1].toFixed(2)),'Ten detail uses its actual price');
+ assert((await cells.nth(5).textContent()).includes(expected.outcome[0].replace('T',' ')),'Paired detail uses nine original endpoint');
+ await press(page.locator('#nine-reset'));
+ await press(page.locator('#nine-next'));
+ assert((await page.locator('#nine-page').textContent()).startsWith('2 / '));
+ await press(page.locator('#nine-prev'));
+ if(viewport.width<600){
+  await page.setViewportSize({width:320,height:730});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Nine controls and tables fit a 320px screen');
+  assert(await page.evaluate(()=>[...document.querySelectorAll('.nine-score strong')].every(e=>e.scrollWidth<=e.clientWidth+1)),'Nine card percentages do not clip');
+  await page.setViewportSize(viewport);
+ }
+ if(process.env.MACD_SCREENSHOT_DIR)await page.locator('#nine-study').screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`nine-analysis-${viewport.width}.png`)});
+}
+
 async function verifySuccessAnalysis(page, viewport){
  const press=locator=>viewport.width<600?locator.tap():locator.click();
  const link=page.getByRole("link",{name:"MACD 成功率",exact:true});
@@ -255,6 +312,7 @@ async function verifySuccessAnalysis(page, viewport){
   await page.setViewportSize(viewport);
  }
  if(process.env.MACD_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`analysis-${viewport.width}.png`),fullPage:true});
+ await verifyNineAnalysis(page,viewport,analysis);
  await press(page.locator("#legacy-study > summary"));
  const rate=period=>page.locator('#overview button[data-period="'+period+'"] .rate-text').textContent();
  for(const {id} of analysis.periods)assert.equal(await rate(id),expected(id));
