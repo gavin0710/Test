@@ -18,7 +18,7 @@
 - 正式HTTP核对15个前端资源逐字节一致，原始JSON与固定合并提交同一批，SHA-256 `22cd9aaefd4847f9bc84eae53549357138e8bc2d63747052ec5e1100b28d189c`；行情/JSON/脚本/CSS匿名401、合法登录200。正式站1500×960、390×844和320px窄屏的全部专题、反转四组、8张图例、真实10价格、PNG下载、放大与明细对账已通过，无前端脚本错误；原引擎页面逐字节未变。
 - 合并后[浏览器及内置规则回归](https://github.com/gavin0710/Test/actions/runs/46124749035)成功。既有[正式验收CI](https://github.com/gavin0710/Test/actions/runs/46124749109)仍缺`MACD_SITE_PASSWORD`，不记为成功；本轮独立正式HTTP和桌面/手机合法登录验收通过。凭据仅在受控进程环境使用，未写入文件或仓库，不更改密码或访问保护。
 
-- 合并后[自动采集](https://github.com/gavin0710/Test/actions/runs/46124749043)取数、重算和严格核验成功，原K线未变，提交阶段Everything up-to-date。已等待其完成后才提交交接文档，继续使用同一批可复算JSON。
+- 合并后[自动采集](https://github.com/gavin0710/Test/actions/runs/46124749043)成功取数、重算并严格核验，使用腾讯备用源后更新来源/生成时刻，实际提交`ab1a409dcbe75bed0076c0c6a2c1ba0aeea65dba`；统计归档时刻变为北京时间2026-11-28 16:14。已逐字段确认coverage、samples、nineSamples、nineHistory与上线时完全相同，K线仍到11月27日、四项总体概率均不变；不能将该来源/时间更新称为新增K线。新JSON SHA-256 `949e87e92af6492ad702840e8cf8405fb34c2febb339926489b689678d729ba8`。已等采集结束后再提交交接。
 
 ## 2026-11-28 成功率专题独立子页与九转K线图例
 
