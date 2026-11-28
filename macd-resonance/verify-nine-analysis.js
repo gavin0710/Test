@@ -101,8 +101,8 @@ for(let index=0;index<4;index++)for(const {id}of data.periods){
  assert.deepEqual(data.nineHistory[index][id],Array.from(series[index][id].bars,b=>[b.t,b.o,b.h,b.l,b.c]));
 }
 let chartChecks=0;
-for(const stage of ['nine','ten','pairedNine','pairedTen'])for(const horizon of metrics.horizons){
- const rows=model.evaluate(data,{stage,horizon,goal:'up'});
+for(const stage of ['nine','ten','pairedNine','pairedTen'])for(const horizon of metrics.horizons)for(const goal of ['up','reversal']){
+ const rows=model.evaluate(data,{stage,horizon,goal});
  for(const row of rows){if(!row.outcome)continue;const chart=charts.snapshot(data,row);
   assert.equal(chart.bars.at(-1).t,row.outcome[0]);assert.equal(chart.bars.at(-1).c,row.outcome[1]);
   assert.equal(chart.bars.find(b=>b.i===chart.entryIndex).c,row.entry[1]);
@@ -113,8 +113,8 @@ for(const stage of ['nine','ten','pairedNine','pairedTen'])for(const horizon of 
  for(const trend of ['up','down'])for(const side of ['low','high']){
   const picked=charts.examples(rows,{trend,side});
   for(const [key,example]of Object.entries(picked))if(example){
-   assert.equal(example.priceMove>0,key==='success');
-   assert(!rows.some(r=>r.trend===trend&&r.side===side&&r.outcome&&(r.priceMove>0)===(key==='success')&&r.time>example.time),'Examples are the latest matching outcomes, not selected by return size');
+   assert.equal(example.result>0,key==='success');
+   assert(!rows.some(r=>r.trend===trend&&r.side===side&&r.outcome&&(r.result>0)===(key==='success')&&r.time>example.time),'Examples are the latest matching outcomes, not selected by return size');
   }
  }
 }

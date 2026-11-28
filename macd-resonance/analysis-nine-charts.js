@@ -3,7 +3,7 @@ const NineCharts=(()=>{
  const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function examples(rows,{trend,side}){
   const done=rows.filter(r=>r.trend===trend&&r.side===side&&r.outcome).sort((a,b)=>b.time.localeCompare(a.time)||a.index-b.index);
-  return {success:done.find(r=>r.priceMove>0)||null,failure:done.find(r=>r.priceMove<=0)||null};
+  return {success:done.find(r=>r.result>0)||null,failure:done.find(r=>r.result<=0)||null};
  }
  function snapshot(data,row){
   const history=data.nineHistory?.[row.index]?.[row.period];
@@ -21,7 +21,7 @@ const NineCharts=(()=>{
   const W=960,H=400,L=62,R=24,T=64,B=72,PW=W-L-R,PH=H-T-B;
   const values=bars.flatMap(b=>[b.h,b.l,...(b.ma===null?[]:[b.ma])]);let lo=Math.min(...values),hi=Math.max(...values);const pad=(hi-lo||hi*.01||1)*.12;lo-=pad;hi+=pad;
   const x=i=>L+(i-from+.5)*PW/bars.length,y=v=>T+(hi-v)*PH/(hi-lo),bw=Math.max(2,Math.min(9,PW/bars.length*.65));
-  let chart=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(s.indexName+' '+s.periodName+' '+row.time+' 真实历史K线')}" style="font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;background:white"><rect width="960" height="400" fill="#ffffff"/><text x="20" y="25" font-size="17" fill="#203e50" font-weight="700">${esc(s.indexName+' · '+s.periodName+' · '+(row.side==='low'?'低':'高')+(entryIndex===nineIndex?'9':'10')+' · '+row.time.replace('T',' '))}</text><text x="20" y="47" font-size="12" fill="#536d7b">${esc(row.trend==='up'?'序列前MA60上行':row.trend==='down'?'序列前MA60下行':'趋势未知')} · 红涨绿跌 · 金线 MA60 · 淡色区为信号后的观察区间</text>`;
+  let chart=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(s.indexName+' '+s.periodName+' '+row.time+' 真实历史K线')}" style="font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;background:white"><rect width="960" height="400" fill="#ffffff"/><text x="20" y="25" font-size="17" fill="#203e50" font-weight="700">${esc(s.indexName+' · '+s.periodName+' · '+(row.side==='low'?'低':'高')+(entryIndex===nineIndex?'9':'10')+(row.side==='low'?'看涨':'看跌')+' · '+row.time.replace('T',' '))}</text><text x="20" y="47" font-size="12" fill="#536d7b">${esc(row.trend==='up'?'序列前MA60上行':row.trend==='down'?'序列前MA60下行':'趋势未知')} · 红涨绿跌 · 金线 MA60 · 淡色区为信号后的观察区间</text>`;
   chart+=`<rect x="${x(entryIndex)+PW/bars.length/2}" y="${T}" width="${Math.max(0,x(endIndex)-x(entryIndex))}" height="${PH}" fill="#eff8f8"/>`;
   for(let k=0;k<=4;k++){const value=lo+(hi-lo)*k/4,Y=y(value);chart+=`<path d="M${L},${Y}H${W-R}" stroke="#e8eff2"/><text x="${L-8}" y="${Y+4}" text-anchor="end" font-size="11" fill="#617786">${value.toFixed(0)}</text>`;}
   chart+=`<path d="M${L},${y(row.entry[1])}H${W-R}" stroke="#839aaa" stroke-dasharray="5 4"/>`;
@@ -32,7 +32,7 @@ const NineCharts=(()=>{
   chart+=`<circle cx="${x(endIndex)}" cy="${y(row.outcome[1])}" r="4.5" fill="#233e50" stroke="white" stroke-width="2"/>`;
   const trendX=x(trendIndex);chart+=`<path d="M${trendX},${T+PH-9}V${T+PH+9}" stroke="#a07f3a"/><text x="${trendX}" y="${T+PH+17}" text-anchor="middle" font-size="11" fill="#876b32">趋势判定</text>`;
   chart+=`<text x="${L}" y="${H-14}" font-size="11" fill="#536d7b">${esc(bars[0].t.replace('T',' '))}</text><text x="${W-R}" y="${H-14}" text-anchor="end" font-size="11" fill="#203e50">终点：${esc(row.outcome[0].replace('T',' '))}</text>`;
-  const change=100*(row.outcome[1]/row.entry[1]-1);chart+=`<text x="${W-R}" y="${H-32}" text-anchor="end" font-size="13" font-weight="700" fill="${change>0?'#0f6f74':'#8e4d42'}">信号 ${row.entry[1].toFixed(2)} → 终点 ${row.outcome[1].toFixed(2)}：${change>0?'+':''}${change.toFixed(2)}%</text></svg>`;
+  const change=100*(row.outcome[1]/row.entry[1]-1);chart+=`<text x="${W-R}" y="${H-32}" text-anchor="end" font-size="13" font-weight="700" fill="${row.result>0?'#0f6f74':'#8e4d42'}">信号 ${row.entry[1].toFixed(2)} → 终点 ${row.outcome[1].toFixed(2)}：${change>0?'+':''}${change.toFixed(2)}%</text></svg>`;
   return chart;
  }
  async function png(svgElement){

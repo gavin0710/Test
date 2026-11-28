@@ -1,6 +1,6 @@
 "use strict";
 const AnalysisCatalog = [
- {id:"nine",href:"analysis-nine.html",title:"九转跟踪",question:"9出现以后，第N根收盘上涨的比例是多少？",detail:"总体9 · 四种趋势情况 · 成功/失败K线 · 连续10"},
+ {id:"nine",href:"analysis-nine.html",title:"九转跟踪",question:"低9之后上涨、高9之后下跌，各有多大概率？",detail:"低9看涨/高9看跌 · 四种趋势情况 · 成功/失败K线 · 连续10"},
  {id:"buy-baseline",href:"analysis-buy-baseline.html",title:"买1后上涨基准",question:"买1之后，各周期有多大比例继续上涨？",detail:"各周期基准 · 5/10/20根终点 · 原始样本"},
  {id:"buy-patterns",href:"analysis-buy-patterns.html",title:"买1形态与指标组合",question:"哪些MACD、九转或多周期条件下，更常上涨？",detail:"单项形态 · 双指标组合 · 可比基准"},
  {id:"buy-confirm",href:"analysis-buy-confirm.html",title:"等待金叉再买",question:"买1直接买，还是等DIF金叉以后再买？",detail:"确认价重新计算 · 同批样本 · 共同终点"},
