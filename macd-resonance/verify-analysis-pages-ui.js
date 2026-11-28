@@ -14,19 +14,27 @@ module.exports=async function verifySuccessAnalysis(page,viewport){
  await press(page.locator('.analysis-link[href="./analysis-nine.html"]'));await wait();
  assert((await page.locator('#asof').textContent()).includes(analysis.asOf.replace('T',' ')));
  assert.equal(await page.locator('#buy-study,#shape-study,#wait-study,#history-study,#legacy-study').count(),0,'Nine page is independent');
- const stats=(stage='nine',trend='all',side='all',extra={})=>nine.summarize(nine.evaluate(analysis,{stage,trend,side,period:'D',horizon:10,goal:'up',...extra}));
+ const stats=(stage='nine',trend='all',side='all',extra={})=>nine.summarize(nine.evaluate(analysis,{stage,trend,side,period:'D',horizon:10,goal:'reversal',...extra}));
  const score=(t,s)=>page.locator('#nine-scorecards button[data-nine-trend="'+t+'"][data-nine-side="'+s+'"] strong');
  for(const t of ['up','down'])for(const s of ['low','high'])assert.equal(await score(t,s).textContent(),pct(stats('nine',t,s)));
- for(const stage of ['nine','ten'])for(const side of ['all','low','high']){
+ for(const stage of ['nine','ten'])for(const side of ['low','high']){
   const panel=stage==='nine'?'#nine-overall-cards':'#nine-ten-cards';
   assert.equal(await page.locator(panel+' button[data-nine-side="'+side+'"] strong').textContent(),pct(stats(stage,'all',side)));
  }
  await page.waitForFunction(()=>document.querySelector('#nine-gallery').dataset.ready==='true');
  assert.equal(await page.locator('#nine-gallery img').count(),8);assert.equal(await page.locator('#nine-gallery a[download]:visible').count(),8);
- const rows=nine.evaluate(analysis,{period:'D',goal:'up'});
+ const rows=nine.evaluate(analysis,{period:'D',goal:'reversal'});
  const expected=charts.examples(rows,{trend:'up',side:'low'}).success;
  assert((await page.locator('.example-card').first().textContent()).includes(expected.entry[1].toFixed(2)));
  assert((await page.locator('.example-card').first().textContent()).includes(expected.outcome[1].toFixed(2)));
+ const high=charts.examples(rows,{trend:'up',side:'high'});
+ assert(high.success.priceMove<0&&high.failure.priceMove>=0,'High-nine success must fall, failure must not fall');
+ const highPair=page.locator('.example-group').nth(1);
+ assert((await highPair.locator('.result-badge').first().textContent()).includes('下跌成功'));
+ assert((await highPair.locator('.result-badge').last().textContent()).includes('未下跌'));
+ assert((await highPair.locator('.example-card').first().textContent()).includes(high.success.outcome[1].toFixed(2)));
+ assert.equal(await page.locator('#nine-overall-cards button').count(),2,'Do not pool high/low direction probabilities');
+ assert((await page.locator('#nine-overall-cards [data-nine-side=high]').textContent()).includes('收盘下跌'));
  const source=await page.locator('.example-card img').first().getAttribute('src');assert(source.startsWith('data:image/png;base64,'));
  await press(page.locator('[data-chart-open="0"]'));assert(await page.locator('#nine-chart-dialog').isVisible());
  assert((await page.locator('#nine-dialog-caption').textContent()).includes(expected.outcome[0].replace('T',' ')));
@@ -34,7 +42,7 @@ module.exports=async function verifySuccessAnalysis(page,viewport){
  const download=page.waitForEvent('download');await press(page.locator('#nine-download-0'));const file=await download;assert(file.suggestedFilename().endsWith('.png'));
  await page.locator('#nine-example-stage').selectOption('ten');await page.waitForFunction(()=>document.querySelector('#nine-gallery').dataset.ready==='true');
  assert.equal(await page.locator('#nine-gallery img').count(),8);
- const tenExpected=charts.examples(nine.evaluate(analysis,{period:'D',goal:'up',stage:'ten'}),{trend:'up',side:'low'}).success;
+ const tenExpected=charts.examples(nine.evaluate(analysis,{period:'D',goal:'reversal',stage:'ten'}),{trend:'up',side:'low'}).success;
  assert((await page.locator('.example-card').first().textContent()).includes(tenExpected.entry[1].toFixed(2)),'Ten image uses actual ten close');
  await page.locator('#nine-example-stage').selectOption('nine');
  await page.locator('#nine-horizon').selectOption('20');assert.equal(await score('down','low').textContent(),pct(stats('nine','down','low',{horizon:20})));
@@ -78,5 +86,5 @@ module.exports=async function verifySuccessAnalysis(page,viewport){
  await page.goto(base+'/analysis.html#nine-study');await page.waitForURL(/analysis-nine\.html/);await wait();
  assert.equal(await page.locator('#nine-overall-cards').count(),1,'Old anchor link lands on standalone study');
  await press(page.getByRole('link',{name:'四指共振',exact:true}));await page.waitForURL(url=>url.pathname==='/');assert.equal(await page.locator('.chart-card:visible').count(),4);
- console.log('ANALYSIS_PAGES_UI_PASS',JSON.stringify({viewport,pages:7,realPngExamples:8,actualTenPrice:true,unifiedUpside:true,legacyDeepLink:true}));
+ console.log('ANALYSIS_PAGES_UI_PASS',JSON.stringify({viewport,pages:7,realPngExamples:8,actualTenPrice:true,reversalTargets:true,legacyDeepLink:true}));
 };
