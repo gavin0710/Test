@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import access from './lib/site-access.cjs';
+import resources from './lib/analysis-resources.cjs';
 
 process.chdir(fileURLToPath(new URL('.', import.meta.url)));
 const password = randomBytes(20).toString('hex');
@@ -56,13 +57,13 @@ const get = (path, cookie, options = {}) => realFetch(origin + path, { redirect:
 const login = (value, options = {}) => get('/_access/login', null, { method: 'POST', body: new URLSearchParams({ password: value, next: options.next || '/' }), headers: { Origin: options.origin || origin, 'x-vercel-forwarded-for': options.ip || 'test-user' } });
 
 try {
-  for (const path of ['/', '/index.html', '/analysis.html', '/analysis']) {
+  for (const path of ['/', '/index.html', '/analysis', ...resources.pages.map(p => '/' + p)]) {
     const response = await get(path);
     assert.equal(response.status, 200);
     assert.match(await response.text(), /name="password"/);
     assert.match(response.headers.get('Cache-Control'), /no-store/);
   }
-  for (const path of ['/api/latest', '/api/history?period=15', '/api/history?period=101', '/api/history?period=102', '/analysis-metrics.js', '/analysis-patterns.js', '/analysis-nine.js', '/analysis-data.json', '/index', '/index.html/', '/api/access?__path=index.html', '/lib/site-access.cjs', '/vercel.json']) {
+  for (const path of ['/api/latest', '/api/history?period=15', '/api/history?period=101', '/api/history?period=102', ...resources.staticFiles.filter(p => !p.endsWith('.html')).map(p => '/' + p), '/analysis-data.json', '/index', '/index.html/', '/api/access?__path=index.html', '/lib/site-access.cjs', '/vercel.json']) {
     const response = await get(path);
     assert.equal(response.status, 401, path);
     assert.doesNotMatch(await response.text(), /buildLedger|MACD_ACCESS_|signalStats/);
@@ -75,10 +76,14 @@ try {
   const granted = await login(password, { next: '/analysis.html' });
   assert.equal(granted.status, 303);
   assert.equal(granted.headers.get('Location'), '/analysis.html');
+  for (const file of resources.pages) {
+    const direct = await login(password, { next: '/' + file });
+    assert.equal(direct.headers.get('Location'), '/' + file, 'Return to requested analysis after login');
+  }
   const cookieHeader = granted.headers.get('Set-Cookie');
   for (const flag of ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/', 'Max-Age=604800']) assert(cookieHeader.includes(flag));
   const cookie = cookieHeader.split(';')[0];
-  for (const path of ['/', '/index.html', '/analysis.html', '/analysis-metrics.js', '/analysis-patterns.js', '/analysis-nine.js', '/analysis-data.json']) {
+  for (const path of ['/', '/index.html', ...resources.staticFiles.map(p => '/' + p), '/analysis-data.json']) {
     const response = await get(path, cookie);
     assert.equal(response.status, 200, path);
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), readFileSync(path === '/' ? 'index.html' : path.slice(1)), path);

@@ -5,18 +5,19 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"/tmp/macd-ledger-v2/nod
 const {evaluate,summarize,groups,bounds}=require("./analysis-metrics");
 const patterns=require("./analysis-patterns");
 const nine=require("./analysis-nine");
+const {staticFiles}=require("./lib/analysis-resources.cjs");
 const viewports=[{width:1500,height:960},{width:390,height:844}];
 const root=__dirname,files={
  "/":path.join(root,"index.html"),"/api/latest":path.join(root,"data","latest.json"),
  "/api/history?period=15":path.join(root,"data","history-15.json"),
  "/api/history?period=101":path.join(root,"data","history-101.json"),
  "/api/history?period=102":path.join(root,"data","history-102.json"),
- ...Object.fromEntries(["analysis.html","analysis-metrics.js","analysis-patterns.js","analysis-nine.js","analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
+ ...Object.fromEntries([...staticFiles,"analysis-data.json"].map(name=>["/"+name,path.join(root,name)]))
 };
 const server=http.createServer((req,res)=>{
- const item=files[req.url?.split("&ts=")[0]]||files[req.url?.split("?ts=")[0]];
+ const item=files[req.url?.split("&ts=")[0]]||files[req.url?.split("?ts=")[0]]||files[new URL(req.url,"http://localhost").pathname];
  if(!item){res.writeHead(404);res.end("not found");return}
- const types={".html":"text/html",".js":"text/javascript",".json":"application/json"};
+ const types={".html":"text/html",".js":"text/javascript",".json":"application/json",".css":"text/css"};
  res.setHeader("Content-Type",types[path.extname(item)]+";charset=utf-8");
  fs.createReadStream(item).pipe(res);
 });
@@ -187,172 +188,7 @@ async function verifyNavigation(page,viewport){
  if(cdp)await cdp.detach();
 }
 
-async function verifyNineAnalysis(page,viewport,analysis){
- const press=locator=>viewport.width<600?locator.tap():locator.click();
- assert.equal(analysis.nineSchema,1);
- assert.equal(await page.locator('#nine-matrix tr').count(),6);
- assert.equal(await page.locator('#nine-scorecards .nine-score').count(),4);
- const pct=s=>s.rate===null?'—':(s.rate*100).toFixed(1)+'%';
- const stats=(trend,side,{stage='nine',period='D',horizon=10,index='all',scope='all',goal='reversal',minBars=0}={})=>nine.summarize(nine.evaluate(analysis,{trend,side,stage,period,horizon,index,scope,goal,minBars}));
- const score=(trend,side)=>page.locator('#nine-scorecards button[data-nine-trend="'+trend+'"][data-nine-side="'+side+'"] strong');
- for(const trend of ['up','down'])for(const side of ['low','high'])assert.equal(await score(trend,side).textContent(),pct(stats(trend,side)));
- await press(page.locator('#nine-scorecards button[data-nine-trend="up"][data-nine-side="low"]'));
- assert(await page.locator('#nine-cases').evaluate(e=>e.open));
- assert((await page.locator('#nine-case-caption').textContent()).includes('上升趋势'));
- assert((await page.locator('#nine-records').textContent()).includes('低9'));
- await page.locator('#nine-stage').selectOption('ten');
- for(const trend of ['up','down'])for(const side of ['low','high'])assert.equal(await score(trend,side).textContent(),pct(stats(trend,side,{stage:'ten'})));
- assert((await page.locator('#nine-case-caption').textContent()).includes('第10根'));
- assert((await page.locator('#nine-records').textContent()).includes('10成立'));
- await page.locator('#nine-goal').selectOption('up');
- assert.equal(await score('up','high').textContent(),pct(stats('up','high',{stage:'ten',goal:'up'})));
- await page.locator('#nine-horizon').selectOption('20');
- assert.equal(await page.locator('#study-horizon').inputValue(),'20','Nine horizon updates the shared research endpoint');
- assert.equal(await score('down','low').textContent(),pct(stats('down','low',{stage:'ten',goal:'up',horizon:20})));
- await page.locator('#scope').selectOption('four');
- await page.locator('#index').selectOption('0');
- await page.locator('#study-warmup').selectOption('130');
- assert.equal(await score('up','low').textContent(),pct(stats('up','low',{stage:'ten',goal:'up',horizon:20,scope:'four',index:0,minBars:130})));
- await page.locator('#nine-period').selectOption('60');
- assert.equal(await score('down','high').textContent(),pct(stats('down','high',{stage:'ten',goal:'up',horizon:20,scope:'four',index:0,minBars:130,period:'60'})));
- await page.locator('#scope').selectOption('all');await page.locator('#index').selectOption('all');
- await page.locator('#study-warmup').selectOption('0');await page.locator('#nine-period').selectOption('D');
- await page.locator('#nine-goal').selectOption('reversal');await page.locator('#nine-stage').selectOption('nine');
- await page.locator('#nine-horizon').selectOption('10');
- const c=nine.continuation(nine.evaluate(analysis,{period:'D',trend:'up',side:'low'}));
- assert.equal(await page.locator('#nine-compare tr').first().locator('td').nth(1).locator('strong').textContent(),pct(c));
- await press(page.locator('#nine-paired > summary'));
- const paired=page.locator('#nine-paired-body button[data-nine-stage="pairedTen"]:enabled').first();
- const trend=await paired.getAttribute('data-nine-trend'),side=await paired.getAttribute('data-nine-side');
- await press(paired);
- assert((await page.locator('#nine-case-caption').textContent()).includes('同终点·第10根价格'));
- const expected=nine.evaluate(analysis,{period:'D',stage:'pairedTen',trend,side}).sort((a,b)=>b.time.localeCompare(a.time)||a.index-b.index)[0];
- const cells=page.locator('#nine-records tr').first().locator('td');
- assert((await cells.nth(4).textContent()).includes(expected.entry[1].toFixed(2)),'Ten detail uses its actual price');
- assert((await cells.nth(5).textContent()).includes(expected.outcome[0].replace('T',' ')),'Paired detail uses nine original endpoint');
- await press(page.locator('#nine-reset'));
- await press(page.locator('#nine-next'));
- assert((await page.locator('#nine-page').textContent()).startsWith('2 / '));
- await press(page.locator('#nine-prev'));
- if(viewport.width<600){
-  await page.setViewportSize({width:320,height:730});
-  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Nine controls and tables fit a 320px screen');
-  assert(await page.evaluate(()=>[...document.querySelectorAll('.nine-score strong')].every(e=>e.scrollWidth<=e.clientWidth+1)),'Nine card percentages do not clip');
-  await page.setViewportSize(viewport);
- }
- if(process.env.MACD_SCREENSHOT_DIR)await page.locator('#nine-study').screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`nine-analysis-${viewport.width}.png`)});
-}
-
-async function verifySuccessAnalysis(page, viewport){
- const press=locator=>viewport.width<600?locator.tap():locator.click();
- const link=page.getByRole("link",{name:"MACD 成功率",exact:true});
- assert.equal(await link.count(),1);
- const sampleResponse=page.waitForResponse(response=>new URL(response.url()).pathname==="/analysis-data.json");
- await press(link);
- await page.waitForURL("**/analysis.html");
- await page.locator("#dashboard").waitFor();
- const response=await sampleResponse;
- assert.equal(response.status(),200);
- const analysis=await response.json();
- assert.equal(await page.locator("#asof").textContent(),"统计截至 "+analysis.asOf.slice(0,10));
- assert.equal(await page.locator("#overview tr").count(),6);
- assert.equal(await page.locator("#matrix tr").count(),6);
- assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Analysis fits both viewports");
-
- function expected(period, mode="trade", scope="all", horizon=10, index="all", group="all"){
-  const stats=summarize(evaluate(analysis,{mode,scope,horizon,index}).filter(row=>
-   row.period===period&&groups[group].includes(row)));
-  return stats.rate===null?"—":(stats.rate*100).toFixed(1)+"%";
- }
- assert.equal(analysis.patternSchema,1);
- assert.equal(await page.locator("#buy-baseline tr").count(),6);
- assert.equal(await page.locator("#pattern-body tr").count(),6);
- assert.equal(await page.locator("#wait-body tr").count(),6);
- assert.equal(await page.locator("#history-body tr").count(),6);
- assert(!(await page.locator("#legacy-study").evaluate(e=>e.open)),"Original trade statistics start folded");
- const shapeRate=(period,rule)=>page.locator('#pattern-body button[data-study-period="'+period+'"][data-study-rule="'+rule+'"] strong');
- const studyExpected=(period,rule,scope="all",horizon=10,index="all",minBars=0)=>{
-  const rows=patterns.evaluate(analysis,{rule,scope,horizon,index,minBars}).filter(r=>r.period===period);
-  const s=summarize(rows);return s.rate===null ? "—" : (s.rate*100).toFixed(1)+"%";
- };
- assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now"));
- await press(page.locator('#pattern-body button[data-study-period="D"][data-study-rule="cross_now"]'));
- assert(await page.locator("#study-cases").evaluate(e=>e.open));
- assert((await page.locator("#study-case-caption").textContent()).includes("当根DIF金叉"));
- assert((await page.locator("#study-records").textContent()).includes("DIF"));
- await page.locator("#study-horizon").selectOption("20");
- assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now","all",20));
- await page.locator("#study-warmup").selectOption("130");
- assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now","all",20,"all",130));
- await page.locator("#study-warmup").selectOption("0");
- await page.locator("#pattern-family").selectOption("combo");
- assert.equal(await shapeRate("D","resonance_and_low9").textContent(),studyExpected("D","resonance_and_low9","all",20));
- await page.locator("#pattern-family").selectOption("other");
- assert.equal(await shapeRate("W","higher_dif_rising").textContent(),"—");
- await page.locator("#pattern-family").selectOption("main");
- await page.locator("#scope").selectOption("four");
- assert.equal(await shapeRate("D","low9_recent3").textContent(),studyExpected("D","low9_recent3","four",20));
- await page.locator("#index").selectOption("0");
- assert.equal(await shapeRate("D","cross_now").textContent(),studyExpected("D","cross_now","four",20,0));
- await page.locator("#index").selectOption("all");
- await page.locator("#scope").selectOption("all");
- await page.locator("#study-horizon").selectOption("10");
- const wait=page.locator('#wait-body button[data-study-period="D"][data-study-stage="wait"]');
- await press(wait);
- assert((await page.locator("#study-case-caption").textContent()).includes("等金叉确认后买"));
- await press(page.locator("#wait-study .rule-explanation > summary"));
- await press(page.locator('#paired-body button[data-study-period="D"][data-study-stage="pairEarly"]'));
- assert((await page.locator("#study-case-caption").textContent()).includes("共同样本·买1价"));
- assert(!/等待[1-5]根/.test(await page.locator("#study-records").textContent()),"Original-entry drilldown cannot show the confirmation delay");
- await page.locator("#history-rule").selectOption("cross_now");
- assert.equal(await page.locator('#history-body button[data-study-period="D"][data-study-scope="four"] strong').textContent(),studyExpected("D","cross_now","four"));
- if(viewport.width<600){
-  await page.setViewportSize({width:320,height:730});
-  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Pattern tables scroll within 320px screen");
-  await page.setViewportSize(viewport);
- }
- if(process.env.MACD_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.MACD_SCREENSHOT_DIR,`analysis-${viewport.width}.png`),fullPage:true});
- await verifyNineAnalysis(page,viewport,analysis);
- await press(page.locator("#legacy-study > summary"));
- const rate=period=>page.locator('#overview button[data-period="'+period+'"] .rate-text').textContent();
- for(const {id} of analysis.periods)assert.equal(await rate(id),expected(id));
- assert.equal(await rate("D"),expected("D"));
- assert.equal(await rate("W"),expected("W"));
- const combo=page.locator('#matrix button[data-period="D"][data-group="both"]');
- assert.equal(await combo.locator("strong").textContent(),expected("D","trade","all",10,"all","both").replace(/^(0|100)\.0%$/,"$1%"));
- await press(combo);
- assert(await page.locator("#cases").evaluate(el=>el.open));
- assert.equal(await page.locator("#case-period").inputValue(),"D");
- assert.equal(await page.locator("#case-group").inputValue(),"both");
- assert((await page.locator("#records").textContent()).includes("低9"));
- await page.locator("#case-group").selectOption("all");
- await press(page.locator("#next"));
- assert((await page.locator("#page-number").textContent()).startsWith("2 / "));
- await press(page.getByRole("button",{name:"买1后上涨",exact:true}));
- assert(await page.locator("#horizon").isVisible());
- assert.equal(await rate("15"),expected("15","buy"));
- await page.locator("#horizon").selectOption("20");
- assert.equal(await rate("15"),expected("15","buy","all",20));
- await page.locator("#scope").selectOption("same");
- assert((await page.locator("#context").textContent()).includes(bounds(analysis.coverage).from));
- assert.equal(await rate("D"),expected("D","buy","same",20));
- await page.locator("#scope").selectOption("all");
- await page.locator("#index").selectOption("0");
- await press(page.getByRole("button",{name:"卖1后下跌",exact:true}));
- assert.equal(await rate("D"),expected("D","sell","all",20,0));
- assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Drill-down table scrolls inside its panel");
- if(viewport.width<600){
-  await page.locator("#index").selectOption("all");
-  await press(page.getByRole("button",{name:"交易胜率",exact:true}));
-  await page.setViewportSize({width:320,height:730});
-  assert(await page.evaluate(()=>[...document.querySelectorAll("#matrix button")].every(el=>el.scrollWidth<=el.clientWidth+1)),
-   "Rates and denominators fit on a 320px display");
-  await page.setViewportSize(viewport);
- }
- await press(page.getByRole("link",{name:"四指共振",exact:true}));
- await page.waitForURL(url=>url.pathname==="/");
- assert.equal(await page.locator(".chart-card:visible").count(),4);
-}
+const verifySuccessAnalysis=require("./verify-analysis-pages-ui.js");
 
 (async()=>{
  let base=process.env.MACD_BASE_URL;

@@ -99,7 +99,7 @@ Vercel Authentication 在正式密码入口发布、验证成功后设为 Standa
 
 JSONP超时后忽略晚到响应，等script实际完成再释放回调，防止慢网下的未定义回调异常。`verify.js`与归档浏览器回归覆盖真实OHLC晚到9秒的情况。腾讯15/60分钟备用源统一使用已核验的`ifzq.gtimg.cn`分钟接口；15/60分钟不论主源或备用源，均在同时间戳保留原已归档价格、仅补缺口。实际采集发现并恢复的8处主源冲突见`data/minute-source-conflicts-20261123.json`；冻结小时响应与哈希见`data/hourly-source-check-20261123.json.gz`及`data/maintenance-20261123.json`。
 
-正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留全部11个运行时文件，不能照搬早期仅3文件的发布方式。
+正式发布资源核对：`MACD_BASE_URL=https://macd-resonance-monitor.vercel.app node macd-resonance/verify-production.mjs`，从环境读取`MACD_SITE_PASSWORD`，不记录密码。既有正式验收工作流读取同名Actions secret；未配置时明确失败，不能把密码入口的HTTP 200计作看板验收。纯文档变更无需重部署；密码入口启用后直接上传必须保留`lib/analysis-resources.cjs`中全部运行时文件，不能照搬早期仅3文件的发布方式。
 
 ### 2026-11-21 分钟历史补录
 
@@ -181,12 +181,29 @@ node macd-resonance/verify-success-refresh.js
 
 `verify-success-analysis.js`要求当前输入哈希与发布统计一致，并对全部信号作截断与逐笔验证；不再跳过过期快照。显式历史截止复算仍可用 `node macd-resonance/research-success.js YYYY-MM-DD[THH:mm]` 输出JSON；要复现旧版本分钟样本，必须使用当时提交中的引擎和输入（首版输入提交 `09b4ad5`），不能用扩展后的EMA预热冒充原快照。
 
+## 独立成功率分析专题（2026-11-28）
+
+`analysis.html`是六个专题的总入口，不再堆叠全部表格。各页独立加载自己的分析和明细，共用导航、样本范围与统计归档：
+
+| 页面 | 内容 |
+| --- | --- |
+| analysis-buy-baseline.html | 买1后上涨基准 |
+| analysis-buy-patterns.html | MACD/九转/多周期形态与组合 |
+| analysis-buy-confirm.html | 等待金叉与实际确认价 |
+| analysis-history-compare.html | 全历史与四指共同历史 |
+| analysis-nine.html | 九转总体、四种情况、真实K线PNG、连续10 |
+| analysis-trades.html | 原交易胜率、买卖方向、共振统计 |
+
+`analysis-app.js`登记专题并管理通用筛选、数据加载、导航与旧锚点跳转；`analysis.css`为共用样式。新增专题时增加独立HTML与挂载函数，在目录登记。`lib/analysis-resources.cjs`根据目录生成页面/脚本/部署清单；新资源需加入其中，认证、正式字节核对和部署均使用该清单。Vercel includeFiles覆盖analysis页面和资源，不增加未认证静态回退。直接访问子页可正常登录并返回原子页。
+
 ## 九转9／10趋势跟踪
 
-分析页第05区独立统计全部连续序列，不要求伴随MACD买1。支持四指数、六周期、日期范围、5／10／20根终点，并分为上升趋势低9、高9和下降趋势低9、高9四组。默认低序列看上涨、高序列看下跌，也可统一比较上涨或下跌。
+先展示所选周期的全部9、低9、高9在后第N根收盘上涨的比例，再按上升/下降趋势×低/高序列分四组，接着展示真实历史成功/失败图例，最后展示10总体、四组、同批9和共同终点。**全页成功口径统一为终点收盘高于信号收盘**；下跌/持平另列。此前默认“低看涨/高看跌”的展示口径已被本次用户要求取代，旧研究模型仍可显式使用反转目标。
 
-`analysis-nine.js`由生成器与浏览器共用。收盘严格低于／高于前4根收盘连续计数，每段首次到9只记录一次；下一根继续同方向条件才是低10／高10。趋势固定取序列第1根之前的MA60相对5根前MA60的方向；历史不足和持平不混入四组。9和10按各自收盘价及各自之后N根收盘计算，尚无终点的样本单列待评估。
+不要求MACD买1伴随。收盘严格低于/高于前4根连续计数，每段首次9只记录一次；下一根继续满足同方向条件才是连续10，不是TD13、也不是反转确认。趋势固定取序列第1根之前的MA60相对5根前MA60的方向；不足65根或走平不硬归四组，但保留在总体中。9和10各用自己的收盘价及各自后N根收盘，未到终点单列待评估。
 
-界面区分“10续数成立率”和“10入场后方向命中率”，并展示续数成功同批9及同一终点的9／10配对比较。点击比例核对原始时间、价格、趋势均线与结果；小于20个有效样本灰显。统计为历史方向命中率，不含实盘费用与成交约束，同期指数与重叠区间存在相关性。
+图例每组取当前筛选下最近一例上涨、最近一例未上涨，不按收益幅度挑选。`nineHistory`保存同一批24组已完成OHLC（时间/开/高/低/收）；图中金线MA60、趋势判定锚点、计数1至9/10、起点价和终点均可复算。浏览器把真实K线渲染为PNG快照，可放大和下载；周期、指数、范围、N或行情归档改变时一起更新，不引用另一时点行情。PNG图例用于事后核对，不属于概率证据。
 
-采集和周度任务随同批OHLC自动生成`nineSchema:1`、`nineDefinition`、`nineSamples`。复核入口：`node macd-resonance/verify-nine-analysis.js`，覆盖全部24组历史的首次9、实际10、冻结趋势、范围截尾、共同终点及筛选对账。
+`analysis-nine.js`由生成器与浏览器共用；`analysis-nine-charts.js`生成图例，`chartSchema:1/nineHistory`随`nineSchema:1/nineSamples`一次原子写入同一JSON。当前完整JSON约2.96MB，低于Vercel响应限制；生成后需关注体积增长。`verify-nine-analysis.js`核对24组序列、135种筛选及所有已到终点图例的OHLC、MA60、9/10价格和截尾。`verify-analysis-pages-ui.js`复用至桌面/手机完整浏览器验收，覆盖独立页面、总体/四组数值、PNG下载、放大和旧链接。
+
+10续数成立率不是10后上涨率；同批9只能事后识别，不能当作9时已知的入场条件。共同终点固定为原9后第N根，排除10多观察一根的影响。少于20个有效样本灰显；不同指数和重叠区间存在相关性，统计不含实盘费用和可成交性。

@@ -94,3 +94,29 @@ const prefix=model.buildNineRows([{D:{bars:bars.slice(0,89)}}],[{id:"D"}]).find(
 assert.equal(prefix.tenCheck,null);assert.deepEqual(prefix.trendMa,low[0].trendMa);assert.equal(prefix.trend,low[0].trend);
 assert.throws(()=>model.evaluate(fixture,{horizon:7}),/Invalid nine/);
 console.log("NINE_ANALYSIS_PASS",JSON.stringify({series:24,sequences:expectedCount,comparisons,scopeCensoring:true,repricedTen:true,pairedEndpoints:true,frozenTrend:true}));
+// Graphs must show the exact source OHLC, frozen trend and counted endpoint.
+const charts=require('./analysis-nine-charts');
+assert.equal(data.chartSchema,1);
+for(let index=0;index<4;index++)for(const {id}of data.periods){
+ assert.deepEqual(data.nineHistory[index][id],Array.from(series[index][id].bars,b=>[b.t,b.o,b.h,b.l,b.c]));
+}
+let chartChecks=0;
+for(const stage of ['nine','ten','pairedNine','pairedTen'])for(const horizon of metrics.horizons){
+ const rows=model.evaluate(data,{stage,horizon,goal:'up'});
+ for(const row of rows){if(!row.outcome)continue;const chart=charts.snapshot(data,row);
+  assert.equal(chart.bars.at(-1).t,row.outcome[0]);assert.equal(chart.bars.at(-1).c,row.outcome[1]);
+  assert.equal(chart.bars.find(b=>b.i===chart.entryIndex).c,row.entry[1]);
+  assert(chart.bars.every(b=>metrics.day(b.t)<=row.rangeEnd));
+  if(row.trendMa[0]!==null)assert(Math.abs(chart.bars.find(b=>b.i===chart.trendIndex).ma-row.trendMa[0])<1e-7);
+  chartChecks++;
+ }
+ for(const trend of ['up','down'])for(const side of ['low','high']){
+  const picked=charts.examples(rows,{trend,side});
+  for(const [key,example]of Object.entries(picked))if(example){
+   assert.equal(example.priceMove>0,key==='success');
+   assert(!rows.some(r=>r.trend===trend&&r.side===side&&r.outcome&&(r.priceMove>0)===(key==='success')&&r.time>example.time),'Examples are the latest matching outcomes, not selected by return size');
+  }
+ }
+}
+assert(require('node:fs').statSync(__dirname+'/analysis-data.json').size<4_000_000,'Complete archive stays below Vercel response limit');
+console.log('NINE_CHARTS_PASS',JSON.stringify({chartChecks,exactOHLC:true,exactEndpoints:true,recentSuccessFailure:true}));
