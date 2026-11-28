@@ -109,7 +109,7 @@ function mountNineAnalysis(data) {
   el('nine-description').textContent=`${periodName(o.period)} · ${o.index==='all'?'四指数合计':data.indices[o.index]} · 以9的收盘为起点，观察后第${o.horizon}根。低9看上涨，高9看下跌；各自命中数 ÷ 各自已到终点的样本数。${o.minBars?'信号前累计至少'+o.minBars+'根行情。':''}`;
   el('nine-overall-cards').innerHTML=['low','high'].map(side=>score(o,'nine',side,nine.filter(r=>side==='all'||r.side===side))).join('');
   el('nine-matrix').innerHTML=data.periods.map(p=>`<tr><th>${esc(p.label)}</th>${['low','high'].map(s=>`<td>${rate({...o,period:p.id},'nine','all',s,rowsFor({...o,period:p.id}).filter(r=>s==='all'||r.side===s))}</td>`).join('')}</tr>`).join('');
-  el('nine-trend-description').textContent=`趋势固定取“序列第1根之前”的MA60相对5根前的方向：上行为上升，下降为下降；9与10沿用同一组。总体${nine.length}个9＝四组${nine.length-unknown-flat}个＋趋势预热不足${unknown}个＋均线走平${flat}个。这里的趋势是该量化定义，不是事后按图形判断。`;
+  el('nine-trend-description').textContent=`趋势按序列开始前MA60相对5根前方向划分。${nine.length}个9中，${nine.length-unknown-flat}个进入四组；历史不足${unknown}个、均线走平${flat}个单列。`;
   el('nine-scorecards').innerHTML=['up','down'].map(t=>`<div class="nine-trend-panel"><h3>${model.trends[t]}<small>序列开始前MA60方向</small></h3><div class="nine-score-grid">${['low','high'].map(side=>{const rows=nine.filter(r=>r.trend===t&&r.side===side),s=facts(rows);return `<button type="button" class="nine-score${s.evaluated<20?' small':''}"${attributes(o,'nine',t,side)}${s.total?'':' disabled'}><span class="nine-label">${model.sides[side]}9</span><span class="nine-direction">后第${o.horizon}根收盘${target(side)}率</span><strong>${pct(s.rate)}</strong><span class="track"><span class="fill" style="width:${100*(s.rate||0)}%"></span></span><span class="nine-count">${target(side)} ${s.wins} / ${s.evaluated} · 待${s.pending}</span><span class="nine-count">未${target(side)} ${s.evaluated-s.wins} · 持平 ${s.flat}</span></button>`;}).join('')}</div></div>`).join('');
   el('nine-ten-cards').innerHTML=['low','high'].map(side=>score(o,'ten',side,ten.filter(r=>side==='all'||r.side===side))).join('');
   const low9=facts(nine.filter(r=>r.side==='low')),high9=facts(nine.filter(r=>r.side==='high')),low10=facts(ten.filter(r=>r.side==='low')),high10=facts(ten.filter(r=>r.side==='high')),c=model.continuation(nine);
@@ -150,5 +150,6 @@ function mountNineAnalysis(data) {
  el('nine-reset').addEventListener('click',()=>{selected=null;casePage=0;renderCases();});
  el('nine-prev').addEventListener('click',()=>{casePage--;renderCases();});el('nine-next').addEventListener('click',()=>{casePage++;renderCases();});
  el('nine-dialog-close').addEventListener('click',()=>el('nine-chart-dialog').close());
+ document.querySelector('a[href="#nine-ten"]')?.addEventListener('click',()=>{el('nine-ten').open=true;});
  render();
 }

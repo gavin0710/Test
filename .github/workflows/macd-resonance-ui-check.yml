@@ -14,6 +14,8 @@ on:
       - "macd-resonance/verify-buy-patterns.js"
       - "macd-resonance/verify-nine-analysis.js"
       - "macd-resonance/verify-analysis-pages-ui.js"
+      - "macd-resonance/verify-early-analysis.js"
+      - "macd-resonance/verify-primary-research-ui.js"
   pull_request:
     branches: [master]
     paths:
@@ -27,6 +29,8 @@ on:
       - "macd-resonance/verify-buy-patterns.js"
       - "macd-resonance/verify-nine-analysis.js"
       - "macd-resonance/verify-analysis-pages-ui.js"
+      - "macd-resonance/verify-early-analysis.js"
+      - "macd-resonance/verify-primary-research-ui.js"
 permissions:
   contents: read
 jobs:
@@ -46,6 +50,7 @@ jobs:
           node macd-resonance/verify-success-refresh.js
           node macd-resonance/verify-buy-patterns.js
           node macd-resonance/verify-nine-analysis.js
+          node macd-resonance/verify-early-analysis.js
       - name: Install headless Chromium
         run: |
           npm install --prefix /tmp/macd-ledger-v2 --no-save playwright
