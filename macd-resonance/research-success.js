@@ -123,14 +123,15 @@ function buildSnapshot(root, asOf) {
     }
   }
   return { asOf, patternSchema: 1, nineSchema: 1, nineDefinition, periods, indices, coverage, sources,
+    chartSchema: 1, nineHistory: series.map(index => Object.fromEntries(periods.map(({id}) => [id, Array.from(index[id].bars, b => [b.t,b.o,b.h,b.l,b.c])]))),
     samples: enrich(samples, series), nineSamples: buildNineRows(series, periods) };
 }
 
 function serializeSnapshot(snapshot) {
   // One observation per line keeps archive changes easy to inspect in a diff.
-  const { samples, nineSamples, ...metadata } = snapshot;
+  const { samples, nineSamples, nineHistory, ...metadata } = snapshot;
   const head = JSON.stringify(metadata, null, 2).slice(0, -2);
-  return head + ',\n  "samples": [\n' +
+  return head + ',\n  "nineHistory": ' + JSON.stringify(nineHistory) + ',\n  "samples": [\n' +
     samples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ],\n  \"nineSamples\": [\n" +
     nineSamples.map(sample => "    " + JSON.stringify(sample)).join(",\n") + "\n  ]\n}\n";
 }

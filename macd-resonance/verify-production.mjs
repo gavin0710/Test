@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import resources from './lib/analysis-resources.cjs';
 
 const base = new URL(process.env.MACD_BASE_URL || 'https://macd-resonance-monitor.vercel.app');
-const files = ['index.html', 'analysis.html', 'analysis-metrics.js', 'analysis-patterns.js', 'analysis-nine.js'];
+const files = ['index.html', ...resources.staticFiles];
 let cookie = '';
 if (process.env.MACD_SITE_PASSWORD) {
   const login = await fetch(new URL('/_access/login', base), {

@@ -64,7 +64,7 @@ const NineAnalysis = (() => {
       if (stage.startsWith("paired") && !outcome) return [];
       const priceMove = outcome ? 100 * (outcome[1] / entry[1] - 1) : null;
       const direction = goal === "up" ? 1 : goal === "down" ? -1 : row.side === "low" ? 1 : -1;
-      return [{ ...row, stage, entry, outcome, priceMove, result: priceMove === null ? null : priceMove * direction, tenStatus, observedCheck }];
+      return [{ ...row, stage, rangeEnd: range.to, entry, outcome, priceMove, result: priceMove === null ? null : priceMove * direction, tenStatus, observedCheck }];
     });
   }
   function summarize(rows) {
@@ -82,100 +82,71 @@ const NineAnalysis = (() => {
 })();
 if (typeof module === "object" && module.exports) module.exports = NineAnalysis;
 
-/* Browser view; archive generation never invokes this function. */
+/* Standalone study: one success definition, in reading order. */
 function mountNineAnalysis(data) {
-  const el = id => document.getElementById(id), model = NineAnalysis;
-  const esc = value => String(value).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
-  const pct = value => value === null ? "—" : (value * 100).toFixed(1) + "%";
-  const move = value => value === null ? "—" : (value > 0 ? "+" : "") + value.toFixed(2) + "%";
-  const periodName = id => data.periods.find(p => p.id === id)?.label || id;
-  const stages = { nine:"第9根", eligibleNine:"会续数到10的第9根", ten:"第10根", pairedNine:"同终点·第9根价格", pairedTen:"同终点·第10根价格" };
-  const scopeNames = { all:"各周期全历史", four:"四指共同历史", same:"六周期同窗" };
-  const quadrants = [{trend:"up",side:"low"},{trend:"up",side:"high"},{trend:"down",side:"low"},{trend:"down",side:"high"}];
-  if (data.nineSchema !== 1 || !Array.isArray(data.nineSamples)) {
-    el("nine-status").textContent = "九转跟踪归档尚未就绪，请稍后刷新。";
-    return;
-  }
-  el("nine-status").hidden = true;
-  el("nine-period").innerHTML = data.periods.map(p => '<option value="'+esc(p.id)+'">'+esc(p.label)+'</option>').join("");
-  el("nine-period").value = "D";
-  el("nine-horizon").value = el("study-horizon").value;
-  el("nine-definitions").innerHTML = Object.entries({"9与10":model.definition.count,"趋势分组":model.definition.trend,"方向命中":model.definition.endpoint,
-    "统计范围":"继承顶部指数、范围和预热筛选，范围按第9根信号日选取；超过范围截止日的10确认和观察终点仍按未知处理。",
-    "趋势预热":"序列开始前需要65根行情。预热不足和均线走平单列，不强行归入上升或下降。微小浮点误差视为走平。",
-    "同样本对照":"同批9只取10成立的序列；各自后N根的终点相差一根。折叠的同终点对照进一步固定为9后第N根。"})
-    .map(([label,text])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(text)+'</dd></div>').join("");
-  const options = () => ({ index:el("index").value === "all" ? "all" : Number(el("index").value), scope:el("scope").value,
-    horizon:Number(el("study-horizon").value), minBars:Number(el("study-warmup").value), goal:el("nine-goal").value });
-  let casePage = 0, selected = null;
-  const selectedStage = () => el("nine-stage").value;
-  const target = side => el("nine-goal").value === "up" ? "上涨" : el("nine-goal").value === "down" ? "下跌" : side === "low" ? "上涨" : "下跌";
-  const labelFor = (trend,side) => model.trends[trend] + "·" + model.sides[side] + "序列";
-  const attr = (period,trend,side,stage,title="") => ' data-nine-period="'+period+'" data-nine-trend="'+trend+'" data-nine-side="'+side+'" data-nine-stage="'+stage+'" data-nine-title="'+esc(title)+'"';
-  function rateButton(period,trend,side,stage,rows,title="") {
-    const s=model.summarize(rows), text=pct(s.rate)+"，"+s.wins+"/"+s.evaluated+"，待"+s.pending;
-    return '<button type="button" class="nine-rate'+(s.evaluated<20 ? " small" : "")+'"'+attr(period,trend,side,stage,title)+
-      ' aria-label="'+esc(periodName(period)+" "+labelFor(trend,side)+" "+stages[stage]+" "+text+"，查看样本")+'"'+(s.total ? "" : " disabled")+'><strong>'+pct(s.rate)+'</strong><span>'+s.wins+' / '+s.evaluated+' · 待'+s.pending+'</span></button>';
-  }
-  function render() {
-    const o=options(), period=el("nine-period").value, stage=selectedStage();
-    const stageRows=model.evaluate(data,{...o,stage}), allNine=model.evaluate(data,{...o,period,stage:"nine"});
-    const by=(rows,p,t,s)=>rows.filter(r=>r.period===p && r.trend===t && r.side===s);
-    const unknown=allNine.filter(r=>r.trend==="unknown").length, flat=allNine.filter(r=>r.trend==="flat").length;
-    el("nine-scope").textContent=scopeNames[o.scope];
-    el("nine-description").textContent=periodName(period)+" · "+stages[stage]+"后第"+o.horizon+"根收盘，"+
-      (o.goal==="reversal" ? "低序列看上涨，高序列看下跌" : o.goal==="up" ? "所有序列统一看上涨" : "所有序列统一看下跌")+
-      "。趋势按序列开始前MA60相对5根前的方向固定，9和10使用同一分组。本周期共有"+allNine.length+"个9；趋势预热不足"+unknown+"个、均线走平"+flat+"个不进入四组对照。";
-    el("nine-scorecards").innerHTML=["up","down"].map(trend=>'<div class="nine-trend-panel"><h3>'+model.trends[trend]+'<small>序列开始前MA60方向</small></h3><div class="nine-score-grid">'+["low","high"].map(side=>{
-      const rows=by(stageRows,period,trend,side),s=model.summarize(rows),name=model.sides[side]+(stage==="ten" ? "10" : "9");
-      return '<button type="button" class="nine-score'+(s.evaluated<20 ? " small" : "")+'"'+attr(period,trend,side,stage)+
-       ' aria-label="'+esc(periodName(period)+" "+model.trends[trend]+" "+name+" 后"+o.horizon+"根"+target(side)+"率 "+pct(s.rate)+"，查看样本")+'"'+(s.total ? "" : " disabled")+'><span class="nine-label">'+name+'</span><span class="nine-direction">后'+o.horizon+'根'+target(side)+'率</span><strong>'+pct(s.rate)+'</strong><span class="track" aria-hidden="true"><span class="fill" style="width:'+((s.rate||0)*100)+'%"></span></span><span class="nine-count">命中 '+s.wins+' / '+s.evaluated+' · 待'+s.pending+'</span><span class="nine-count">涨跌幅中位 '+move(s.medianReturn)+'</span></button>';
-    }).join("")+'</div></div>').join("");
-    el("nine-matrix-heading").textContent="六周期对照 · "+stages[stage]+"后"+o.horizon+"根";
-    el("nine-matrix").innerHTML=data.periods.map(p=>'<tr class="'+(p.id===period ? "nine-selected" : "")+'"><th scope="row">'+esc(p.label)+'</th>'+quadrants.map(q=>'<td>'+rateButton(p.id,q.trend,q.side,stage,by(stageRows,p.id,q.trend,q.side))+'</td>').join("")+'</tr>').join("");
-    const eligible=model.evaluate(data,{...o,period,stage:"eligibleNine"}), tens=model.evaluate(data,{...o,period,stage:"ten"});
-    el("nine-compare").innerHTML=quadrants.map(q=>{
-      const rows=by(allNine,period,q.trend,q.side), c=model.continuation(rows);
-      const continuation='<button type="button" class="nine-rate'+(c.evaluated<20 ? " small" : "")+'"'+attr(period,q.trend,q.side,"nine","续数到10的观察")+(rows.length ? "" : " disabled")+' aria-label="'+esc(labelFor(q.trend,q.side)+" 续数到10成立率 "+pct(c.rate)+"，查看全部9")+'"><strong>'+pct(c.rate)+'</strong><span>'+c.valid+' / '+c.evaluated+' · 待'+c.waiting+'</span></button>';
-      return '<tr><th scope="row">'+model.trends[q.trend]+'<span>'+model.sides[q.side]+'序列 · 看'+target(q.side)+'</span></th><td>'+rateButton(period,q.trend,q.side,"nine",rows)+'</td><td>'+continuation+'</td><td>'+rateButton(period,q.trend,q.side,"eligibleNine",by(eligible,period,q.trend,q.side))+'</td><td>'+rateButton(period,q.trend,q.side,"ten",by(tens,period,q.trend,q.side))+'</td></tr>';
-    }).join("");
-    const pairedNine=model.evaluate(data,{...o,period,stage:"pairedNine"}), pairedTen=model.evaluate(data,{...o,period,stage:"pairedTen"});
-    el("nine-paired-body").innerHTML=quadrants.map(q=>{
-      const early=by(pairedNine,period,q.trend,q.side),late=by(pairedTen,period,q.trend,q.side);
-      const change=model.median(early.map(r=>100*(r.observedCheck[1]/r.close-1)));
-      return '<tr><th scope="row">'+model.trends[q.trend]+'<span>'+model.sides[q.side]+'序列</span></th><td>'+early.length+'</td><td>'+rateButton(period,q.trend,q.side,"pairedNine",early)+'</td><td>'+rateButton(period,q.trend,q.side,"pairedTen",late)+'</td><td>'+move(change)+'</td></tr>';
-    }).join("");
-    renderCases();
-  }
-  function renderCases() {
-    const o=options(), c=selected||{period:el("nine-period").value,trend:"all",side:"all",stage:selectedStage(),title:"近期全部序列"};
-    const rows=model.evaluate(data,{...o,...c}).sort((a,b)=>b.time.localeCompare(a.time)||a.index-b.index),s=model.summarize(rows);
-    el("nine-case-caption").textContent=periodName(c.period)+" · "+(c.title||[c.trend==="all" ? "所有趋势" : model.trends[c.trend],c.side==="all" ? "高／低序列" : model.sides[c.side]+"序列"].join(" · "))+
-      " · "+stages[c.stage]+" · "+rows.length+"个样本，已评估"+s.evaluated+"，待评估"+s.pending+"，已评估信号分布"+s.signalDays+"日。"+
-      (c.stage.startsWith("paired") ? "终点固定为9后第"+o.horizon+"根。" : "观察终点为各自信号后第"+o.horizon+"根。");
-    const pages=Math.max(1,Math.ceil(rows.length/10));casePage=Math.min(casePage,pages-1);
-    const point=p=>p ? esc(p[0].replace("T"," "))+'<span class="sub">'+p[1].toFixed(2)+'</span>' : "待评估";
-    el("nine-records").innerHTML=rows.slice(casePage*10,(casePage+1)*10).map(row=>{
-      const check=row.observedCheck, status=row.tenStatus==="valid" ? "10成立" : row.tenStatus==="invalid" ? "未续数到10" : "待下一根";
-      const ma=row.trendMa.every(v=>v!==null) ? '<span class="sub">序列前MA60 '+row.trendMa[0].toFixed(2)+' / 5根前 '+row.trendMa[1].toFixed(2)+'</span>' : '<span class="sub">序列前历史不足</span>';
-      return '<tr><td>'+esc(data.indices[row.index])+'<span class="sub">'+esc(periodName(row.period))+'</span></td><td>'+model.sides[row.side]+'9 · '+model.trends[row.trend]+ma+'</td><td>'+point([row.time,row.close])+'</td><td>'+status+(check ? '<span class="sub">'+esc(check[0].replace("T"," "))+' · '+check[1].toFixed(2)+'</span>' : "")+'</td><td>'+point(row.entry)+'</td><td>'+point(row.outcome)+'</td><td class="'+(row.priceMove>0 ? "win" : row.priceMove<0 ? "loss" : "")+'">'+move(row.priceMove)+'</td><td>'+(row.result===null ? "待评估" : row.result>0 ? "命中" : "未命中")+'</td></tr>';
-    }).join("")||'<tr><td class="empty" colspan="8">当前筛选没有符合条件的序列</td></tr>';
-    el("nine-pagination").hidden=pages<2;el("nine-prev").disabled=casePage===0;el("nine-next").disabled=casePage+1>=pages;el("nine-page").textContent=(casePage+1)+" / "+pages;
-  }
-  el("nine-study").addEventListener("click",event=>{
-    const b=event.target.closest("button[data-nine-period]");if(!b||b.disabled)return;
-    el("nine-period").value=b.dataset.ninePeriod;
-    selected={period:b.dataset.ninePeriod,trend:b.dataset.nineTrend,side:b.dataset.nineSide,stage:b.dataset.nineStage,title:b.dataset.nineTitle};
-    casePage=0;render();el("nine-cases").open=true;
-    const summary=el("nine-cases").querySelector("summary");summary.focus({preventScroll:true});summary.scrollIntoView({block:"start"});
-  });
-  for(const id of ["index","scope","study-warmup","nine-goal"])el(id).addEventListener("change",()=>{casePage=0;render();});
-  el("nine-stage").addEventListener("change",()=>{selected=null;casePage=0;render();});
-  el("nine-period").addEventListener("change",()=>{selected=null;casePage=0;render();});
-  el("study-horizon").addEventListener("change",()=>{el("nine-horizon").value=el("study-horizon").value;casePage=0;render();});
-  el("nine-horizon").addEventListener("change",()=>{el("study-horizon").value=el("nine-horizon").value;el("study-horizon").dispatchEvent(new Event("change"));});
-  el("nine-reset").addEventListener("click",()=>{selected=null;casePage=0;renderCases();});
-  el("nine-prev").addEventListener("click",()=>{casePage--;renderCases();});
-  el("nine-next").addEventListener("click",()=>{casePage++;renderCases();});
-  render();
+ const el=id=>document.getElementById(id),model=NineAnalysis;
+ const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const pct=v=>v===null?'—':(100*v).toFixed(1)+'%',move=v=>v===null?'—':(v>0?'+':'')+v.toFixed(2)+'%';
+ const periodName=p=>data.periods.find(r=>r.id===p)?.label||p;
+ const qs=[{trend:'up',side:'low'},{trend:'up',side:'high'},{trend:'down',side:'low'},{trend:'down',side:'high'}];
+ const scopeNames={all:'各周期全历史',four:'四指共同历史',same:'六周期同窗'};
+ const stages={nine:'9',eligibleNine:'同批9',ten:'10',pairedNine:'同终点·9',pairedTen:'同终点·10'};
+ if(data.nineSchema!==1||data.chartSchema!==1||!Array.isArray(data.nineHistory))throw Error('Nine study archive not ready');
+ const options=()=>({index:el('index').value==='all'?'all':Number(el('index').value),scope:el('scope').value,horizon:Number(el('nine-horizon').value),minBars:Number(el('study-warmup').value),goal:'up',period:el('nine-period').value});
+ const rowsFor=(o,stage='nine',trend='all',side='all')=>model.evaluate(data,{...o,stage,trend,side});
+ const label=(t,s)=>(t==='all'?'所有趋势':model.trends[t])+' · '+(s==='all'?'高低序列合计':model.sides[s]+'序列');
+ const attributes=(o,stage,trend='all',side='all')=>` data-nine-period="${o.period}" data-nine-stage="${stage}" data-nine-trend="${trend}" data-nine-side="${side}"`;
+ const facts=rows=>{const s=model.summarize(rows),done=rows.filter(r=>r.priceMove!==null);return {...s,down:done.filter(r=>r.priceMove<0).length,flat:done.filter(r=>r.priceMove===0).length};};
+ let selected=null,casePage=0,chartRows=[],galleryVersion=0;
+ const rate=(o,stage,trend,side,rows)=>{const s=facts(rows);return `<button type="button" class="nine-rate${s.evaluated<20?' small':''}"${attributes(o,stage,trend,side)} aria-label="${esc(periodName(o.period)+' '+label(trend,side)+' '+stages[stage]+'后上涨率 '+pct(s.rate)+'，查看样本')}"${s.total?'':' disabled'}><strong>${pct(s.rate)}</strong><span>${s.wins} / ${s.evaluated} · 待${s.pending}</span></button>`;};
+ function score(o,stage,side,rows){const s=facts(rows),name=side==='all'?'全部'+stages[stage]:model.sides[side]+stages[stage];return `<button type="button" class="overall-score${s.evaluated<20?' small':''}"${attributes(o,stage,'all',side)}${s.total?'':' disabled'}><span>${name}后第${o.horizon}根收盘上涨</span><strong>${pct(s.rate)}</strong><b>上涨 ${s.wins} / 已评估 ${s.evaluated}</b><small>下跌 ${s.down} · 持平 ${s.flat} · 待评估 ${s.pending}</small><small>涨跌幅中位 ${move(s.medianReturn)}</small></button>`;}
+ function render(){
+  const o=options(),nine=rowsFor(o),ten=rowsFor(o,'ten');
+  const unknown=nine.filter(r=>r.trend==='unknown').length,flat=nine.filter(r=>r.trend==='flat').length;
+  el('nine-scope').textContent=scopeNames[o.scope];
+  el('nine-description').textContent=`${periodName(o.period)} · ${o.index==='all'?'四指数合计':data.indices[o.index]} · 以9的收盘为起点，观察后第${o.horizon}根。上涨率＝上涨数 ÷ 已到终点的样本数。${o.minBars?'信号前累计至少'+o.minBars+'根行情。':''}`;
+  el('nine-overall-cards').innerHTML=['all','low','high'].map(side=>score(o,'nine',side,nine.filter(r=>side==='all'||r.side===side))).join('');
+  el('nine-matrix').innerHTML=data.periods.map(p=>`<tr><th>${esc(p.label)}</th>${['all','low','high'].map(s=>`<td>${rate({...o,period:p.id},'nine','all',s,rowsFor({...o,period:p.id}).filter(r=>s==='all'||r.side===s))}</td>`).join('')}</tr>`).join('');
+  el('nine-trend-description').textContent=`趋势固定取“序列第1根之前”的MA60相对5根前的方向：上行为上升，下降为下降；9与10沿用同一组。总体${nine.length}个9＝四组${nine.length-unknown-flat}个＋趋势预热不足${unknown}个＋均线走平${flat}个。这里的趋势是该量化定义，不是事后按图形判断。`;
+  el('nine-scorecards').innerHTML=['up','down'].map(t=>`<div class="nine-trend-panel"><h3>${model.trends[t]}<small>序列开始前MA60方向</small></h3><div class="nine-score-grid">${['low','high'].map(side=>{const rows=nine.filter(r=>r.trend===t&&r.side===side),s=facts(rows);return `<button type="button" class="nine-score${s.evaluated<20?' small':''}"${attributes(o,'nine',t,side)}${s.total?'':' disabled'}><span class="nine-label">${model.sides[side]}9</span><span class="nine-direction">后第${o.horizon}根收盘上涨率</span><strong>${pct(s.rate)}</strong><span class="track"><span class="fill" style="width:${100*(s.rate||0)}%"></span></span><span class="nine-count">上涨 ${s.wins} / ${s.evaluated} · 待${s.pending}</span><span class="nine-count">下跌 ${s.down}（${pct(s.evaluated?s.down/s.evaluated:null)}）· 持平 ${s.flat}</span></button>`;}).join('')}</div></div>`).join('');
+  el('nine-ten-cards').innerHTML=['all','low','high'].map(side=>score(o,'ten',side,ten.filter(r=>side==='all'||r.side===side))).join('');
+  const s9=facts(nine),s10=facts(ten),c=model.continuation(nine);
+  el('nine-ten-reading').textContent=`${periodName(o.period)}：9后上涨 ${pct(s9.rate)}，10后上涨 ${pct(s10.rate)}。有下一根可判断的${c.evaluated}个9中，${c.valid}个续数到10（${pct(c.rate)}），${c.invalid}个中断，${c.waiting}个仍待下一根。9和10样本不同，不能仅凭两个总体比例认定等待10更好。`;
+  el('nine-compare').innerHTML=qs.map(q=>{const r=nine.filter(r=>r.trend===q.trend&&r.side===q.side),c=model.continuation(r);return `<tr><th>${model.trends[q.trend]}<span>${model.sides[q.side]}序列</span></th><td>${rate(o,'nine',q.trend,q.side,r)}</td><td><span class="continuation-value">${pct(c.rate)}</span><span class="sub">${c.valid} / ${c.evaluated} · 待${c.waiting}</span></td><td>${rate(o,'eligibleNine',q.trend,q.side,rowsFor(o,'eligibleNine',q.trend,q.side))}</td><td>${rate(o,'ten',q.trend,q.side,rowsFor(o,'ten',q.trend,q.side))}</td></tr>`;}).join('');
+  el('nine-paired-body').innerHTML=qs.map(q=>{const early=rowsFor(o,'pairedNine',q.trend,q.side),late=rowsFor(o,'pairedTen',q.trend,q.side);return `<tr><th>${model.trends[q.trend]}<span>${model.sides[q.side]}序列</span></th><td>${early.length}</td><td>${rate(o,'pairedNine',q.trend,q.side,early)}</td><td>${rate(o,'pairedTen',q.trend,q.side,late)}</td><td>${move(model.median(early.map(r=>100*(r.observedCheck[1]/r.close-1))))}</td></tr>`;}).join('');
+  renderCases();renderGallery();
+ }
+ const chartCaption=row=>`${data.indices[row.index]} · ${periodName(row.period)} · ${label(row.trend,row.side)}。${stages[row.stage]}收盘 ${row.entry[0].replace('T',' ')}：${row.entry[1].toFixed(2)}；终点 ${row.outcome?.[0].replace('T',' ')||'未到'}：${row.outcome?.[1].toFixed(2)||'待评估'}；涨跌幅 ${move(row.priceMove)}。${row.priceMove>0?'上涨成功':'未上涨'}（统一看上涨）。`;
+ function openChart(row){const snapshot=NineCharts.snapshot(data,row);el('nine-dialog-title').textContent=data.indices[row.index]+' · '+periodName(row.period)+' · '+model.sides[row.side]+stages[row.stage];el('nine-dialog-chart').innerHTML=NineCharts.svg(snapshot);el('nine-dialog-caption').textContent=chartCaption(row);el('nine-chart-dialog').showModal();}
+ async function renderGallery(){
+  const version=++galleryVersion,o=options(),stage=el('nine-example-stage').value,rows=rowsFor(o,stage);chartRows=[];el('nine-gallery').dataset.ready='false';
+  el('nine-example-description').textContent=`${periodName(o.period)} · ${stage==='ten'?'10':'9'}后第${o.horizon}根；以下“成功/失败”全部指收盘是否上涨，不把高9下跌另记为成功。切换周期、指数或N，图例一起更新。`;
+  el('nine-gallery').innerHTML=qs.map(q=>{const examples=NineCharts.examples(rows,q);return `<section class="example-group"><h3>${model.trends[q.trend]} · ${model.sides[q.side]}${stage==='ten'?'10':'9'}</h3><div class="example-pair">${[true,false].map(success=>{const row=examples[success?'success':'failure'];if(!row)return `<div class="example-empty">当前筛选没有已到终点的${success?'上涨成功':'未上涨'}图例。</div>`;const id=chartRows.push(row)-1;return `<figure class="example-card" data-example="${id}"><div class="example-heading"><span class="result-badge ${success?'win':'loss'}">${success?'上涨成功':'未上涨'}</span><strong>${move(row.priceMove)}</strong></div><div class="chart-preview" id="nine-image-${id}" aria-label="${esc(chartCaption(row))}">${NineCharts.svg(NineCharts.snapshot(data,row))}</div><figcaption>${esc(data.indices[row.index]+' · '+row.time.replace('T',' '))}<span>${esc(stages[stage]+'价 '+row.entry[1].toFixed(2)+' → 终点 '+row.outcome[1].toFixed(2))}</span><span>${row.tenStatus==='valid'?'连续10成立，图中标蓝色10':row.tenStatus==='invalid'?'下一根未续数到10，图中不标10':'仍待下一根判断10'}</span></figcaption><div class="example-actions"><button type="button" data-chart-open="${id}">放大看K线</button><a id="nine-download-${id}" download="nine-${row.index}-${row.period}-${row.time.replace(/[^0-9]/g,'')}-${stage}-N${o.horizon}.png" hidden>下载PNG</a></div></figure>`;}).join('')}</div></section>`;}).join('');
+  const currentRows=[...chartRows];await Promise.all(currentRows.map(async(row,id)=>{
+   const box=el('nine-image-'+id);if(!box)return;const svg=box.querySelector('svg');
+   try{const png=await NineCharts.png(svg);if(version!==galleryVersion)return;const image=new Image();image.alt=chartCaption(row);image.width=960;image.height=400;image.src=png;box.replaceChildren(image);const a=el('nine-download-'+id);a.href=png;a.hidden=false;}catch(error){if(version===galleryVersion)console.error('K-line PNG generation failed',error);}
+  }));
+  if(version===galleryVersion)el('nine-gallery').dataset.ready='true';
+ }
+ function renderCases(){
+  const o=options(),c=selected||{stage:'nine',trend:'all',side:'all'},rows=rowsFor(o,c.stage,c.trend,c.side).sort((a,b)=>b.time.localeCompare(a.time)||a.index-b.index),s=facts(rows);
+  el('nine-case-caption').textContent=`${periodName(o.period)} · ${label(c.trend,c.side)} · ${stages[c.stage]} · ${rows.length}个样本，已评估${s.evaluated}，待评估${s.pending}。${c.stage.startsWith('paired')?'共同终点固定为9后第'+o.horizon+'根。':'终点为各自信号后第'+o.horizon+'根。'}`;
+  const point=p=>p?esc(p[0].replace('T',' '))+'<span class="sub">'+p[1].toFixed(2)+'</span>':'待评估';
+  const pages=Math.max(1,Math.ceil(rows.length/10));casePage=Math.min(casePage,pages-1);
+  el('nine-records').innerHTML=rows.slice(casePage*10,(casePage+1)*10).map(row=>`<tr><td>${esc(data.indices[row.index])}<span class="sub">${periodName(row.period)}</span></td><td>${model.sides[row.side]}9 · ${model.trends[row.trend]}<span class="sub">序列前MA60 ${row.trendMa[0]?.toFixed(2)||'不足'} / 5根前 ${row.trendMa[1]?.toFixed(2)||'不足'}</span></td><td>${point([row.time,row.close])}</td><td>${row.tenStatus==='valid'?'10成立':row.tenStatus==='invalid'?'未续数到10':'待下一根'}${row.observedCheck?'<span class="sub">'+point(row.observedCheck)+'</span>':''}</td><td>${point(row.entry)}</td><td>${point(row.outcome)}</td><td>${move(row.priceMove)}</td><td>${row.priceMove===null?'待评估':row.priceMove>0?'上涨成功':'未上涨'}${row.outcome?'<button class="record-chart" type="button" data-record-chart="'+rows.indexOf(row)+'">看K线</button>':''}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">当前筛选没有序列</td></tr>';
+  el('nine-records').querySelectorAll('[data-record-chart]').forEach(b=>b.addEventListener('click',()=>openChart(rows[Number(b.dataset.recordChart)])));
+  el('nine-pagination').hidden=pages<2;el('nine-prev').disabled=casePage===0;el('nine-next').disabled=casePage+1>=pages;el('nine-page').textContent=(casePage+1)+' / '+pages;
+ }
+ el('nine-definitions').innerHTML=Object.entries({'9与10':model.definition.count,'上涨成功':'以9（或10）当根收盘价为起点，只比较后第N根同周期收盘价。持平记未上涨，没到终点单列待评估；不是区间内曾上涨，也不是按下一根开盘成交的收益。','趋势分组':model.definition.trend,'趋势未知':'序列前至少65根行情才可比较MA60方向；不足或均线持平不硬分四组，但保留在总体统计中。','同批9':'只保留后来续数到10的那些9。这种筛选在9当时尚不可知，只作事后归因对照。','共同终点':'在同批样本中再把终点固定为9后第N根，分别用9价和10价计算，避免10多观察一根。','图例':'使用与统计完全同批的原始OHLC和收盘MA60；每段首次9记录一次，延续计数不会反复制造9信号。按日期取最近成功/失败，不按涨幅挑选。','范围':'以第9根日期选择样本，超过截止日的10和终点按未知。全部比例均未扣费用、滑点。'}).map(([k,v])=>'<div><dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd></div>').join('');
+ el('nine-study').addEventListener('click',event=>{
+  const open=event.target.closest('[data-chart-open]');if(open){openChart(chartRows[Number(open.dataset.chartOpen)]);return;}
+  const b=event.target.closest('button[data-nine-stage]');if(!b||b.disabled)return;
+  el('nine-period').value=b.dataset.ninePeriod;selected={stage:b.dataset.nineStage,trend:b.dataset.nineTrend,side:b.dataset.nineSide};casePage=0;render();el('nine-cases').open=true;el('nine-cases').scrollIntoView({block:'start'});
+ });
+ for(const id of ['index','scope','study-warmup','nine-period','nine-horizon'])el(id).addEventListener('change',()=>{selected=null;casePage=0;render();});
+ el('nine-example-stage').addEventListener('change',renderGallery);
+ el('nine-reset').addEventListener('click',()=>{selected=null;casePage=0;renderCases();});
+ el('nine-prev').addEventListener('click',()=>{casePage--;renderCases();});el('nine-next').addEventListener('click',()=>{casePage++;renderCases();});
+ el('nine-dialog-close').addEventListener('click',()=>el('nine-chart-dialog').close());
+ render();
 }

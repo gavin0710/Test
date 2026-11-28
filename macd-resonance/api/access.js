@@ -1,15 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import access from '../lib/site-access.cjs';
+import resources from '../lib/analysis-resources.cjs';
 
 const files = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/analysis': ['analysis.html', 'text/html; charset=utf-8'],
   '/analysis.html': ['analysis.html', 'text/html; charset=utf-8'],
-  '/analysis-patterns.js': ['analysis-patterns.js', 'application/javascript; charset=utf-8'],
-  '/analysis-nine.js': ['analysis-nine.js', 'application/javascript; charset=utf-8'],
-  '/analysis-metrics.js': ['analysis-metrics.js', 'application/javascript; charset=utf-8']
+  ...Object.fromEntries(resources.staticFiles.map(file => ['/' + file, [file, file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8']]))
 };
 const fileCache = new Map();
 
@@ -61,7 +60,7 @@ export default async function handler(req, res) {
   }
 
   if (!access.authenticated(req)) {
-    if (['/', '/index.html', '/analysis', '/analysis.html'].includes(path)) return page(res, 200, next);
+    if (['/', '/index.html', '/analysis', ...resources.pages.map(p => '/' + p)].includes(path)) return page(res, 200, next);
     return res.status(401).json({ error: '请先输入访问密码', login: '/' });
   }
   if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).setHeader('Allow', 'GET, HEAD').end();

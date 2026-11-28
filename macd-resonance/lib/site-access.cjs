@@ -90,7 +90,8 @@ function recordFailure(req, now = Date.now()) {
 function resetFailures(req) { failures.delete(clientKey(req)); }
 
 function safeNext(value) {
-  return value === '/analysis.html' || value === '/analysis' ? '/analysis.html' : '/';
+  if (value === '/analysis') return '/analysis.html';
+  return require('./analysis-resources.cjs').pages.some(page => value === '/' + page) ? value : '/';
 }
 
 function sameOrigin(req) {

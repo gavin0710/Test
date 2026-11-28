@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f4f7f9"><title>等待金叉再买 | 成功率分析</title><link rel="stylesheet" href="./analysis.css"><script src="./analysis-metrics.js" defer></script><script src="./analysis-patterns.js" defer></script><script src="./analysis-app.js" defer></script></head><body data-analysis="buy-confirm"><main class="wrap"><nav class="nav" aria-label="页面导航"><div class="breadcrumbs"><a href="./">四指共振</a><span>/</span><a href="./analysis.html">成功率分析</a></div><span class="asof" id="asof"></span></nav><h1>等待金叉再买</h1><p class="page-intro">等金叉确认后再买，价格和上涨率有什么变化？</p><nav class="analysis-tabs" id="analysis-nav" aria-label="分析专题"></nav><p class="context" id="status" role="status">正在读取历史样本…</p><div id="dashboard" hidden><div class="filters" aria-label="样本筛选"><label class="field">指数 <select id="index"><option value="all">四指数合计</option></select></label><label class="field">范围 <select id="scope"><option value="all">各周期全历史</option><option value="four">四指共同历史</option><option value="same">六周期同窗</option></select></label></div><div class="study-controls"><label class="field">观察终点 <select id="study-horizon"><option value="5">信号后第5根</option><option value="10" selected>信号后第10根</option><option value="20">信号后第20根</option></select></label><label class="field">起始段 <select id="study-warmup"><option value="0">保留全部信号</option><option value="60">至少60根行情</option><option value="130">至少130根行情</option></select></label></div><p class="caption" id="pattern-status" role="status"></p><section class="card inset study-section" id="wait-study" aria-labelledby="wait-heading">
+   <div class="section-head"><h2 id="wait-heading">等待金叉再买：确认后按新价格计算</h2></div>
+   <p class="caption study-description">买1当根DIF已在DEA上方则当根入场；否则最多等5根，首次金叉时按该根收盘价入场。未确认的信号单列。</p>
+   <div class="table-scroll" tabindex="0" aria-label="等待金叉入场比较表"><table class="study-table wait-table">
+    <thead><tr><th scope="col">周期</th><th scope="col">买1直接买<br><span class="sub">全部买1基准</span></th><th scope="col">确认后买<br><span class="sub" id="delay-end-label"></span></th><th scope="col">已入场 / 买1总数</th><th scope="col">5根未确认</th><th scope="col">仍在等待</th></tr></thead><tbody id="wait-body"></tbody>
+   </table></div>
+   <details class="rule-explanation"><summary>同一批信号、同一个终点：直接买和等金叉谁更好</summary>
+    <p class="caption study-description">仅比较已确认入场且已到原买1观察终点的共同样本。终点固定为原买1后第N根，分别使用原买1价和确认价计算上涨率。</p>
+    <div class="table-scroll" tabindex="0" aria-label="金叉共同样本同终点比较表"><table class="study-table">
+     <thead><tr><th scope="col">周期</th><th scope="col">共同已评估样本</th><th scope="col">买1价 → 同一终点</th><th scope="col">确认价 → 同一终点</th><th scope="col">等待根数中位</th></tr></thead><tbody id="paired-body"></tbody>
+    </table></div>
+   </details>
+  </section><details class="card" id="study-cases">
+   <summary>形态研究 · 逐条样本明细</summary>
+   <div class="details-body">
+    <p class="caption study-description" id="study-case-caption">点击上方上涨率查看对应样本。</p>
+    <div class="table-scroll" tabindex="0" aria-label="形态研究样本明细表"><table class="records study-records">
+     <thead><tr><th scope="col">指数</th><th scope="col">原买1时间 / 价格</th><th scope="col">买1当时指标</th><th scope="col">实际入场 / 价格</th><th scope="col">观察终点 / 价格</th><th scope="col">涨跌幅</th><th scope="col">状态</th></tr></thead><tbody id="study-records"></tbody>
+    </table></div>
+    <div class="case-footer" id="study-pagination" hidden><button type="button" id="study-prev">上一页</button><span id="study-page"></span><button type="button" id="study-next">下一页</button></div>
+   </div>
+  </details><details class="card"><summary>行情覆盖与数据来源</summary><div class="details-body"><p class="caption">图例和统计使用同一批已完成K线。时间为北京时间；范围筛选会截去截止日之后的10及观察终点。不同周期历史长度不同。</p><div class="table-scroll" tabindex="0"><table class="sources"><thead><tr><th>周期</th><th>所选指数历史覆盖</th><th>每指数K线根数</th></tr></thead><tbody id="coverage"></tbody></table></div><p class="source-links">东方财富、腾讯公开指数行情 · <a href="https://github.com/gavin0710/Test/tree/master/macd-resonance/data">历史归档</a></p></div></details></div></main></body></html>

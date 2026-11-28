@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f4f7f9"><title>买1形态与指标组合 | 成功率分析</title><link rel="stylesheet" href="./analysis.css"><script src="./analysis-metrics.js" defer></script><script src="./analysis-patterns.js" defer></script><script src="./analysis-app.js" defer></script></head><body data-analysis="buy-patterns"><main class="wrap"><nav class="nav" aria-label="页面导航"><div class="breadcrumbs"><a href="./">四指共振</a><span>/</span><a href="./analysis.html">成功率分析</a></div><span class="asof" id="asof"></span></nav><h1>买1形态与指标组合</h1><p class="page-intro">MACD、九转和多周期条件，分别对应怎样的上涨表现？</p><nav class="analysis-tabs" id="analysis-nav" aria-label="分析专题"></nav><p class="context" id="status" role="status">正在读取历史样本…</p><div id="dashboard" hidden><div class="filters" aria-label="样本筛选"><label class="field">指数 <select id="index"><option value="all">四指数合计</option></select></label><label class="field">范围 <select id="scope"><option value="all">各周期全历史</option><option value="four">四指共同历史</option><option value="same">六周期同窗</option></select></label></div><div class="study-controls"><label class="field">观察终点 <select id="study-horizon"><option value="5">信号后第5根</option><option value="10" selected>信号后第10根</option><option value="20">信号后第20根</option></select></label><label class="field">起始段 <select id="study-warmup"><option value="0">保留全部信号</option><option value="60">至少60根行情</option><option value="130">至少130根行情</option></select></label></div><p class="caption" id="pattern-status" role="status"></p><section class="card inset study-section" id="shape-study" aria-labelledby="shape-heading">
+   <div class="section-head"><h2 id="shape-heading">买1当根形态：哪些条件下更常上涨</h2>
+    <label class="field">查看 <select id="pattern-family"><option value="main">常用形态</option><option value="combo">双指标组合</option><option value="other">其他MACD与九转状态</option></select></label>
+   </div>
+   <p class="caption study-description">条件只用买1确认时已知的信息。每格依次为上涨率、上涨数/已评估数、待评估数；“可比基准”只取该条件能够判断的买1。</p>
+   <div class="table-scroll" tabindex="0" aria-label="多周期买1形态比较表"><table class="study-table pattern-table">
+    <thead id="pattern-head"></thead><tbody id="pattern-body"></tbody>
+   </table></div>
+   <details class="rule-explanation"><summary>当前条件怎么判定</summary><dl class="pattern-definitions" id="pattern-definitions"></dl></details>
+   <p class="caption study-footnote">灰色为已评估不足20个。高比例伴随少量样本时仅供观察；这些分组尚未确立稳定的预测优势。手机可左右滑动表格。</p>
+  </section><details class="card" id="study-cases">
+   <summary>形态研究 · 逐条样本明细</summary>
+   <div class="details-body">
+    <p class="caption study-description" id="study-case-caption">点击上方上涨率查看对应样本。</p>
+    <div class="table-scroll" tabindex="0" aria-label="形态研究样本明细表"><table class="records study-records">
+     <thead><tr><th scope="col">指数</th><th scope="col">原买1时间 / 价格</th><th scope="col">买1当时指标</th><th scope="col">实际入场 / 价格</th><th scope="col">观察终点 / 价格</th><th scope="col">涨跌幅</th><th scope="col">状态</th></tr></thead><tbody id="study-records"></tbody>
+    </table></div>
+    <div class="case-footer" id="study-pagination" hidden><button type="button" id="study-prev">上一页</button><span id="study-page"></span><button type="button" id="study-next">下一页</button></div>
+   </div>
+  </details><details class="card"><summary>行情覆盖与数据来源</summary><div class="details-body"><p class="caption">图例和统计使用同一批已完成K线。时间为北京时间；范围筛选会截去截止日之后的10及观察终点。不同周期历史长度不同。</p><div class="table-scroll" tabindex="0"><table class="sources"><thead><tr><th>周期</th><th>所选指数历史覆盖</th><th>每指数K线根数</th></tr></thead><tbody id="coverage"></tbody></table></div><p class="source-links">东方财富、腾讯公开指数行情 · <a href="https://github.com/gavin0710/Test/tree/master/macd-resonance/data">历史归档</a></p></div></details></div></main></body></html>

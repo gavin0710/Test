@@ -134,8 +134,8 @@ function mountBuyPatternStudy(data) {
  let casePage=0, selected={period:"D",rule:"all",stage:"signal",scope:"selected",title:"上涨基准"};
  const ready=data.patternSchema===1 && data.samples.filter(r=>r.signal==="buy").every(r=>r.pattern && model.rules.every(rule=>typeof r.pattern.features[rule.id]==="boolean" || r.pattern.features[rule.id]===null));
  if(!ready) {el("pattern-status").textContent="形态研究样本正在更新，请稍后刷新。下方原有交易统计仍可查看。";return;}
- el("history-rule").innerHTML=model.rules.filter(r=>r.id!=="all").map(r=>'<option value="'+r.id+'">'+esc(r.label)+'</option>').join("");
- el("history-rule").value="low9_recent3";
+ if(el("history-rule")) el("history-rule").innerHTML=model.rules.filter(r=>r.id!=="all").map(r=>'<option value="'+r.id+'">'+esc(r.label)+'</option>').join("");
+ if(el("history-rule")) el("history-rule").value="low9_recent3";
  const options=()=>({index:el("index").value==="all" ? "all" : Number(el("index").value),scope:el("scope").value,horizon:Number(el("study-horizon").value),minBars:Number(el("study-warmup").value)});
  function comparison(period,opts) {
   const c=model.compare(data,opts), rows=c.rows.filter(r=>r.period===period), eligible=c.eligibleRows.filter(r=>r.period===period);
@@ -150,6 +150,7 @@ function mountBuyPatternStudy(data) {
  }
  function render() {
   const o=options(), rows=model.evaluate(data,o), summary=metrics.summarize(rows);
+  if(el("buy-study")){
   el("study-scope").textContent=scopeLabel[o.scope];
   el("buy-description").textContent="买入价取买1收盘，终点取后第"+o.horizon+"根同周期已完成K线收盘。已评估"+summary.evaluated+"个买1，待评估"+summary.pending+"个。"+
    (o.minBars ? "仅保留买1当根已累计至少"+o.minBars+"根行情的信号。" : "");
@@ -158,6 +159,8 @@ function mountBuyPatternStudy(data) {
    const duration=s.medianMinutes===null ? "—" : s.medianMinutes<1440 ? (s.medianMinutes/60).toFixed(1)+"小时" : (s.medianMinutes/1440).toFixed(0)+"天";
    return '<tr><th scope="row">'+esc(label)+'</th><td>'+rateButton(id,s,{title:"上涨基准",rateOnly:true})+'</td><td>'+s.wins+' / '+s.evaluated+'</td><td>'+s.pending+'</td><td>'+move(s.medianMove)+'</td><td>'+duration+'</td></tr>';
   }).join("");
+  }
+  if(el("shape-study")){
   const rules=model.rules.filter(r=>r.family===el("pattern-family").value);
   el("pattern-head").innerHTML='<tr><th scope="col">周期</th><th scope="col">全部买1<br><span class="sub">上涨基准</span></th>'+rules.map(r=>'<th scope="col">'+esc(r.label)+'</th>').join("")+'</tr>';
   el("pattern-head").parentElement.style.minWidth=Math.max(760,76+132*(rules.length+1))+"px";
@@ -168,6 +171,8 @@ function mountBuyPatternStudy(data) {
     const c=comparison(id,{...o,rule:rule.id});
     return '<td>'+rateButton(id,c.stats,{rule:rule.id,reference:c.baseline})+'</td>';
    }).join("")+'</tr>').join("");
+  }
+  if(el("wait-study")){
   const delayed=model.evaluateDelayed(data,o);
   el("delay-end-label").textContent="实际入场后第"+o.horizon+"根";
   el("wait-body").innerHTML=data.periods.map(({id,label})=>{
@@ -182,6 +187,8 @@ function mountBuyPatternStudy(data) {
    const delays=group.map(r=>r.delay).sort((a,b)=>a-b), mid=Math.floor(delays.length/2), median=delays.length ? delays.length%2 ? delays[mid] : (delays[mid-1]+delays[mid])/2 : null;
    return '<tr><th scope="row">'+esc(label)+'</th><td>'+group.length+'</td><td>'+rateButton(id,early,{stage:"pairEarly",title:"共同样本·买1价"})+'</td><td>'+rateButton(id,late,{stage:"pairWait",title:"共同样本·确认价"})+'</td><td>'+(median===null ? "—" : median+"根")+'</td></tr>';
   }).join("");
+  }
+  if(el("history-study")){
   const historyRule=el("history-rule").value;
   el("history-body").innerHTML=data.periods.map(({id,label})=>'<tr><th scope="row">'+esc(label)+'</th>'+["all","four"].map(scope=>{
    const c=comparison(id,{...o,scope,rule:historyRule});
@@ -191,6 +198,7 @@ function mountBuyPatternStudy(data) {
    return '<td>'+rateButton(id,c.stats,{rule:historyRule,scope,reference:c.baseline,title:"历史对照·"+model.ruleMap[historyRule].label})+
     '<p class="history-range">行情 '+esc(from||"无共同历史")+(to ? " 至 "+esc(to) : "")+'<br>已评估信号分布 '+c.stats.signalDays+' 日</p></td>';
   }).join("")+'</tr>').join("");
+  }
   renderCases();
  }
  function renderCases() {
@@ -224,8 +232,8 @@ function mountBuyPatternStudy(data) {
   casePage=0;renderCases();el("study-cases").open=true;
   const summary=el("study-cases").querySelector("summary");summary.focus({preventScroll:true});summary.scrollIntoView({block:"start"});
  }
- for(const id of ["buy-study","shape-study","wait-study","history-study"])el(id).addEventListener("click",drill);
- for(const id of ["index","scope","study-horizon","study-warmup","pattern-family","history-rule"])el(id).addEventListener("change",()=>{casePage=0;render();});
+ for(const id of ["buy-study","shape-study","wait-study","history-study"])el(id)?.addEventListener("click",drill);
+ for(const id of ["index","scope","study-horizon","study-warmup","pattern-family","history-rule"])el(id)?.addEventListener("change",()=>{casePage=0;render();});
  el("study-prev").addEventListener("click",()=>{casePage--;renderCases();});el("study-next").addEventListener("click",()=>{casePage++;renderCases();});
  render();
 }

@@ -1,0 +1,72 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f4f7f9"><title>交易胜率与卖点统计 | 成功率分析</title><link rel="stylesheet" href="./analysis.css"><script src="./analysis-metrics.js" defer></script><script src="./analysis-trades.js" defer></script><script src="./analysis-app.js" defer></script></head><body data-analysis="trades"><main class="wrap"><nav class="nav" aria-label="页面导航"><div class="breadcrumbs"><a href="./">四指共振</a><span>/</span><a href="./analysis.html">成功率分析</a></div><span class="asof" id="asof"></span></nav><h1>交易胜率与卖点统计</h1><p class="page-intro">按原结构账本看交易结果，或单独观察买卖点方向。</p><nav class="analysis-tabs" id="analysis-nav" aria-label="分析专题"></nav><p class="context" id="status" role="status">正在读取历史样本…</p><div id="dashboard" hidden><div class="filters" aria-label="样本筛选"><label class="field">指数 <select id="index"><option value="all">四指数合计</option></select></label><label class="field">范围 <select id="scope"><option value="all">各周期全历史</option><option value="four">四指共同历史</option><option value="same">六周期同窗</option></select></label></div><section class="study-section" id="legacy-study">
+   
+   <div class="trade-body">
+    <p class="caption legacy-title">按现有结构账本看交易结果，或切换买卖点方向命中。</p>
+    <div class="filters">
+   <div class="modes" role="group" aria-label="结果口径">
+    <button type="button" data-mode="trade" aria-pressed="true">交易胜率</button>
+    <button type="button" data-mode="buy" aria-pressed="false">买1后上涨</button>
+    <button type="button" data-mode="sell" aria-pressed="false">卖1后下跌</button>
+   </div>
+   <label class="field" id="horizon-field" hidden>观察 <select id="horizon"><option value="5">后 5 根</option><option value="10" selected>后 10 根</option><option value="20">后 20 根</option></select></label>
+    </div>
+  <p class="context" id="context" aria-live="polite"></p>
+  <div class="comparison">
+  <section class="card inset" aria-labelledby="period-heading">
+   <div class="section-head"><h2 id="period-heading">各周期胜率</h2><p class="caption" id="history-span"></p></div>
+   <table class="overview" aria-labelledby="period-heading">
+    <thead><tr>
+     <th scope="col">周期</th><th scope="col"><span class="scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></span><span class="result-label" id="result-heading">胜率</span></th>
+     <th scope="col" id="count-heading">盈利 / 已结束</th><th scope="col">待评估</th><th scope="col" id="time-heading">持有中位</th>
+    </tr></thead><tbody id="overview"></tbody>
+   </table>
+   <p class="reading" id="period-note" hidden></p>
+  </section>
+  <section class="card inset" aria-labelledby="factor-heading">
+   <div class="section-head"><h2 id="factor-heading">共振与九转</h2><p class="caption">数字下方为成功数 / 已评估数</p></div>
+   <table class="matrix" aria-labelledby="factor-heading" aria-describedby="factor-note">
+    <thead>
+     <tr><th rowspan="2" scope="col">周期</th><th colspan="2" scope="colgroup">四指共振</th><th colspan="2" scope="colgroup" class="split">同向九转</th><th scope="colgroup" class="split">组合</th></tr>
+     <tr><th scope="col">单指</th><th scope="col">≥2 指</th><th scope="col" class="split">无 9</th><th scope="col">有 9</th><th scope="col" class="split">共振 + 9</th></tr>
+    </thead><tbody id="matrix"></tbody>
+   </table>
+   <p class="caption" id="factor-note">共振和组合仅统计四指同期行情齐全的样本。已评估少于 20 个时用灰色标注。</p>
+   <p class="reading" id="factor-reading" hidden></p>
+  </section>
+  </div>
+  <details class="card" id="cases">
+   <summary>样本明细</summary>
+   <div class="details-body">
+    <div class="case-controls">
+     <div class="case-selects">
+      <label class="field">周期 <select id="case-period"></select></label>
+      <label class="field">条件 <select id="case-group"></select></label>
+     </div>
+     <p class="caption" id="case-caption"></p>
+    </div>
+    <div class="table-scroll" tabindex="0" aria-label="信号样本明细表">
+     <table class="records">
+      <thead><tr><th scope="col">指数</th><th scope="col">信号时间 / 收盘</th><th scope="col">同向指数</th><th scope="col">同向 9</th><th scope="col" id="exit-heading">退出时间 / 收盘</th><th scope="col" id="move-heading">收益</th></tr></thead>
+      <tbody id="records"></tbody>
+     </table>
+    </div>
+    <div class="case-footer" id="case-footer" hidden><button type="button" id="prev">上一页</button><span id="page-number"></span><button type="button" id="next">下一页</button></div>
+   </div>
+  </details>
+   </div>
+  </section>  <details class="card">
+   <summary>样本覆盖与统计口径</summary>
+   <div class="details-body">
+    <dl class="terms">
+     <div><dt>交易胜率</dt><dd>买1的首次结构交易按现有账本退出。指数收盘价收益为正记成功，一笔结构算一个样本。未退出单列，纠错买回另有账本。收益未扣成本，也未做可成交性模拟。</dd></div>
+     <div><dt>方向命中</dt><dd>从信号收盘看到后第 N 根同周期已完成 K 线。买1看涨，卖1看跌，持平计未命中。不同周期的 N 根对应不同实际时长。</dd></div>
+     <div><dt>四指共振</dt><dd>按同周期当根和此前两根已完成 K 线统计同向信号，每个指数最多算一次。买卖后续点与纠错买回可作为共振证据。四指这三根时间一致才进入分组。</dd></div>
+     <div><dt>同向九转</dt><dd>买1配低9，卖1配高9。只认当根或此前两根内首次达到 9，连续显示的 9 不重复计。九转按本指数、本周期观察。</dd></div>
+     <div><dt>范围与时长</dt><dd>同窗筛选以所选范围截止日结算，超过截止日的结果仍计待评估。时间为北京时间，时长含休市。分钟线包含归档起始段，各指数的历史起点不同，同日信号也可能集中出现。</dd></div>
+    </dl>
+    <div class="table-scroll" tabindex="0" aria-label="行情覆盖表">
+     <table class="sources"><thead><tr><th scope="col">周期</th><th scope="col">所选指数历史覆盖</th><th scope="col">每指数 K 线根数</th></tr></thead><tbody id="coverage"></tbody></table>
+    </div>
+    <p class="source-links">东方财富、腾讯公开指数行情。<a href="https://github.com/gavin0710/Test/tree/master/macd-resonance/data">历史归档</a> · <a href="https://github.com/gavin0710/Test/blob/master/macd-resonance/research-success.js">复算脚本</a></p>
+   </div>
+  </details></div></main></body></html>
