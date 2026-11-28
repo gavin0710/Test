@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-11-27T17:12",
+  "asOf": "2026-11-28T16:14",
   "patternSchema": 1,
   "nineSchema": 1,
   "nineDefinition": {
@@ -236,8 +236,8 @@
   "sources": [
     {
       "file": "data/latest.json",
-      "generatedAt": "2026-11-27T09:12:24.915751+00:00",
-      "sha256": "78591d747a00428ca7ad639d35bef15d1e4fe608af55159f041c246ab53a346c"
+      "generatedAt": "2026-11-28T08:14:58.526913+00:00",
+      "sha256": "7799eea76b9797dd9ca4e7a015945a1d75551ca8011590f06561cf78a7b99489"
     },
     {
       "file": "data/history-15.json",
